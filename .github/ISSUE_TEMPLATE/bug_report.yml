@@ -1,0 +1,81 @@
+name: Bug report
+description: Report something that does not work in the app
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a local prototype: there is no backend, no accounts and no push
+        notifications, and the app stores its state unencrypted on the device.
+        Please leave personal data out of your report.
+
+        The Android native modules (system notifications and keyboard media)
+        cannot run in Expo Go. If you are testing in Expo Go, install a release
+        APK or a local build first.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: The release tag you installed, or the commit you built from.
+      placeholder: v0.0.1
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install the app?
+      options:
+        - Release APK from GitHub Releases
+        - Local build (npm run android:build)
+        - Other, described below
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      description: Device model and Android version.
+      placeholder: Pixel 8, Android 15
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps in order, starting from a fresh app launch where possible.
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happens instead. Include the full error text if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots or recordings
+      description: Optional. `adb logcat` output around the failure helps, as do screenshots or short recordings.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I am running a release APK or a local build, not Expo Go.
+          required: true

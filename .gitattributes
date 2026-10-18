@@ -1,0 +1,14 @@
+# Normalise text to LF in the repository so Windows and Unix checkouts produce
+# identical diffs. Files that must never be rewritten are marked binary.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.apk binary
+*.aab binary
+*.keystore binary
+*.jar binary

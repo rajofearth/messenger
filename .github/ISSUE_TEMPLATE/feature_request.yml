@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a local prototype with no backend and no accounts, so requests
+        that need a server, push notifications or a real account directory
+        cannot be demonstrated here yet. Describe what you would like all the
+        same.
+
+        The Android native modules (system notifications and keyboard media)
+        only exist in a rebuilt Android binary, not in Expo Go.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is awkward, missing or confusing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: What should happen instead? Sketches or mock-ups are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Other approaches and why they are worse.
+    validations:
+      required: false
+  - type: dropdown
+    id: native
+    attributes:
+      label: Does this touch native code?
+      description: Native changes need modules/ or app.json plus a rebuilt Android binary.
+      options:
+        - No, JavaScript or TypeScript only
+        - Yes, Android native code or configuration
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and requests for the same idea.
+          required: true

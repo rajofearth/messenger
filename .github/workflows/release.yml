@@ -1,0 +1,233 @@
+name: Release
+
+# A version bump plus a tag is the whole release process. The tag must match
+# `expo.version` in app.json, so the APK, the tag and the changelog can never
+# drift apart. The workflow can also be started by hand from the Actions tab.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to release. Defaults to v<version in app.json>.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Keep these in step with the machine notes in README.md.
+  EXPO_VERSION: "57.0.30"
+  NODE_VERSION: 24
+  JAVA_VERSION: 17
+  NDK_VERSION: 27.1.12297006
+  BUILD_TOOLS_VERSION: 36.0.0
+  PLATFORM_VERSION: android-36
+
+jobs:
+  release:
+    name: Build and publish the APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      # The release tag is the single source of truth: it has to match the
+      # version the app reports, otherwise the APK filename would lie.
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./app.json').expo.version")
+          tag="${INPUT_TAG:-v$version}"
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::Tag $tag does not match app.json version $version. Bump the version or use tag v$version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # android/ is generated and gitignored, so every release starts from the
+      # Expo config. This also means the build always matches app.json.
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          missing=()
+          [ -d "$ANDROID_HOME/ndk/$NDK_VERSION" ] || missing+=("ndk;$NDK_VERSION")
+          [ -d "$ANDROID_HOME/platforms/$PLATFORM_VERSION" ] || missing+=("platforms;$PLATFORM_VERSION")
+          [ -d "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION" ] || missing+=("build-tools;$BUILD_TOOLS_VERSION")
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "All required SDK packages are already installed."
+            exit 0
+          fi
+          echo "Installing: ${missing[*]}"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "${missing[@]}"
+
+      # Release signing is optional. With the four ANDROID_* secrets set, the
+      # APK is signed with that key; without them it falls back to the debug
+      # keystore that Expo generates, which is fine for a prototype and is
+      # stated in the release notes.
+      - name: Build release APK
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          args=(-PreactNativeArchitectures=arm64-v8a --console=plain --max-workers 4)
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            args+=(
+              "-Pandroid.injected.signing.store.file=$RUNNER_TEMP/release.keystore"
+              "-Pandroid.injected.signing.store.password=$STORE_PASSWORD"
+              "-Pandroid.injected.signing.key.alias=$KEY_ALIAS"
+              "-Pandroid.injected.signing.key.password=$KEY_PASSWORD"
+            )
+            echo "RELEASE_SIGNING=1" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_SIGNING=0" >> "$GITHUB_ENV"
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set, so the APK will be signed with the generated debug key."
+          fi
+          ./gradlew :keyboard-media:testDebugUnitTest :app:assembleRelease "${args[@]}"
+
+      - name: Inspect the APK signature
+        working-directory: android
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs "$apk" | head -6
+          unzip -l "$apk" | grep -c '^.*lib/arm64-v8a/.*\.so$' | xargs -I {} echo "Packaged arm64-v8a libraries: {}"
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle' && echo "JavaScript bundle: present"
+
+      - name: Collect release artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/release
+          apk="artifacts/release/messenger-$VERSION-arm64-v8a.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$apk"
+          size=$(du -h "$apk" | cut -f1)
+          echo "APK size: $size"
+          (cd artifacts/release && sha256sum "messenger-$VERSION-arm64-v8a.apk" > SHA256SUMS.txt)
+          cat artifacts/release/SHA256SUMS.txt
+          {
+            echo "## Messenger $VERSION for Android"
+            echo
+            echo "Standalone arm64-v8a APK built from tag \`v$VERSION\` on GitHub Actions."
+            echo
+            echo "### Install"
+            echo
+            echo "1. Download \`messenger-$VERSION-arm64-v8a.apk\` below."
+            echo "2. Allow installing unknown apps for your browser or file manager."
+            echo "3. Open the file and install. Android 7.0 or newer, arm64 device required."
+            echo
+            echo "### Contents"
+            echo
+            echo "- Version: \`$VERSION\`"
+            echo "- ABI: \`arm64-v8a\`"
+            echo "- APK size: $size"
+            echo "- Checksum: see \`SHA256SUMS.txt\`"
+            if [ "${RELEASE_SIGNING:-0}" = "1" ]; then
+              echo "- Signing: the project release keystore"
+            else
+              echo "- Signing: Expo's generated debug keystore. Not a store upload; see SECURITY.md."
+            fi
+            echo
+            echo "This is a local prototype with no backend and no push notifications. Everything it shows is driven by the app itself."
+            echo
+            echo "### Commits"
+            echo
+            git log --oneline --no-decorate -25
+          } > artifacts/release/notes.md
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=(
+            "artifacts/release/messenger-$VERSION-arm64-v8a.apk"
+            "artifacts/release/SHA256SUMS.txt"
+          )
+          # Re-running a tag, or tagging a version whose release already exists
+          # by hand, should replace the assets instead of failing.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists; replacing its assets."
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Messenger $VERSION" \
+              --notes-file artifacts/release/notes.md
+          fi
+
+      - name: Append the build notes to an existing release
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --notes-file artifacts/release/notes.md || true
+
+      - name: Upload the APK as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: messenger-${{ steps.version.outputs.version }}-arm64-v8a
+          path: |
+            artifacts/release/messenger-*.apk
+            artifacts/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

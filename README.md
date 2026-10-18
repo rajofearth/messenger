@@ -1,119 +1,133 @@
 # Messenger
 
-A clickable messenger prototype built with Expo SDK 57 and React Native 0.86. The interface uses warm ivory, coral accents, bundled DM Sans fonts, and Ionicons. Android is built locally as a standalone ARM64 APK. There is no Expo Go, development client, or running Metro server in the phone-testing workflow.
+[![CI](https://github.com/rajofearth/messenger/actions/workflows/ci.yml/badge.svg)](https://github.com/rajofearth/messenger/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/rajofearth/messenger?include_prereleases&sort=semver)](https://github.com/rajofearth/messenger/releases)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-## Explore the prototype
+A messenger interface for Android, built with Expo SDK 57 and React Native 0.86. Chats, media albums, stories, calls and profiles are all interactive, and calls and messages arrive as real Android system notifications with working action buttons. State lives on the device: there is no server, no account and no push service.
 
-- **Chats:** compact heading and private/group tabs, no Stories section heading, search, unread badges, online indicators, and seeded typing states. Typing a search query hides stories and tabs and searches all conversations. Emptying the query restores them. Open a chat to clear its unread count. Send a message to see a simulated reply after a short typing delay. Return to the list before the reply to see its unread badge.
-- **Messages:** text, photos, videos, files, and voice notes. The plus beside the composer opens a compact attachment popover. Recording shows a metered animated waveform and duration. Long-press a bubble for anchored reactions, Reply, Forward, and Delete. Double-tap to react with 🤍. Reply snapshots also support replying to replies. Forward opens a searchable multi-recipient screen. Own messages support local delete-for-everyone tombstones; incoming messages can only be deleted for yourself. Tap media to view or play; files use the native sharing chooser.
-- **Media albums:** select multiple photos/videos in one library session, or send consecutive media within two minutes. Matching-sender media forms a compact grid with at most four previews. For 50 items the fourth tile shows `+47`, counting that covered tile and the remaining items. Tap to browse every item or long-press an individual item for its actions. Text, different senders, replies to different messages, forwarded/deleted messages, and GIFs break the automatic grouping. Stored messages remain individual records for deletion, replies, and shared-media history.
-- **Stories:** one ring per person, including one self ring for all your uploads. Indicators count items belonging to the current person, not all contacts. Tap to move between items, hold to pause, and swipe horizontally to switch people. Add multiple images/videos without forced cropping, with captions per item. Landscape media is contained rather than cropped. Open your own story to delete an item.
-- **New conversation:** the plus button opens a compact anchored menu for a conversation, voice call, or video call. The conversation picker includes New contact and Create group actions. Voice/video call pickers show contacts only. There is no People tab. This does not query a real account directory or import the device address book.
-- **Calls:** use the phone/video buttons in any conversation. Outgoing calls connect to a simulated screen after 2.5 seconds. Toggle video/microphone, open more controls, return to chat, or end the call. The ongoing call pill keeps its duration and returns to the call screen. Completed and declined calls appear in call history. Tap a call row to see all calls with that contact; only its trailing phone/video button starts another call.
-- **Incoming call:** My Profile → Settings → Try an incoming call. A foreground banner lets you accept, decline, or open the full calling screen. Answer uses an upright handset; decline/end uses a rotated handset.
-- **Profiles:** tap a chat’s name/avatar for a contact or group profile, shared media/docs/links, call history, dates, mutual groups, members/admins, mute/block, clear, and delete. Long-press a chat/group row for profile, mute, pin, and delete actions. Seeded membership and dates are mock data; newly created groups start with you as admin.
-- **My Profile:** the avatar navigation opens your profile first, without a redundant page title. Edit photo, name, username, and bio in a keyboard-aware editor. Settings is a separate page for appearance, saved demo notification preferences, and an actual global haptics toggle. The bottom navigation is a rounded icon-only pill without individual active-icon boxes.
+The point of the project is the client architecture. Everything the app knows is read through one typed repository (`src/data/messengerRepository.ts`) and one cache (`src/data/cache.ts`), so a real backend can replace the local store without touching a single screen. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Conversations, stories, call history, profile, and appearance are saved in local, unencrypted app storage. Do not enter sensitive information. Notification sound/preview switches save preferences only. There are no push notifications, real users, real calls, live camera feeds on the call screen, or network messaging. Photo/video story uploads do not expire automatically in this prototype. Block, mute, forwarding, and deletion are local prototype operations, not requests to a messaging server. Mute saves the preference; no push service exists to suppress. Delete for everyone changes the local representation only. Group creation creates a local conversation, not invitations or a membership service.
+## What it is, and what it is not
 
-Camera, photo, file, and microphone features use native Expo APIs and ask for permissions when needed. The video-call screen uses still photos instead of accessing the camera. Bundled fonts work offline; sample avatars, story photos, and chat photos load from Unsplash, which receives normal image requests. Picked media uses app-managed local/cache URIs and may be removed when the OS clears cache; this is not permanent media storage.
+Working: chat list with unread badges and typing states, conversation threads with text, photos, videos, files and voice notes, automatic media albums, stories with per-item captions, call history, incoming/outgoing/ongoing voice and video calls with real camera preview, contact and group profiles, mute and block, and Android system notifications for calls and messages.
 
-The composer uses your system keyboard rather than a custom emoji grid. React Native does not expose a portable command to open the keyboard’s emoji tab directly; use the keyboard’s own emoji key. Inputs use keyboard-avoiding layouts, with Android configured for resize. Verify keyboard behavior on a physical device and your chosen keyboard.
+Simulated: other people. Replies are generated locally after a short typing delay, calls connect on a timer, and profile photos and story images are loaded from Unsplash. There is no authentication, no message transport, no signalling server and no push notification service, so a notification can only appear while the app process is running. Nothing here is end-to-end encrypted, and app state is stored unencrypted on the device. Do not put anything private in it.
 
-Android keyboards that implement rich-content insertion can send GIFs, images, and MP4 clips directly into the composer through the local `modules/keyboard-media` Expo module. Accepted files are limited to 25 MiB, copied unchanged into app-owned storage, and sent as image/video messages. `expo-image` renders animated GIFs. GIF insertion depends on the active keyboard; it is not universally supported on iOS or web. Library/file attachments remain available as a fallback. See `modules/keyboard-media/README.md` for source references and the device test checklist.
+## Requirements
 
-Rebuild the APK after adding native modules, including `expo-image` and the local keyboard-media bridge. An older APK and Expo Go cannot load the bridge. Native keyboard-module compilation has not yet been verified: a focused native build timed out after 180 seconds while compiling Expo core, before reaching the new module. JavaScript checks and bundle export do not establish native keyboard delivery. A physical Android keyboard/GIF test is required.
+- Node 22.18 or newer (24 recommended). `npm test` uses `node --test` with built-in TypeScript stripping, which needs 22.18+.
+- JDK 17 and the Android SDK for a native build: platform 36, build-tools 36.0.0, NDK 27.1.12297006, CMake 3.22.1, and an arm64-v8a device or an emulator matching the ABI you build.
+- Android only. The native modules are Kotlin, `isSystemNotificationsAvailable` is false elsewhere, and the app does not run in Expo Go.
 
-Keyboard media copies live in the app documents directory rather than temporary cache. They remain on this device until app data is cleared; automatic orphan-file cleanup is not implemented. Media selected through the regular picker retains the existing cache-lifetime limitation.
-
-### Frontend checks
-
-```sh
-npm run check
-npm test
-npx expo export --platform android --output-dir artifacts/preview-bundle --max-workers 1
-```
-
-The model tests require Node 22.18+ or Node 24 for built-in TypeScript stripping. They cover unread counts, conversation ordering, read state, previews, duration formatting, story grouping, reply snapshots, forwarding payloads, deletion permissions, redaction, media-album boundaries, GIF exclusion, and overflow counts. They are not device interaction tests.
-
-Expo uses Metro internally to bundle JavaScript during the release build. Avoiding Metro entirely would mean replacing Expo's supported bundling pipeline. The APK contains the bundle and runs without a connection to this computer.
-
-## Build and install
-
-From this directory on Windows:
+## Getting started
 
 ```sh
 npm ci
-npm run check
-npm run android:build
+npm run check   # typecheck + Expo dependency compatibility
+npm test        # pure model and data tests, no device needed
 ```
 
-The build generates `android/` if necessary, builds the release variant for `arm64-v8a`, and copies the APK to `artifacts/messenger-local.apk`. First builds can take several minutes. Build again after editing the app; there is no hot reload.
-
-Connect an ARM64 Android phone running Android 7.0 or newer. Enable developer options and USB debugging, accept the phone's authorization prompt, then run:
+Build and install a standalone APK:
 
 ```sh
-npm run android:install
+npm run android:build     # release APK for arm64-v8a -> artifacts/messenger-local.apk
+npm run android:install   # adb install -r, then launch com.yashraj.messenger
 ```
 
-This installs and opens `com.yashraj.messenger`. ADB does not need to be on PATH. Use the `ANDROID_SERIAL` environment variable if more than one device is connected. You can also copy the APK to the phone and install it manually.
+The APK contains the JavaScript bundle and runs without a connection to this computer, and without Metro. Rebuild after any code change: there is no hot reload in this workflow. If you prefer a development server with fast refresh, `npx expo run:android` works too; the native modules require a native build either way.
 
-## This machine
+`npm run android:build` is a Windows helper. On macOS or Linux, generate the project and build it yourself:
 
-The build script respects `ANDROID_HOME` or `ANDROID_SDK_ROOT` and `JAVA_HOME`. When unset, it uses the tool locations found on this machine:
+```sh
+npx expo prebuild --platform android --no-install
+cd android && ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
+```
 
-| Tool | Location or version |
+Builds are signed with the debug keystore Expo generates, which is fine for a prototype and is not suitable for the Play Store. See [SECURITY.md](SECURITY.md) and the signing notes in [.github/workflows/release.yml](.github/workflows/release.yml) for how to sign a release from CI.
+
+### Scripts
+
+| Script | What it does |
 | --- | --- |
-| Android SDK | `P:\Applications\Android\Sdk` |
-| JDK | `P:\Applications\jdk-17.0.17+10` |
-| SDK platform / target | Android 36 |
-| Build Tools | 36.0.0 |
-| NDK | 27.1.12297006 |
-| CMake | 3.22.1 |
+| `npm run typecheck` | `tsc --noEmit` over the whole project |
+| `npm test` | Node test runner over the listed test files: domain models, data cache, notification payloads, layout maths, and the keyboard input handler |
+| `npm run check` | Typecheck plus `expo install --check` |
+| `npm run android:prebuild` | Regenerates the `android/` project from `app.json` |
+| `npm run android:build` | Release APK, arm64-v8a, copied to `artifacts/messenger-local.apk` |
+| `npm run android:install` | Installs the built APK over adb and starts it |
+| `npm run android` | Alias for `android:build` |
 
-The Windows host is ARM64. The installed NDK uses Windows x86-64 host tools under Windows emulation. The APK's `arm64-v8a` ABI describes the Android phone, not the Windows toolchain.
+## Features
 
-The setup was compared with `../sosroad-rn`, `../famloc`, `../sosroad`, and `../cometchat-sample-app`. CometChat's recorded successful builds use `assembleRelease -PreactNativeArchitectures=arm64-v8a`. No custom AAPT2 override was found or added. Two Gradle workers limit concurrent native compilation.
+- **Chats.** Compact heading with private/group tabs, search that hides the stories strip while a query is active, unread badges, online and typing indicators. Opening a chat clears its unread count.
+- **Messages.** Text, photos, videos, files and voice notes, with a metered recording waveform. Long-press a bubble for anchored reactions, reply (including replies to replies), forward and delete. Double-tap to react. Forwarding opens a searchable multi-recipient screen. Media opens in a viewer; documents use the system share sheet.
+- **Media albums.** Consecutive media from one sender within two minutes forms a grid with up to four previews and a `+n` overflow tile. Albums break on text, a different sender, different reply targets, forwarded or deleted messages. Individual items stay addressable for deletion, replies and shared-media history.
+- **Stories.** One ring per person, plus a self ring for your own uploads, with per-item captions and no forced cropping. Tap to advance, hold to pause, swipe to change people. Your own story items can be deleted.
+- **Calls.** Voice and video calls from any conversation, with history, a connecting state, mute, speaker, camera flip and a return-to-chat pill that keeps the call running. The video call screen shows your real front or rear camera in the picture-in-picture view; the remote video is a placeholder image because there is no second participant.
+- **Profiles.** Contact and group profiles with shared media, documents, links, call history, dates, members and admins, plus mute and block switches that persist. Edit your own name, username, bio and photo, with the current photo shown before you replace it.
+- **Settings.** Appearance, haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
 
-SDK 57 matches those projects and the installed Android platform. The SDK 58 template requires platform 37, which was not installed when this project was created. Keep Expo and React Native versions aligned when upgrading.
+## Android system notifications
 
-`android/`, machine-specific `local.properties`, and build outputs are ignored by Git. Expo config is in `app.json`; regenerate native configuration with `npm run android:prebuild` after changing it. Do not put permanent manual changes in generated native files. Use an Expo config plugin for future native adjustments.
+`modules/system-notifications` renders real notifications through `NotificationCompat`, so they appear on the lock screen, in the shade and in the status bar while the app is backgrounded or closed.
 
-## Signing
+| Channel | Importance | Used for |
+| --- | --- | --- |
+| `system_incoming_calls_v1` | High | Incoming call, expires after 60 seconds |
+| `system_active_calls_v1` | Low | Outgoing connecting and ongoing calls |
+| `system_messages_v1` | High | Message notifications |
+| `system_messages_silent_v1` | High, sound cleared | Messages when the sound preference is off |
 
-This is a **local test build**, not a store release. Expo's generated release variant uses its debug signing key. Do not distribute this APK as a production release. Set up a private upload key and production signing before publishing. Regenerating the Android directory can change the test signing key; if Android reports a signature mismatch, uninstall the previous test app first, which deletes its app data.
+- **Call notification.** Caller avatar and name, live connected duration via the system chronometer, and buttons: answer and decline while ringing, end call plus mute and speaker while ongoing. Answering opens the app straight into the call screen.
+- **Message notification.** Contact or group avatar and name, the last few messages in `MessagingStyle`, and three actions: reply inline through `RemoteInput`, mark as read, and mute the conversation. Marking read clears the notification and the unread badge; muting suppresses later notifications for that conversation.
+- **Tap and act while closed.** Button presses are written to native storage before anything else, then delivered to JavaScript when the app runs. Answer and taps launch the app; other actions queue. Every action carries a UUID and is acknowledged only after it has been handled, so a crash between the two replays the action instead of losing it, and the app deduplicates by that ID.
 
-## Checks and limitations
+Limits worth knowing: this is presentation and action delivery only. It does not register a Telecom call, run a foreground service, wake the process, receive push, or keep audio alive, so notification buttons are requests that the app applies when JavaScript is running rather than a headless call engine. Dismissing a notification does not hang up the local call state. See the module's [README](modules/system-notifications/README.md) for the full contract, and note that everything notification-related still needs a pass on physical hardware.
 
-- `npm run check` passed TypeScript and Expo dependency compatibility checks during setup.
-- `npm run android:build` completed successfully. Initial compilation exceeded the command time limit; cached follow-up builds completed the release tasks.
-- APK inspection confirmed an embedded `assets/index.android.bundle` and 14 native libraries, all under `lib/arm64-v8a/`. The initial APK is about 26 MB.
-- No phone was connected during initial setup, so installation and offline cold startup need a phone test.
-- npm audit reports inherited Expo/React Native tooling advisories. Do not run `npm audit fix --force`: its proposed Expo/React Native downgrades are incompatible with this project. Recheck compatible upstream releases before production work.
-- These build/install helpers target Windows and physical ARM64 Android phones. An x86-64 Android emulator needs its own ABI build. iOS native builds require macOS and Xcode.
-
-## Source architecture
-
-`App.tsx` handles screen composition and navigation, not feature markup or native media operations.
+## Project layout
 
 ```text
-src/
-  domain/          Mock data, types, and pure conversation helpers
-  state/           Persistent messenger state and simulated replies
-  ui/              Shared controls, palette, navigation, quick actions
-  features/
-    chats/         Conversation list and stories strip
-    conversations/ Messages, attachments, recording, reactions
-    contacts/      New-conversation picker and contact/group editor
-    calls/         Call state/timers, history, ringing and active screens
-    profile/       Profile preferences, settings, and dialogs
-    stories/       Story viewing, creation, and upload
+App.tsx                     Screen composition and navigation only
+src/domain/                 Types, mock data and pure helpers (no React, no storage)
+src/data/                   Typed persistence, cache and the repository seam
+src/services/               Thin typed bridges to the two native modules
+src/state/                  App state: messenger, notifications, notification actions
+src/notifications/          Notification payloads, settings, bridge and ledger
+src/features/               Screens grouped by area: chats, conversations, contacts,
+                            calls, profile, stories
+src/ui/                     Shared primitives, theme, quick actions, navigation
+modules/system-notifications/  Kotlin: Android call and message notifications
+modules/keyboard-media/        Kotlin: rich content from third-party keyboards
+scripts/                    Android build helper and the Node test files
 ```
 
-Features depend on domain and shared UI modules, never on `App.tsx`. Native media operations are isolated in `useMessageMedia`; messaging persistence and reply timers are in `useMessenger`; call lifecycle timers are in `useCalls`. Call and conversation screens stay mounted while switching between a call and chat, preserving drafts and call controls. Read counts use conversation visibility rather than selection alone.
+Features depend on `src/domain`, `src/data` and `src/ui`, never on `App.tsx`. `npm test` enforces this: a 500-line limit per source file, no imports back into `App.tsx`, and domain modules free of React, storage and native imports.
 
-`npm test` enforces a 500-line limit on application source files, prevents imports back into `App.tsx`, and keeps domain modules independent of screens, storage, and React Native. Lockfiles and generated native files are not subject to source-file limits. `INSPIRATION/` is preserved.
+`android/` and `ios/` are generated by `expo prebuild` and are not committed. Native configuration belongs in `app.json` plugins, never in generated files.
 
-For this frontend update, TypeScript, Expo dependency compatibility checks, model tests, and Android bundle export were verified. The full updated APK build passed native project configuration and reached compilation, but exceeded a four-minute command limit. Do not assume the existing APK contains this frontend until `npm run android:build` completes. Phone interaction, recording/playback, permission prompts, and Android visual layout still need device testing.
+## Releases
 
-`expo-asset` is pinned to the SDK 57-compatible range explicitly because the unrestricted peer dependency from `expo-audio` otherwise allowed npm to select Expo 58's asset package, which fails SDK 57 native autolinking.
+A release is one version bump and one tag. Push a tag named `v<version>` where `<version>` matches `expo.version` in `app.json`; [`.github/workflows/release.yml`](.github/workflows/release.yml) then runs the tests, regenerates the Android project, builds a signed arm64-v8a APK, verifies the signature and publishes it with its SHA-256 checksum on a public GitHub release. The same workflow can be started by hand from the Actions tab.
+
+Set `ANDROID_KEYSTORE_BASE64` (a base64-encoded keystore), `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` as repository secrets to sign with your own key. Without them the workflow falls back to Expo's debug keystore and says so in the release notes.
+
+## Known limitations
+
+- No backend, no push, no accounts. Replies and calls are simulated while the app process is alive.
+- Block, mute, forwarding and deletion change local state only.
+- Story uploads never expire, and picked media uses app-managed cache locations that the OS may reclaim.
+- Media and avatar images load from Unsplash over the network; bundled fonts work offline.
+- The composer uses the system keyboard rather than a custom emoji grid.
+- Dismissing a call notification does not end the call, and a call cannot be answered from a notification while the JavaScript runtime is dead.
+- `npm audit` reports advisories inherited from Expo and React Native tooling. Do not run `npm audit fix --force`: its proposed downgrades break the SDK 57 toolchain.
+- `expo-asset` is pinned to the SDK 57 range on purpose. The unrestricted peer dependency from `expo-audio` would otherwise let npm install Expo 58's asset package, which fails SDK 57 native autolinking.
+- `INSPIRATION/` holds design reference screenshots that are not covered by this project's licence.
+
+## Contributing
+
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Release notes are in [CHANGELOG.md](CHANGELOG.md), performance work and the reasoning behind it in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
