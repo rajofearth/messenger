@@ -28,6 +28,8 @@ npm run check   # typecheck + Expo dependency compatibility
 npm test        # pure model and data tests, no device needed
 ```
 
+To try the app without building it, download the APK from the [latest release](https://github.com/rajofearth/messenger/releases/latest) and sideload it (Android 7.0 or newer, arm64 device).
+
 Build and install a standalone APK:
 
 ```sh
