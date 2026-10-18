@@ -1,15 +1,24 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   BackHandler,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
+  type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Image } from "expo-image";
 import type { Chat, Message } from "../../domain/data";
@@ -18,10 +27,9 @@ import { coral, palette } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
-import MessageBubble from "./MessageBubble";
-import MediaAlbum from "./MediaAlbum";
+import MessageRow from "./MessageRow";
 import AlbumViewer from "./AlbumViewer";
-import { groupMediaMessages } from "../../domain/mediaAlbums";
+import { groupMediaMessages, type MediaRow } from "../../domain/mediaAlbums";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
 import { styles as s } from "./ConversationScreen.styles";
@@ -64,13 +72,36 @@ export default function ConversationScreen({
   const [viewer, setViewer] = useState<Message | null>(null);
   const [album, setAlbum] = useState<{ ids: string[]; initialId: string } | null>(null);
   const rows = useMemo(() => groupMediaMessages(messages), [messages]);
+  const tail = messages.length
+    ? `${messages.length}:${messages[messages.length - 1].id}`
+    : "";
   const albumMessages = album
     ? messages.filter((message) => album.ids.includes(message.id) && !message.deleted)
     : [];
   const [reply, setReply] = useState<Message["replyTo"] | null>(null);
-  const list = useRef<ScrollView>(null);
+  const list = useRef<FlatList<MediaRow>>(null);
+  const pinned = useRef(true);
   const currentChat = useRef(chat.id);
   currentChat.current = chat.id;
+  // The newest message owns the viewport again whenever the thread grows.
+  useEffect(() => {
+    pinned.current = true;
+    list.current?.scrollToEnd({ animated: true });
+  }, [tail]);
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } =
+        event.nativeEvent;
+      pinned.current =
+        contentSize.height - contentOffset.y - layoutMeasurement.height < 120;
+    },
+    [],
+  );
+  // Rows report their height as they mount, so the tail is only chased while
+  // the newest message is already on screen.
+  const onContentSizeChange = useCallback(() => {
+    if (pinned.current) list.current?.scrollToEnd({ animated: true });
+  }, []);
   const send = (message: Partial<Message>) => {
     if (chat.blocked || currentChat.current !== chat.id) return;
     onSend(withReply(message, reply));
@@ -154,6 +185,38 @@ export default function ConversationScreen({
     setReply(replySnapshot(message));
     setAttachmentOpen(false);
   }
+  const onActions = useCallback((nextTarget: ActionTarget) => {
+    setAttachmentOpen(false);
+    setTarget(nextTarget);
+  }, []);
+  const onOpenAlbum = useCallback((ids: string[], initialId: string) => {
+    setAlbum({ ids, initialId });
+  }, []);
+  const keyExtractor = useCallback(
+    (row: MediaRow) => (row.type === "album" ? row.id : row.message.id),
+    [],
+  );
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<MediaRow>) => {
+      const message = item.type === "album" ? item.messages[0] : item.message;
+      const next = rows[index + 1];
+      const nextMine =
+        next?.type === "album" ? next.messages[0].mine : next?.message.mine;
+      return (
+        <MessageRow
+          row={item}
+          dark={dark}
+          visible={visible}
+          showTimestamp={index === rows.length - 1 || nextMine !== message.mine}
+          onActions={onActions}
+          onReact={onReact}
+          onViewMedia={setViewer}
+          onOpenAlbum={onOpenAlbum}
+        />
+      );
+    },
+    [rows, dark, visible, onActions, onReact, onOpenAlbum],
+  );
 
   return (
     <KeyboardAvoidingView
@@ -218,52 +281,34 @@ export default function ConversationScreen({
         />
       </View>
       <View style={s.root}>
-        <ScrollView
+        <FlatList
           ref={list}
           style={s.root}
+          data={rows}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
           contentContainerStyle={s.messageList}
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={() => setAttachmentOpen(false)}
-          onContentSizeChange={() =>
-            list.current?.scrollToEnd({ animated: true })
-          }
-        >
-          <View style={s.dateChip}>
-            <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
-          </View>
-          {rows.map((row, index) => {
-            const message = row.type === "album" ? row.messages[0] : row.message;
-            const next = rows[index + 1];
-            const nextMine = next?.type === "album" ? next.messages[0].mine : next?.message.mine;
-            const shared = {
-              dark,
-              visible,
-              showTimestamp: index === rows.length - 1 || nextMine !== message.mine,
-              onActions: (nextTarget: ActionTarget) => {
-                setAttachmentOpen(false);
-                setTarget(nextTarget);
-              },
-              onReact,
-            };
-            return row.type === "album" ? (
-              <MediaAlbum
-                key={row.id}
-                {...shared}
-                messages={row.messages}
-                onViewMedia={(selected) => setAlbum({
-                  ids: row.messages.map((item) => item.id), initialId: selected.id,
-                })}
-              />
-            ) : (
-              <MessageBubble key={message.id} {...shared} message={message} onViewMedia={setViewer} />
-            );
-          })}
-          {typing && (
-            <View style={[s.typing, { backgroundColor: card }]}>
-              <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+          onContentSizeChange={onContentSizeChange}
+          initialNumToRender={12}
+          maxToRenderPerBatch={8}
+          windowSize={9}
+          ListHeaderComponent={
+            <View style={s.dateChip}>
+              <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
             </View>
-          )}
-        </ScrollView>
+          }
+          ListFooterComponent={
+            typing ? (
+              <View style={[s.typing, { backgroundColor: card }]}>
+                <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
+              </View>
+            ) : null
+          }
+        />
         {attachmentOpen && (
           <Pressable
             style={StyleSheet.absoluteFill}

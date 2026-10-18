@@ -219,4 +219,13 @@ export const styles = StyleSheet.create({
     marginTop: 3,
   },
   primaryText: { fontFamily: "DMSans_700Bold", color: "#29372F", fontSize: 14 },
+  secondary: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: CORAL,
+    minHeight: 46,
+  },
+  secondaryText: { fontFamily: "DMSans_500Medium", color: CORAL, fontSize: 13 },
 });

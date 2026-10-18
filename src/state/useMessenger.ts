@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   chats as initialChats,
   initialStories,
@@ -16,6 +15,7 @@ import {
   refreshChatPreview,
 } from "../domain/messageActions";
 import { setHapticsEnabled } from "../ui/primitives";
+import { messengerRepository } from "../data/messengerRepository";
 
 export type Profile = {
   name: string;
@@ -25,6 +25,8 @@ export type Profile = {
   bio?: string;
   username?: string;
   haptics?: boolean;
+  /** Master switch for Android system notifications. */
+  systemNotifications?: boolean;
 };
 export type CallRecord = {
   id: string;
@@ -38,7 +40,13 @@ export const uid = () =>
   `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 export const clock = () =>
   new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const STORAGE_KEY = "messenger-prototype-v1";
+
+const DEFAULT_PROFILE: Profile = {
+  name: "Alex Morgan",
+  avatar: me,
+  sound: true,
+  previews: true,
+};
 
 export function useMessenger() {
   const [chats, setChats] = useState(initialChats.map(enrichChat));
@@ -47,12 +55,7 @@ export function useMessenger() {
   const [history, setHistory] = useState<CallRecord[]>([]);
   const [dark, setDark] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [profile, setProfile] = useState<Profile>({
-    name: "Alex Morgan",
-    avatar: me,
-    sound: true,
-    previews: true,
-  });
+  const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [selected, setSelected] = useState<string | null>(null);
   const [typingIds, setTypingIds] = useState<string[]>([]);
   const conversationVisible = useRef(true);
@@ -61,6 +64,13 @@ export function useMessenger() {
   const chatsRef = useRef(chats);
   chatsRef.current = chats;
   const messagesRef = useRef(messages);
+  // Slices already written, so a state change never rewrites untouched data.
+  const savedChats = useRef<Chat[] | null>(null);
+  const savedStories = useRef<Story[] | null>(null);
+  const savedHistory = useRef<CallRecord[] | null>(null);
+  const savedDark = useRef<boolean | null>(null);
+  const savedThreads = useRef(new Map<string, Message[]>());
+  const threads = useRef(new Map<string, Promise<Message[]>>());
   function updateMessages(
     update: (current: Record<string, Message[]>) => Record<string, Message[]>,
   ) {
@@ -72,34 +82,55 @@ export function useMessenger() {
     setChats(chatsRef.current);
   }
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const writes = useRef(Promise.resolve());
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-        if (!raw || !active) return;
-        const saved = JSON.parse(raw);
-        if (Array.isArray(saved.chats))
-          updateChats(() => saved.chats.map(enrichChat));
-        if (saved.messages && typeof saved.messages === "object")
-          updateMessages(() => saved.messages);
-        if (Array.isArray(saved.stories)) setStories(saved.stories);
-        if (Array.isArray(saved.history)) setHistory(saved.history);
-        setDark(!!saved.dark);
-      }),
-      AsyncStorage.getItem("@messenger/settings/v1").then((raw) => {
-        if (!raw || !active) return;
-        const saved = JSON.parse(raw);
-        setHapticsEnabled(saved.haptics !== false);
-        if (typeof saved.avatar === "string" && typeof saved.name === "string")
-          setProfile(saved);
-      }),
-    ])
-      .catch(() => {})
-      .finally(() => {
+    void (async () => {
+      try {
+        // One-time upgrade from the single saved blob to per-slice records.
+        await messengerRepository.migrateLegacy();
+        const [storedChats, storedStories, storedHistory, appearance, settings] =
+          await Promise.all([
+            messengerRepository.loadChats(),
+            messengerRepository.loadStories(),
+            messengerRepository.loadHistory(),
+            messengerRepository.loadAppearance(),
+            messengerRepository.loadSettings(),
+          ]);
+        if (!active) return;
+        if (storedChats?.length) {
+          const next = storedChats.map(enrichChat);
+          savedChats.current = next;
+          updateChats(() => next);
+        }
+        if (storedStories?.length) {
+          savedStories.current = storedStories;
+          setStories(storedStories);
+        }
+        if (storedHistory?.length) {
+          savedHistory.current = storedHistory;
+          setHistory(storedHistory);
+        }
+        if (appearance) {
+          savedDark.current = appearance.dark;
+          setDark(appearance.dark);
+        }
+        if (settings) {
+          setHapticsEnabled(settings.haptics !== false);
+          setProfile({
+            name: settings.name || DEFAULT_PROFILE.name,
+            avatar: settings.avatar || DEFAULT_PROFILE.avatar,
+            sound: settings.sound !== false,
+            previews: settings.previews !== false,
+            systemNotifications: settings.systemNotifications !== false,
+          });
+        }
+      } catch {
+        // Damaged storage keeps the seeded demo data rather than blocking startup.
+      } finally {
         if (active) setLoaded(true);
-      });
+      }
+    })();
     return () => {
       active = false;
       timers.current.forEach(clearTimeout);
@@ -107,28 +138,62 @@ export function useMessenger() {
   }, []);
 
   useEffect(() => {
+    if (!loaded || savedChats.current === chats) return;
+    savedChats.current = chats;
+    void messengerRepository.saveChats(chats).catch(() => {});
+  }, [chats, loaded]);
+  useEffect(() => {
+    if (!loaded || savedStories.current === stories) return;
+    savedStories.current = stories;
+    void messengerRepository.saveStories(stories).catch(() => {});
+  }, [stories, loaded]);
+  useEffect(() => {
+    if (!loaded || savedHistory.current === history) return;
+    savedHistory.current = history;
+    void messengerRepository.saveHistory(history).catch(() => {});
+  }, [history, loaded]);
+  useEffect(() => {
+    if (!loaded || savedDark.current === dark) return;
+    savedDark.current = dark;
+    void messengerRepository.saveAppearance(dark).catch(() => {});
+  }, [dark, loaded]);
+  useEffect(() => {
     if (!loaded) return;
-    const snapshot = JSON.stringify({
-      chats,
-      messages,
-      stories,
-      history,
-      dark,
-    });
-    writes.current = writes.current
-      .then(() => AsyncStorage.setItem(STORAGE_KEY, snapshot))
-      .catch(() => {});
-  }, [chats, messages, stories, history, dark, loaded]);
+    for (const [id, thread] of Object.entries(messages)) {
+      if (savedThreads.current.get(id) === thread) continue;
+      savedThreads.current.set(id, thread);
+      void messengerRepository.saveMessages(id, thread).catch(() => {});
+    }
+  }, [messages, loaded]);
 
+  /** Reads one conversation the first time it is opened, then keeps it in memory. */
+  function thread(chat: Chat): Promise<Message[]> {
+    const cached = messagesRef.current[chat.id];
+    if (cached) return Promise.resolve(cached);
+    const pending = threads.current.get(chat.id);
+    if (pending) return pending;
+    const request = messengerRepository
+      .loadMessages(chat.id)
+      .then((stored) => {
+        const thread = stored ?? seedMessages(chat);
+        updateMessages((current) =>
+          current[chat.id] ? current : { ...current, [chat.id]: thread },
+        );
+        savedThreads.current.set(chat.id, thread);
+        return thread;
+      })
+      .catch(() => seedMessages(chat))
+      .finally(() => {
+        threads.current.delete(chat.id);
+      });
+    threads.current.set(chat.id, request);
+    return request;
+  }
   function openChat(chat: Chat) {
     selectedRef.current = chat.id;
     setSelected(chat.id);
-    updateMessages((current) =>
-      current[chat.id]
-        ? current
-        : { ...current, [chat.id]: seedMessages(chat) },
-    );
     updateChats((current) => markChatRead(current, chat.id));
+    void thread(chat);
   }
   function setConversationVisible(visible: boolean) {
     conversationVisible.current = visible;
@@ -203,6 +268,52 @@ export function useMessenger() {
       }, 2600),
     );
   }
+  /**
+   * Sends a message into a named conversation, used by notification replies.
+   * The action id doubles as the message id, so a redelivered action can never
+   * post the same reply twice. The thread is loaded first, because appending to
+   * the seeded fallback would save that seed over the stored conversation. The
+   * promise resolves only once the thread is written, because the notification
+   * action is acknowledged after this returns.
+   */
+  async function sendTo(chatId: string, text: string, actionId?: string) {
+    const chat = chatsRef.current.find((item) => item.id === chatId);
+    const body = text.trim();
+    if (!chat || !body || chat.blocked) return;
+    const id = actionId ? `notice-${actionId}` : uid();
+    const existing = messagesRef.current[chatId] ?? (await thread(chat));
+    if (existing.some((message) => message.id === id)) return;
+    const message: Message = {
+      id,
+      text: body,
+      mine: true,
+      time: clock(),
+      createdAt: new Date().toISOString(),
+    };
+    let appended: Message[] | undefined;
+    updateMessages((current) => {
+      const base = current[chatId] ?? existing;
+      if (base.some((item) => item.id === id)) return current;
+      appended = [...base, message];
+      return { ...current, [chatId]: appended };
+    });
+    const next = appended;
+    if (!next) return;
+    updateChats((current) =>
+      updateChatPreview(current, {
+        id: chatId,
+        preview: body,
+        time: clock(),
+        mine: true,
+        openChatId: conversationVisible.current ? selectedRef.current : null,
+      }),
+    );
+    savedThreads.current.set(chatId, next);
+    await messengerRepository.saveMessages(chatId, next).catch(() => {});
+  }
+  function markRead(chatId: string) {
+    updateChats((current) => markChatRead(current, chatId));
+  }
   function react(messageId: string, emoji: string) {
     if (!selected) return;
     updateMessages((current) => ({
@@ -234,6 +345,7 @@ export function useMessenger() {
     };
     updateChats((current) => [chat, ...current]);
     updateMessages((current) => ({ ...current, [chat.id]: [] }));
+    savedThreads.current.set(chat.id, []);
     return chat;
   }
   function markStorySeen(id: string) {
@@ -284,16 +396,16 @@ export function useMessenger() {
     );
     if (forwarded) append(target, forwarded, messagePreview(forwarded));
   }
-  function toggleFlag(id: string, flag: "muted" | "blocked" | "pinned") {
+  function updateFlag(id: string, flag: "muted" | "blocked" | "pinned", value: boolean) {
     const chat = chatsRef.current.find((item) => item.id === id);
-    if (!chat) return;
-    if (flag === "blocked" && !chat.blocked) cancelReplies(id);
+    if (!chat || !!chat[flag] === value) return;
+    if (flag === "blocked" && value) cancelReplies(id);
     updateChats((current) =>
       current.map((item) =>
         item.id === id
           ? {
               ...item,
-              [flag]: !item[flag],
+              [flag]: value,
               ...(flag === "blocked" ? { typing: false } : {}),
             }
           : item,
@@ -301,13 +413,22 @@ export function useMessenger() {
     );
   }
   function toggleMute(id: string) {
-    toggleFlag(id, "muted");
+    const chat = chatsRef.current.find((item) => item.id === id);
+    if (chat) updateFlag(id, "muted", !chat.muted);
+  }
+  function setMuted(id: string, muted: boolean) {
+    updateFlag(id, "muted", muted);
+  }
+  function setBlocked(id: string, blocked: boolean) {
+    updateFlag(id, "blocked", blocked);
   }
   function toggleBlock(id: string) {
-    toggleFlag(id, "blocked");
+    const chat = chatsRef.current.find((item) => item.id === id);
+    if (chat) updateFlag(id, "blocked", !chat.blocked);
   }
   function togglePin(id: string) {
-    toggleFlag(id, "pinned");
+    const chat = chatsRef.current.find((item) => item.id === id);
+    if (chat) updateFlag(id, "pinned", !chat.pinned);
   }
   function clearChat(id: string) {
     cancelReplies(id);
@@ -325,6 +446,9 @@ export function useMessenger() {
       delete next[id];
       return next;
     });
+    savedThreads.current.delete(id);
+    threads.current.delete(id);
+    void messengerRepository.removeMessages(id).catch(() => {});
     updateChats((current) => current.filter((chat) => chat.id !== id));
     if (selectedRef.current === id) closeChat();
   }
@@ -347,10 +471,14 @@ export function useMessenger() {
     closeChat,
     setConversationVisible,
     send,
+    sendTo,
+    markRead,
     react,
     deleteMessage,
     forwardMessage,
     toggleMute,
+    setMuted,
+    setBlocked,
     toggleBlock,
     togglePin,
     clearChat,
@@ -360,5 +488,6 @@ export function useMessenger() {
     deleteStory,
     shareStory,
     addCall,
+    thread,
   };
 }

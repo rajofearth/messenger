@@ -108,7 +108,13 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
               style={[s.tile, messages.length === 3 && index === 2 && { width: "100%", aspectRatio: 2 }]}
             >
               {message.kind === "image" ? (
-                <Image source={{ uri: message.uri }} contentFit="cover" style={StyleSheet.absoluteFill} />
+                <Image
+                  source={{ uri: message.uri }}
+                  recyclingKey={message.id}
+                  cachePolicy="memory-disk"
+                  contentFit="cover"
+                  style={StyleSheet.absoluteFill}
+                />
               ) : <Ionicons name="play-circle" size={44} color="white" />}
               {!!message.text && <Text numberOfLines={2} style={s.caption}>{message.text}</Text>}
               {!!message.reaction && <Text style={s.reaction}>{message.reaction}</Text>}

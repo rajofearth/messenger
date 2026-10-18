@@ -2,7 +2,7 @@
   "expo": {
     "name": "Messenger",
     "slug": "messenger",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -42,7 +42,17 @@
       ],
       "expo-video",
       "expo-sharing",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "# Keep the app's own Expo modules. Expo's default rules already keep\n# module constructors and manifest components; this only pins the two\n# local modules so renamed classes can never break a release build.\n-keep class expo.modules.keyboardmedia.** { *; }\n-keep class expo.modules.systemnotifications.** { *; }\n"
+          }
+        }
+      ]
     ]
   }
 }

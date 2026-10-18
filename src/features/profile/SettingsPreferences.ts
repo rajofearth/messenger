@@ -1,41 +1,34 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { setHapticsEnabled } from "../../ui/primitives";
+import { messengerRepository } from "../../data/messengerRepository";
+import type { SettingsRecord } from "../../data/records";
 
-type Preferences = {
-  name: string;
-  bio: string;
-  username: string;
-  haptics: boolean;
-  avatar: string;
-  sound: boolean;
-  previews: boolean;
-};
+type Preferences = SettingsRecord;
 export type SettingsProfile = Pick<
   Preferences,
-  "name" | "avatar" | "sound" | "previews"
+  "name" | "avatar" | "sound" | "previews" | "systemNotifications"
 > &
   Partial<Pick<Preferences, "bio" | "username" | "haptics">>;
 type Sheet = "profile" | "privacy" | "info" | null;
-const STORAGE_KEY = "@messenger/settings/v1";
-const DEFAULTS: Preferences = {
+export const DEFAULT_PREFERENCES: Preferences = {
   name: "Alex Morgan",
   bio: "Here for the little moments.",
   username: "alexmorgan",
   haptics: true,
   avatar:
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=85",
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
   sound: true,
   previews: true,
+  systemNotifications: true,
 };
 
 export function useSettingsPreferences(
   onProfileChange?: (profile: SettingsProfile) => void,
 ) {
-  const [preferences, setPreferences] = useState<Preferences>(DEFAULTS);
-  const current = useRef(DEFAULTS);
+  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
+  const current = useRef(DEFAULT_PREFERENCES);
   const writes = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -49,35 +42,32 @@ export function useSettingsPreferences(
     let active = true;
     void (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const value: unknown = JSON.parse(raw);
-          if (value && typeof value === "object") {
-            const stored = value as Record<string, unknown>;
-            const loaded: Preferences = {
-              name:
-                typeof stored.name === "string" && stored.name.trim()
-                  ? stored.name
-                  : DEFAULTS.name,
-              bio: typeof stored.bio === "string" ? stored.bio : DEFAULTS.bio,
-              username:
-                typeof stored.username === "string"
-                  ? stored.username
-                  : DEFAULTS.username,
-              haptics:
-                typeof stored.haptics === "boolean" ? stored.haptics : true,
-              avatar:
-                typeof stored.avatar === "string" && stored.avatar
-                  ? stored.avatar
-                  : DEFAULTS.avatar,
-              sound: typeof stored.sound === "boolean" ? stored.sound : true,
-              previews:
-                typeof stored.previews === "boolean" ? stored.previews : true,
-            };
-            if (active) {
-              current.current = loaded;
-              setPreferences(loaded);
-            }
+        const stored = await messengerRepository.loadSettings();
+        if (stored) {
+          const loaded: Preferences = {
+            name: stored.name?.trim() ? stored.name : DEFAULT_PREFERENCES.name,
+            bio:
+              typeof stored.bio === "string"
+                ? stored.bio
+                : DEFAULT_PREFERENCES.bio,
+            username:
+              typeof stored.username === "string"
+                ? stored.username
+                : DEFAULT_PREFERENCES.username,
+            haptics:
+              typeof stored.haptics === "boolean" ? stored.haptics : true,
+            avatar:
+              typeof stored.avatar === "string" && stored.avatar
+                ? stored.avatar
+                : DEFAULT_PREFERENCES.avatar,
+            sound: typeof stored.sound === "boolean" ? stored.sound : true,
+            previews:
+              typeof stored.previews === "boolean" ? stored.previews : true,
+            systemNotifications: stored.systemNotifications !== false,
+          };
+          if (active) {
+            current.current = loaded;
+            setPreferences(loaded);
           }
         }
       } catch {
@@ -107,13 +97,16 @@ export function useSettingsPreferences(
     current.current = next;
     setPreferences(next);
     const write = writes.current.then(() =>
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)),
+      messengerRepository.saveSettings(next).then(() => undefined),
     );
     writes.current = write.catch(() => {});
     return write;
   }
 
-  function toggle(key: "sound" | "previews" | "haptics", value: boolean) {
+  function toggle(
+    key: "sound" | "previews" | "haptics" | "systemNotifications",
+    value: boolean,
+  ) {
     if (key === "haptics") setHapticsEnabled(value);
     void persist({ [key]: value }).catch(() => {
       Alert.alert(
@@ -140,7 +133,7 @@ export function useSettingsPreferences(
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.85,
+        quality: 0.7,
       });
       if (!result.canceled && result.assets[0]?.uri) {
         setAvatarFailed(false);

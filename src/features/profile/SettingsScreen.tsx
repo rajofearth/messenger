@@ -17,6 +17,7 @@ import {
 } from "./SettingsPreferences";
 import SettingsDialogs from "./SettingsDialogs";
 import { IconButton, tap } from "../../ui/primitives";
+import { useNotificationSettings } from "../../notifications/useNotificationSettings";
 
 export type SettingsScreenProps = {
   dark: boolean;
@@ -32,6 +33,17 @@ export default function SettingsScreen({
   onProfileChange,
 }: SettingsScreenProps) {
   const settings = useSettingsPreferences(onProfileChange);
+  const notifications = useNotificationSettings();
+  const channels = notifications.status?.channels ?? {
+    incoming: true,
+    calls: true,
+    messages: true,
+  };
+  const status = notifications.status ?? {
+    permissionGranted: false,
+    notificationsEnabled: false,
+    channels,
+  };
   const [page, setPage] = useState<"profile" | "settings">("profile");
   useEffect(() => {
     if (page !== "settings") return;
@@ -225,26 +237,7 @@ export default function SettingsScreen({
                 />
               )}
             </View>
-            {section("PROFILE DETAILS")}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              {row("Name", preferences.name, "person-outline", editProfile)}
-              {divider}
-              {row(
-                "Username",
-                preferences.username
-                  ? `@${preferences.username}`
-                  : "Add a username",
-                "at-outline",
-                editProfile,
-              )}
-              {divider}
-              {row(
-                "Bio",
-                preferences.bio || "Add a bio",
-                "document-text-outline",
-                editProfile,
-              )}
-            </View>
+
             {section("PREFERENCES")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {row(
@@ -270,27 +263,68 @@ export default function SettingsScreen({
             {section("NOTIFICATIONS")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {switchRow(
+                "System notifications",
+                notifications.available
+                  ? status.permissionGranted
+                    ? "Calls and messages can appear outside the app"
+                    : "Android permission is not granted yet"
+                  : "Requires the Android app build",
+                "notifications-outline",
+                preferences.systemNotifications,
+                (value) => toggle("systemNotifications", value),
+                !ready || !notifications.available,
+              )}
+              {divider}
+              {row(
+                "Android permission",
+                status.permissionGranted ? "Allowed" : "Not allowed",
+                "shield-checkmark-outline",
+                () => {
+                  if (notifications.available && !status.permissionGranted)
+                    void notifications.request();
+                  else notifications.openChannel();
+                },
+              )}
+              {divider}
+              {row(
+                "Call notifications",
+                channels.incoming && channels.calls
+                  ? "Ringing and ongoing calls"
+                  : "Some call channels are off",
+                "call-outline",
+                () => notifications.openChannel("incoming"),
+              )}
+              {divider}
+              {row(
+                "Message notifications",
+                channels.messages ? "With reply, read and mute" : "Channel is off",
+                "chatbubble-ellipses-outline",
+                () => notifications.openChannel("messages"),
+              )}
+              {divider}
+              {switchRow(
+                "Message previews",
+                "Show message text in notifications",
+                "chatbubble-outline",
+                preferences.previews,
+                (value) => toggle("previews", value),
+                !ready,
+              )}
+              {divider}
+              {switchRow(
                 "Message sounds",
-                "Saved demo preference. No sounds play yet.",
+                "Play a sound for new messages",
                 "musical-notes-outline",
                 preferences.sound,
                 (value) => toggle("sound", value),
                 !ready,
               )}
-              {divider}
-              {switchRow(
-                "Message previews",
-                "Saved demo preference. No push previews yet.",
-                "chatbubble-ellipses-outline",
-                preferences.previews,
-                (value) => toggle("previews", value),
-                !ready,
-              )}
             </View>
             <Text style={[styles.note, { color: colors.muted }]}>
-              Demo preferences are saved on this device only. These switches do
-              not enable notification sounds, push notifications, or message
-              previews yet.
+              Android owns notification permissions and channel settings. The
+              permission row opens the system screen when it is blocked. Call
+              actions answer or decline; message actions reply, mark read, or
+              mute without opening the app.
             </Text>
             {section("FEEDBACK")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>

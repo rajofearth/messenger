@@ -1,6 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-  Keyboard,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,6 +14,7 @@ import {
   Text,
   TextInput,
   View,
+  type ListRenderItemInfo,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Chat, Story } from "../../domain/data";
@@ -18,6 +25,7 @@ import QuickActions from "../../ui/QuickActions";
 import { s } from "./ChatsScreen.styles";
 import { groupStories } from "../../domain/stories";
 import ChatListActions, { type ChatActionTarget } from "./ChatListActions";
+import ChatRow from "./ChatRow";
 
 type Props = {
   chats: Chat[];
@@ -58,25 +66,45 @@ export default function ChatsScreen({
   const [tab, setTab] = useState<"private" | "group">("private");
   const [search, setSearch] = useState(false);
   const [query, setQuery] = useState("");
-  const list = useRef<ScrollView>(null);
+  const list = useRef<FlatList<Chat>>(null);
   const term = query.trim().toLowerCase();
-  const filtered = filterConversations(chats, query, tab).sort(
-    (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+  const filtered = useMemo(
+    () =>
+      filterConversations(chats, query, tab).sort(
+        (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+      ),
+    [chats, query, tab],
   );
   const groups = groupStories(stories);
   const selfIndex = groups.findIndex((group) => group.id === "self");
   const self = groups[selfIndex];
   const [actions, setActions] = useState<ChatActionTarget | null>(null);
-  const longPressed = useRef(false);
 
   useEffect(() => {
-    list.current?.scrollTo({ y: 0, animated: false });
+    list.current?.scrollToOffset({ offset: 0, animated: false });
   }, [term, tab]);
 
   function closeSearch() {
     setQuery("");
     setSearch(false);
   }
+
+  const onRowActions = useCallback((chat: Chat, x: number, y: number) => {
+    setActions({ chat, x, y });
+  }, []);
+  const keyExtractor = useCallback((chat: Chat) => chat.id, []);
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<Chat>) => (
+      <ChatRow
+        chat={item}
+        dark={dark}
+        typing={item.typing || typingId === item.id}
+        onOpen={onOpenChat}
+        onActions={onRowActions}
+      />
+    ),
+    [dark, typingId, onOpenChat, onRowActions],
+  );
 
   return (
     <KeyboardAvoidingView
@@ -122,243 +150,151 @@ export default function ChatsScreen({
           />
         </View>
       )}
-      <ScrollView
+      <FlatList
         ref={list}
+        data={filtered}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={s.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-      >
-        {!term && (
-          <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.stories}
-            >
-              <Pressable
-                style={s.storyItem}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  self
-                    ? `Your story, ${self.seen ? "seen" : "unseen"}`
-                    : "Add your story"
-                }
-                onPress={() => (self ? onStory(selfIndex) : onAddStory())}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={9}
+        removeClippedSubviews
+        ListHeaderComponent={
+          term ? null : (
+            <>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={s.stories}
               >
-                <View
-                  style={[
-                    s.storyRing,
-                    {
-                      borderColor: self
-                        ? self.seen
-                          ? colors.line
-                          : coral
-                        : colors.line,
-                      borderStyle: self ? "solid" : "dashed",
-                    },
-                  ]}
+                <Pressable
+                  style={s.storyItem}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    self
+                      ? `Your story, ${self.seen ? "seen" : "unseen"}`
+                      : "Add your story"
+                  }
+                  onPress={() => (self ? onStory(selfIndex) : onAddStory())}
                 >
-                  <Avatar uri={self?.avatar ?? avatar} size={58} />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Add your story"
-                    hitSlop={4}
-                    onPress={(event) => {
-                      event.stopPropagation();
-                      onAddStory();
-                    }}
-                    style={[s.storyPlus, { borderColor: colors.bg }]}
+                  <View
+                    style={[
+                      s.storyRing,
+                      {
+                        borderColor: self
+                          ? self.seen
+                            ? colors.line
+                            : coral
+                          : colors.line,
+                        borderStyle: self ? "solid" : "dashed",
+                      },
+                    ]}
                   >
-                    <Ionicons name="add" size={17} color="white" />
-                  </Pressable>
-                </View>
-                <Text style={[s.storyName, { color: colors.muted }]}>
-                  Your story
-                </Text>
-              </Pressable>
-              {groups.map((story, index) =>
-                story.id === "self" ? null : (
-                  <Pressable
-                    key={story.id}
-                    style={s.storyItem}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${story.name} story, ${story.seen ? "seen" : "unseen"}`}
-                    onPress={() => onStory(index)}
-                  >
-                    <View
+                    <Avatar uri={self?.avatar ?? avatar} size={58} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Add your story"
+                      hitSlop={4}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        onAddStory();
+                      }}
+                      style={[s.storyPlus, { borderColor: colors.bg }]}
+                    >
+                      <Ionicons name="add" size={17} color="white" />
+                    </Pressable>
+                  </View>
+                  <Text style={[s.storyName, { color: colors.muted }]}>
+                    Your story
+                  </Text>
+                </Pressable>
+                {groups.map((story, index) =>
+                  story.id === "self" ? null : (
+                    <Pressable
+                      key={story.id}
+                      style={s.storyItem}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${story.name} story, ${story.seen ? "seen" : "unseen"}`}
+                      onPress={() => onStory(index)}
+                    >
+                      <View
+                        style={[
+                          s.storyRing,
+                          { borderColor: story.seen ? colors.line : coral },
+                        ]}
+                      >
+                        <Avatar uri={story.avatar} size={58} />
+                      </View>
+                      <Text
+                        numberOfLines={1}
+                        style={[s.storyName, { color: colors.fg }]}
+                      >
+                        {story.name}
+                      </Text>
+                    </Pressable>
+                  ),
+                )}
+              </ScrollView>
+              <View
+                style={[
+                  s.tabs,
+                  { backgroundColor: dark ? colors.card : "#F0EFEA" },
+                ]}
+              >
+                {(["private", "group"] as const).map((item) => {
+                  const selected = tab === item;
+                  const unread = unreadConversations(chats, item);
+                  const color = selected ? colors.fg : colors.muted;
+                  return (
+                    <Pressable
+                      key={item}
+                      accessibilityRole="tab"
+                      accessibilityLabel={
+                        item === "private"
+                          ? "Private conversations"
+                          : "Group conversations"
+                      }
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        tap();
+                        setTab(item);
+                      }}
                       style={[
-                        s.storyRing,
-                        { borderColor: story.seen ? colors.line : coral },
+                        s.tab,
+                        selected && {
+                          backgroundColor: dark ? colors.line : colors.card,
+                        },
                       ]}
                     >
-                      <Avatar uri={story.avatar} size={58} />
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[s.storyName, { color: colors.fg }]}
-                    >
-                      {story.name}
-                    </Text>
-                  </Pressable>
-                ),
-              )}
-            </ScrollView>
-            <View
-              style={[
-                s.tabs,
-                { backgroundColor: dark ? colors.card : "#F0EFEA" },
-              ]}
-            >
-              {(["private", "group"] as const).map((item) => {
-                const selected = tab === item;
-                const unread = unreadConversations(chats, item);
-                const color = selected ? colors.fg : colors.muted;
-                return (
-                  <Pressable
-                    key={item}
-                    accessibilityRole="tab"
-                    accessibilityLabel={
-                      item === "private"
-                        ? "Private conversations"
-                        : "Group conversations"
-                    }
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      tap();
-                      setTab(item);
-                    }}
-                    style={[
-                      s.tab,
-                      selected && {
-                        backgroundColor: dark ? colors.line : colors.card,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={
-                        item === "private"
-                          ? "chatbubble-outline"
-                          : "people-outline"
-                      }
-                      size={15}
-                      color={color}
-                    />
-                    <Text style={[s.tabText, { color }]}>
-                      {item === "private" ? "Private" : "Groups"}
-                    </Text>
-                    {unread > 0 && (
-                      <View style={s.tabCount}>
-                        <Text style={s.tabCountText}>{unread}</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
-        {filtered.map((chat) => {
-          const typing = chat.typing || typingId === chat.id;
-          const preview = typing ? "typing •••" : chat.preview;
-          return (
-            <Pressable
-              key={chat.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${chat.name}, ${chat.unread > 0 ? `${chat.unread} unread messages, ` : ""}${preview}`}
-              accessibilityHint="Long press for conversation actions"
-              onPressIn={() => {
-                longPressed.current = false;
-              }}
-              onLongPress={(event) => {
-                longPressed.current = true;
-                Keyboard.dismiss();
-                setActions({
-                  chat,
-                  x: event.nativeEvent.pageX,
-                  y: event.nativeEvent.pageY,
-                });
-              }}
-              onPress={() => {
-                if (!longPressed.current) onOpenChat(chat);
-              }}
-              style={({ pressed }) => [
-                s.chatRow,
-                pressed && { backgroundColor: colors.card },
-              ]}
-            >
-              <Avatar uri={chat.avatar} online={chat.online} />
-              <View style={s.chatBody}>
-                <View style={s.rowTop}>
-                  <Text
-                    numberOfLines={1}
-                    style={[s.name, { color: colors.fg }]}
-                  >
-                    {chat.name}
-                  </Text>
-                  <Text
-                    style={[
-                      s.time,
-                      { color: chat.unread > 0 ? coral : colors.muted },
-                    ]}
-                  >
-                    {chat.time}
-                  </Text>
-                </View>
-                <View style={s.rowBottom}>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      s.preview,
-                      {
-                        color: typing
-                          ? coral
-                          : chat.unread > 0
-                            ? dark
-                              ? "#D7DAD3"
-                              : "#667268"
-                            : colors.muted,
-                      },
-                    ]}
-                  >
-                    {preview}
-                  </Text>
-                  {chat.muted && (
-                    <Ionicons
-                      name="notifications-off-outline"
-                      size={14}
-                      color={colors.muted}
-                      accessibilityLabel="Muted"
-                    />
-                  )}
-                  {chat.pinned && (
-                    <Ionicons
-                      name="pin-outline"
-                      size={14}
-                      color={colors.muted}
-                      accessibilityLabel="Pinned"
-                    />
-                  )}
-                  {chat.unread > 0 && (
-                    <View style={s.unread}>
-                      <Text style={s.unreadText}>{chat.unread}</Text>
-                    </View>
-                  )}
-                  {chat.unread <= 0 &&
-                    !typing &&
-                    chat.preview.startsWith("You:") && (
                       <Ionicons
-                        name="checkmark-done"
-                        color={colors.muted}
+                        name={
+                          item === "private"
+                            ? "chatbubble-outline"
+                            : "people-outline"
+                        }
                         size={15}
+                        color={color}
                       />
-                    )}
-                </View>
+                      <Text style={[s.tabText, { color }]}>
+                        {item === "private" ? "Private" : "Groups"}
+                      </Text>
+                      {unread > 0 && (
+                        <View style={s.tabCount}>
+                          <Text style={s.tabCountText}>{unread}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
               </View>
-            </Pressable>
-          );
-        })}
-        {!filtered.length && (
+            </>
+          )
+        }
+        ListEmptyComponent={
           <View style={s.empty}>
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
               {term ? "No conversations found" : "A little quiet here"}
@@ -369,8 +305,8 @@ export default function ChatsScreen({
                 : "Start a new conversation and say hello."}
             </Text>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
       <QuickActions
         dark={dark}
         onNewConversation={onNewConversation}

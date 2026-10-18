@@ -242,6 +242,7 @@ export default function MessageBubble({
         ) : m.kind === "image" ? (
           <Image
             source={{ uri: m.uri }}
+            recyclingKey={m.id}
             style={s.chatImage}
             contentFit="cover"
             accessibilityLabel="Photo attachment"

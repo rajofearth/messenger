@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { clearAvatarCache } from "../../data/avatars";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 import type { useSettingsPreferences } from "./SettingsPreferences";
 
@@ -37,8 +39,20 @@ export default function SettingsDialogs({
     saveProfile,
     picking,
     pickAvatar,
+    preferences,
+    avatarFailed,
+    setAvatarFailed,
   } = settings;
   const insets = useSafeAreaInsets();
+  const [avatarsCleared, setAvatarsCleared] = React.useState(false);
+  React.useEffect(() => {
+    if (sheet !== "privacy") setAvatarsCleared(false);
+  }, [sheet]);
+  /** Contact photos are cached locally for notifications; this frees that space. */
+  function clearAvatars() {
+    clearAvatarCache();
+    setAvatarsCleared(true);
+  }
   const busy = saving || picking;
   const icon = (
     name: React.ComponentProps<typeof Ionicons>["name"],
@@ -100,6 +114,20 @@ export default function SettingsDialogs({
           >
             {sheet === "profile" ? (
               <>
+                <View style={[styles.avatarWrap, { alignSelf: "center", marginBottom: 16 }]}>
+                  {avatarFailed ? (
+                    <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.tint }]}>
+                      {icon("person-outline", 36)}
+                    </View>
+                  ) : (
+                    <Image
+                      source={{ uri: preferences.avatar }}
+                      style={styles.avatar}
+                      accessibilityLabel="Current profile photo"
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  )}
+                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Change profile photo"
@@ -210,6 +238,19 @@ export default function SettingsDialogs({
                     ? "Your profile and notification preferences are saved on this device using local app storage, not encrypted secure storage. A selected profile photo stays on this device. Default remote avatars are fetched from Unsplash, which receives a normal image request. Notification preferences do not register you for push notifications. Avoid entering sensitive information. Clearing app data removes these saved preferences."
                     : "Built with Expo and React Native. Profile edits and notification preferences are stored locally. This prototype does not connect to a messaging service or place real calls."}
                 </Text>
+                {sheet === "privacy" && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={clearAvatars}
+                    style={[styles.secondary, { marginTop: 14 }]}
+                  >
+                    <Text style={styles.secondaryText}>
+                      {avatarsCleared
+                        ? "Downloaded avatars cleared"
+                        : "Clear downloaded avatars"}
+                    </Text>
+                  </Pressable>
+                )}
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setSheet(null)}

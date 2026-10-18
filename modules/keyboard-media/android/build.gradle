@@ -18,6 +18,7 @@ dependencies {
   // Expo core does not export its implementation dependency on React Android.
   // The React Native Gradle plugin supplies the installed RN version.
   implementation 'com.facebook.react:react-android'
+  testImplementation 'junit:junit:4.13.2'
 }
 
 // AndroidX Core is exported by expo-modules-core; RN exports AppCompat.

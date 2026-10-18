@@ -16,7 +16,10 @@ function sources(directory) {
 }
 const files = [path.join(root, "App.tsx"), ...sources(path.join(root, "src"))];
 test("application source files stay under 500 lines", () => {
-  const nativeDirectory = path.join(root, "modules/keyboard-media/android/src");
+  const nativeDirectories = [
+    "modules/keyboard-media/android/src",
+    "modules/system-notifications/android/src",
+  ].map((directory) => path.join(root, directory));
   function nativeSources(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const file = path.join(directory, entry.name);
@@ -27,7 +30,10 @@ test("application source files stay under 500 lines", () => {
           : [];
     });
   }
-  for (const file of [...files, ...nativeSources(nativeDirectory)]) {
+  for (const file of [
+    ...files,
+    ...nativeDirectories.flatMap(nativeSources),
+  ]) {
     const lines = readFileSync(file, "utf8").trimEnd().split("\n").length;
     assert.ok(
       lines <= 500,

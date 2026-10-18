@@ -45,7 +45,12 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
             {message.uri ? message.kind === "video" ? (
               <VideoAttachment uri={message.uri} />
             ) : (
-              <Image source={{ uri: message.uri }} style={s.image} contentFit="contain" />
+              <Image
+                source={{ uri: message.uri }}
+                recyclingKey={message.id}
+                style={s.image}
+                contentFit="contain"
+              />
             ) : <Text style={s.text}>Media unavailable</Text>}
           </AlbumItem>
         )}

@@ -9,8 +9,10 @@ import android.view.inputmethod.InputMethodManager
 import androidx.core.view.ContentInfoCompat
 import androidx.core.view.ViewCompat
 import com.facebook.react.bridge.ReactContext
+import com.facebook.react.uimanager.IllegalViewOperationException
 import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.views.textinput.ReactEditText
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -23,6 +25,10 @@ import java.util.concurrent.TimeUnit
 class KeyboardMediaModule : Module() {
   private val main = Handler(Looper.getMainLooper())
   private val bindings = mutableMapOf<String, Binding>()
+  private val mounts = MountAwaiter<ReactEditText>(
+    { main.postDelayed(it, 16L) },
+    { main.removeCallbacks(it) },
+  )
   private val worker = ThreadPoolExecutor(
     1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(4)
   )
@@ -36,45 +42,66 @@ class KeyboardMediaModule : Module() {
     Name("KeyboardMedia")
     Events("onMedia", "onMediaError")
 
-    AsyncFunction("attach") { tag: Int, id: String ->
+    AsyncFunction("attach") { tag: Int, id: String, promise: Promise ->
       remove(id)
-      val context = appContext.reactContext as? ReactContext
-        ?: error("React context unavailable")
-      val view = UIManagerHelper.getUIManagerForReactTag(context, tag)?.resolveView(tag)
-        as? ReactEditText ?: error("Expected a mounted React Native TextInput")
-      check(bindings.values.none { it.view === view }) { "Input already registered" }
-      check(ViewCompat.getOnReceiveContentMimeTypes(view) == null) {
-        "Input already has a receive-content listener"
-      }
-      val binding = Binding(id, view)
-      bindings[id] = binding
-
-      ViewCompat.setOnReceiveContentListener(view, mimeTypes) { _, payload ->
-        if (!view.isEnabled || view.keyListener == null) {
-          payload
-        } else {
-          // Preserve ordinary text paste. Unsupported URI items are returned to Android.
-          val split = payload.partition { item ->
-            item.uri?.let { it.scheme == "content" } == true &&
-              mimeTypes.any { payload.clip.description.hasMimeType(it) }
-          }
-          split.first?.let { accepted -> receive(binding, accepted) }
-          split.second
+      mounts.start(id, lookup = {
+        val context = appContext.reactContext as? ReactContext
+          ?: error("React context unavailable")
+        val manager = UIManagerHelper.getUIManagerForReactTag(context, tag)
+          ?: error("Fabric UIManager unavailable")
+        // A JS ref can exist before Fabric's UI-thread mount transaction runs.
+        // RN 0.86 returns null for an unknown surface and throws for a missing view.
+        val candidate = try {
+          manager.resolveView(tag)
+        } catch (_: IllegalViewOperationException) {
+          null
         }
-      }
-      // autoFocus may have opened a connection before this asynchronous registration.
-      if (view.hasFocus()) restart(view)
+        if (candidate == null) null
+        else candidate as? ReactEditText
+          ?: error("Expected ReactEditText for tag $tag, got ${candidate.javaClass.name}")
+      }, ready = { view ->
+        bind(id, view)
+        promise.resolve()
+      }, failed = { error ->
+        promise.reject("ERR_KEYBOARD_MEDIA_ATTACH", "Cannot attach keyboard media to tag $tag: ${error.message}", error)
+      })
     }.runOnQueue(Queues.MAIN)
 
     AsyncFunction("detach") { id: String -> remove(id) }.runOnQueue(Queues.MAIN)
 
     OnDestroy {
       main.post {
+        mounts.clear()
         bindings.keys.toList().forEach { remove(it) }
         // Drain accepted work so its permission-bearing payload is retained through copying.
         worker.shutdown()
       }
     }
+  }
+
+  private fun bind(id: String, view: ReactEditText) {
+    check(bindings.values.none { it.view === view }) { "Input already registered" }
+    check(ViewCompat.getOnReceiveContentMimeTypes(view) == null) {
+      "Input already has a receive-content listener"
+    }
+    val binding = Binding(id, view)
+    bindings[id] = binding
+
+    ViewCompat.setOnReceiveContentListener(view, mimeTypes) { _, payload ->
+      if (!view.isEnabled || view.keyListener == null) {
+        payload
+      } else {
+        // Preserve ordinary text paste. Unsupported URI items are returned to Android.
+        val split = payload.partition { item ->
+          item.uri?.let { it.scheme == "content" } == true &&
+            mimeTypes.any { payload.clip.description.hasMimeType(it) }
+        }
+        split.first?.let { accepted -> receive(binding, accepted) }
+        split.second
+      }
+    }
+    // autoFocus may have opened a connection before this asynchronous registration.
+    if (view.hasFocus()) restart(view)
   }
 
   private fun restart(view: ReactEditText) {
@@ -83,6 +110,7 @@ class KeyboardMediaModule : Module() {
   }
 
   private fun remove(id: String) {
+    mounts.cancel(id)
     val binding = bindings.remove(id) ?: return
 
     ViewCompat.setOnReceiveContentListener(binding.view, null, null)

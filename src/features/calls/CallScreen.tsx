@@ -16,21 +16,23 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
+import CallScreenCamera from "./CallScreenCamera";
 
 export type CallScreenProps = {
   name: string;
   avatar: string;
   video: boolean;
   seconds: number;
+  /** Confirmed call state, shared with the system notification. */
+  muted: boolean;
+  speaker: boolean;
+  onMuteChange: (value: boolean) => void;
+  onSpeakerChange: (value: boolean) => void;
   onBack: () => void;
   onEnd: () => void;
   onChat: () => void;
 };
 
-const REMOTE_PORTRAIT =
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1400&q=85";
-const LOCAL_PORTRAIT =
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80";
 
 function duration(seconds: number): string {
   const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -43,18 +45,20 @@ export default function CallScreen({
   avatar,
   video,
   seconds,
+  muted,
+  speaker,
+  onMuteChange,
+  onSpeakerChange,
   onBack,
   onEnd,
   onChat,
 }: CallScreenProps) {
   const [cameraOn, setCameraOn] = useState(video);
-  const [muted, setMuted] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(true);
   const [frontCamera, setFrontCamera] = useState(true);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
+
   const showingVideo = cameraOn;
   const displayName = name.trim() || "Your contact";
   const initials = displayName
@@ -69,7 +73,7 @@ export default function CallScreen({
       <StatusBar barStyle="light-content" backgroundColor="#161B20" />
       {showingVideo && !remoteFailed && (
         <Image
-          source={{ uri: avatar.replace("w=400", "w=1400") }}
+          source={{ uri: avatar.replace(/w=\d+/, "w=1080") }}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           accessibilityIgnoresInvertColors
@@ -144,23 +148,10 @@ export default function CallScreen({
             </View>
           )}
           {showingVideo && (
-            <View
-              style={styles.preview}
-              accessibilityLabel={`Your simulated ${frontCamera ? "front" : "rear"} camera preview`}
-            >
-              {!previewFailed ? (
-                <Image
-                  source={{
-                    uri: frontCamera ? REMOTE_PORTRAIT : LOCAL_PORTRAIT,
-                  }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="cover"
-                  onError={() => setPreviewFailed(true)}
-                />
-              ) : (
-                <Ionicons name="person" size={38} color={CORAL} />
-              )}
+            <View style={styles.preview}>
+              <CallScreenCamera front={frontCamera} />
               <LinearGradient
+                pointerEvents="none"
                 colors={["transparent", "#00000099"]}
                 style={StyleSheet.absoluteFill}
               />
@@ -180,7 +171,7 @@ export default function CallScreen({
           <View style={styles.callNote}>
             <View style={styles.smallDot} />
             <Text style={styles.callNoteText}>
-              Demo call · No camera or microphone in use
+              Demo call · Local preview only · No audio or video sent
             </Text>
           </View>
           <View style={styles.dock}>
@@ -201,7 +192,7 @@ export default function CallScreen({
                 icon={muted ? "mic-off-outline" : "mic-outline"}
                 label={muted ? "Turn microphone on" : "Turn microphone off"}
                 active={muted}
-                onPress={() => setMuted((value) => !value)}
+                onPress={() => onMuteChange(!muted)}
               />
               <Control
                 icon="chatbubble-outline"
@@ -257,7 +248,7 @@ export default function CallScreen({
               <View style={styles.optionRow}>
                 <View style={styles.optionIcon}>
                   <Ionicons
-                    name={speakerOn ? "volume-high-outline" : "ear-outline"}
+                    name={speaker ? "volume-high-outline" : "ear-outline"}
                     size={23}
                     color={CORAL}
                   />
@@ -265,24 +256,21 @@ export default function CallScreen({
                 <View style={styles.optionCopy}>
                   <Text style={styles.optionTitle}>Speaker</Text>
                   <Text style={styles.optionSubtitle}>
-                    {speakerOn ? "Speaker selected" : "Earpiece selected"}
+                    {speaker ? "Speaker selected" : "Earpiece selected"}
                   </Text>
                 </View>
                 <Switch
-                  value={speakerOn}
-                  onValueChange={setSpeakerOn}
+                  value={speaker}
+                  onValueChange={onSpeakerChange}
                   trackColor={{ false: "#4A4D52", true: CORAL }}
                   thumbColor="#FFFFFF"
-                  accessibilityLabel="Use speaker, simulated"
+                  accessibilityLabel="Use speaker"
                 />
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Switch to ${frontCamera ? "rear" : "front"} camera, simulated`}
-                onPress={() => {
-                  setFrontCamera((value) => !value);
-                  setPreviewFailed(false);
-                }}
+                accessibilityLabel={`Switch to ${frontCamera ? "rear" : "front"} camera`}
+                onPress={() => setFrontCamera((value) => !value)}
                 style={({ pressed }) => [
                   styles.optionRow,
                   pressed && styles.pressed,
@@ -300,8 +288,7 @@ export default function CallScreen({
                   <Text style={styles.optionSubtitle}>
                     {frontCamera
                       ? "Front camera selected"
-                      : "Rear camera selected"}{" "}
-                    · mock preview
+                      : "Rear camera selected"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={19} color="#A7ABB0" />
@@ -313,8 +300,9 @@ export default function CallScreen({
                   color={CORAL}
                 />
                 <Text style={styles.simulationText}>
-                  Simulated call. Controls update this screen only. No audio,
-                  video, or device settings are changed.
+                  The camera shows a live local preview when enabled. No video
+                  is recorded or sent. Microphone and speaker controls are
+                  simulated; no call audio is captured.
                 </Text>
               </View>
             </ScrollView>

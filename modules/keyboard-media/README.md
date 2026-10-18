@@ -24,6 +24,32 @@ reflection, observing global focus, replacing text watchers, or a new input view
 The installed Expo 57 APIs provide Fabric UIManager lookup and a main-thread
 AsyncFunction queue. This module uses those, not the legacy bridge UIManager.
 
+### Attach rejection on RN 0.86.3
+
+The installed `ReactTextInputManager.kt` creates `ReactEditText` directly, and
+`TextInput.js` forwards its host instance. There is no extra native container to
+search for or reason to replace the TextInput ref.
+
+`FabricUIManager.java:1072` resolves through a SurfaceMountingManager. It returns
+null if the tag has no registered surface or the surface is stopped.
+`SurfaceMountingManager.kt:1125` throws `IllegalViewOperationException` when a
+surface exists but the native view is missing. A JS ref/effect does not wait for
+that UI-thread mount transaction. The old single lookup converted null into
+`Expected a mounted React Native TextInput`, incorrectly treating a not-yet-mounted
+input as a type error.
+
+Attach now retries only a missing native view, up to 60 lookups with 16 ms between
+attempts. Wrong native types, unavailable React context/UIManager, and listener
+conflicts still reject immediately with a specific diagnostic and the tag.
+Detach, replacement of the same id, and module destruction cancel pending lookups
+and settle their promises. A stopped surface or stale tag eventually times out;
+it cannot keep a pending request alive indefinitely. Existing focused inputs still
+get their IME connection restarted after successful registration.
+
+The native regression reproduces lookup-before-mount ordering deterministically,
+not a captured device trace. Without a connected device, the screenshot's exact
+runtime ordering cannot be independently confirmed.
+
 Official sources:
 
 - https://developer.android.com/develop/ui/views/touch-and-input/image-keyboard
@@ -159,18 +185,17 @@ this module cannot know when the parent has finished with an attachment.
 
 ## Validation and device checklist
 
-Verified Expo autolinking discovers `keyboard-media` and its native class.
-`npm run typecheck` passes. `npm test` passes all 45 existing tests; those tests
-are not native IME coverage. The focused Gradle compile initially exposed missing
-versionName configuration, which was fixed. Its subsequent run timed out after
-180 seconds in `:expo-modules-core:compileDebugKotlin`, before compiling this
-module. Native compilation and actual IME delivery are not yet verified.
+For the attach fix, the native regression failed against the original immediate
+lookup with `Expected a mounted React Native TextInput`, then passed after adding
+the bounded mount wait. All five `MountAwaiterTest` tests pass, covering eventual
+mount, detach cancellation, timeout, non-retryable errors, replacement, and destroy
+cleanup. The tests execute the Kotlin coordinator used by the native module with
+a deterministic scheduler, without Android view mocks or a device.
 
-Follow-up static review replaced nullable file accesses with an immutable
-nonnull `target: File` captured by stream/event lambdas. Only `cleanupFile` is
-nullable, and only failure cleanup reads it. No native build was rerun after
-this review; Kotlin compilation, resolved dependency graph, and device behavior
-remain unverified.
+Both debug and release native Kotlin compilation passed using the installed SDK
+and JDK. These checks do not assemble an APK or exercise an actual Fabric renderer,
+Android Handler timing, or IME content delivery. ADB was available but listed no
+connected device. A rebuilt native binary is required for this fix.
 
 Wrapper regression tests use the real transpiled component with mocked hooks
 and native APIs to verify missing-binary warning deduplication across mounts and
@@ -181,11 +206,11 @@ attach/detach. They do not simulate React reconciliation or native IME delivery.
 node --test modules/keyboard-media/KeyboardMediaInput.test.cjs
 ```
 
-Optional native build, only when the user chooses to retry, from `android` with
-the project's JDK/SDK configured:
+Native regression and compilation, from `android` with the project's JDK/SDK
+configured:
 
 ```sh
-gradlew.bat :keyboard-media:compileDebugKotlin --console=plain --max-workers=2
+gradlew.bat :keyboard-media:testDebugUnitTest --tests expo.modules.keyboardmedia.MountAwaiterTest :keyboard-media:compileReleaseKotlin --console=plain --max-workers=2
 ```
 
 On a native rebuild, test with Gboard or another commitContent-capable keyboard:

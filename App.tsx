@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, BackHandler, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -27,6 +27,15 @@ import ChatProfile from "./src/features/contacts/ChatProfile";
 import CallHistoryDetail from "./src/features/calls/CallHistoryDetail";
 import ForwardScreen from "./src/features/conversations/ForwardScreen";
 import { palette, coral } from "./src/ui/theme";
+import { useCallNotifications } from "./src/features/calls/useCallNotifications";
+import { forgetIncomingCall, rememberIncomingCall } from "./src/features/calls/pendingCall";
+import { useMessageNotifications } from "./src/notifications/useMessageNotifications";
+import { useNotificationBridge } from "./src/notifications/useNotificationBridge";
+import { useNotificationActions } from "./src/state/useNotificationActions";
+import {
+  isSystemNotificationsAvailable,
+  setConversationMuted,
+} from "./src/services/systemNotifications";
 
 type ComposeMode = "message" | "voice" | "video";
 
@@ -91,6 +100,43 @@ export default function App() {
     setTab("chats");
     messenger.openChat(contact);
   }
+  /**
+   * System notifications are on unless the user turns them off; the native
+   * module itself refuses to post when Android permission or a channel blocks it.
+   */
+  const notificationsEnabled =
+    isSystemNotificationsAvailable &&
+    messenger.profile.systemNotifications !== false;
+  const onNotificationAction = useNotificationActions({
+    messenger,
+    calls,
+    // The bridge keeps the newest handler in a ref, so identity churn is fine.
+    openConversation: openChat,
+  });
+  useNotificationBridge(onNotificationAction, notificationsEnabled);
+  useCallNotifications(calls.call, notificationsEnabled);
+  useMessageNotifications({
+    chats: messenger.chats,
+    messages: messenger.messages,
+    seed: seedMessages,
+    self: {
+      id: "self",
+      name: messenger.profile.name,
+      avatarUri: messenger.profile.avatar,
+    },
+    visibleChatId: messenger.selected,
+    visible:
+      !calls.full && !detail && !forward && storyIndex === null && !addingStory,
+    previews: messenger.profile.previews !== false,
+    sound: messenger.profile.sound !== false,
+    enabled: notificationsEnabled,
+  });
+  /** Mute is stored in both places: the app preference and native suppression. */
+  function muteChat(id: string, muted: boolean) {
+    messenger.setMuted(id, muted);
+    if (isSystemNotificationsAvailable)
+      void setConversationMuted(id, muted).catch(() => {});
+  }
   function startCall(contact: Chat, video: boolean, incoming = false) {
     if (!contact) {
       Alert.alert("No contacts", "Add a contact before trying a call.");
@@ -114,6 +160,35 @@ export default function App() {
     }
     calls.start(currentContact, video, incoming);
   }
+  /** Incoming calls keep a record so a notification answer can rebuild them. */
+  function ringIncoming(contact: Chat, video: boolean) {
+    startCall(contact, video, true);
+  }
+  /**
+   * A ringing call is recorded so a notification answer can rebuild it. The
+   * record is dropped as soon as the call stops ringing, otherwise a later
+   * notification action would resurrect a call the user already answered, or
+   * record a missed call that actually connected.
+   */
+  const ringing = useRef(false);
+  useEffect(() => {
+    if (!notificationsEnabled) return;
+    if (calls.call?.status !== "incoming") {
+      if (!ringing.current) return;
+      ringing.current = false;
+      void forgetIncomingCall();
+      return;
+    }
+    if (ringing.current) return;
+    ringing.current = true;
+    void rememberIncomingCall({
+      callId: calls.call.id,
+      chatId: calls.call.chat.id,
+      video: calls.call.video,
+      receivedAt: Date.now(),
+      timeoutMs: 60_000,
+    });
+  }, [notificationsEnabled, calls.call]);
   function openCall(answer = false) {
     if (recording) {
       Alert.alert(
@@ -178,6 +253,8 @@ export default function App() {
               onBack={() => calls.setFull(false)}
               onEnd={calls.end}
               onAnswer={calls.answer}
+              onMuteChange={calls.setMuted}
+              onSpeakerChange={calls.setSpeaker}
               onChat={() => {
                 openChat(calls.call!.chat);
                 calls.setFull(false);
@@ -209,8 +286,10 @@ export default function App() {
                 dark={messenger.dark}
                 onBack={() => setDetail(null)}
                 onCall={(video) => startCall(detailChat, video)}
-                onToggleMute={() => messenger.toggleMute(detailChat.id)}
-                onToggleBlock={() => messenger.toggleBlock(detailChat.id)}
+                onMuteChange={(muted) => muteChat(detailChat.id, muted)}
+                onBlockChange={(blocked) =>
+                  messenger.setBlocked(detailChat.id, blocked)
+                }
                 onDeleteChat={() => {
                   messenger.deleteChat(detailChat.id);
                   setDetail(null);
@@ -289,7 +368,7 @@ export default function App() {
               dark={messenger.dark}
               onDarkChange={messenger.setDark}
               onProfileChange={messenger.setProfile}
-              onIncoming={() => startCall(messenger.chats[0], true, true)}
+              onIncoming={() => ringIncoming(messenger.chats[0], true)}
             />
           ) : tab === "calls" ? (
             <CallsScreen
@@ -312,7 +391,9 @@ export default function App() {
               onProfile={(contact) =>
                 setDetail({ id: contact.id, kind: "profile" })
               }
-              onToggleMute={(contact) => messenger.toggleMute(contact.id)}
+              onToggleMute={(contact) =>
+                muteChat(contact.id, !contact.muted)
+              }
               onTogglePin={(contact) => messenger.togglePin(contact.id)}
               onDeleteChat={(contact) => messenger.deleteChat(contact.id)}
               onStory={setStoryIndex}

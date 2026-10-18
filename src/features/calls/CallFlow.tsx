@@ -61,12 +61,16 @@ export default function CallFlow({
   onEnd,
   onAnswer,
   onChat,
+  onMuteChange,
+  onSpeakerChange,
 }: {
   call: Call;
   onBack: () => void;
   onEnd: () => void;
   onAnswer: () => void;
   onChat: () => void;
+  onMuteChange: (value: boolean) => void;
+  onSpeakerChange: (value: boolean) => void;
 }) {
   if (call.status === "active")
     return (
@@ -75,6 +79,10 @@ export default function CallFlow({
         avatar={call.chat.avatar}
         video={call.video}
         seconds={call.seconds}
+        muted={call.muted}
+        speaker={call.speaker}
+        onMuteChange={onMuteChange}
+        onSpeakerChange={onSpeakerChange}
         onBack={onBack}
         onEnd={onEnd}
         onChat={onChat}

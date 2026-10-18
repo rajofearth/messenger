@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -27,8 +28,8 @@ export type ChatProfileProps = {
   dark: boolean;
   onBack: () => void;
   onCall: (video: boolean) => void;
-  onToggleMute: () => void;
-  onToggleBlock: () => void;
+  onMuteChange: (muted: boolean) => void;
+  onBlockChange: (blocked: boolean) => void;
   onDeleteChat: () => void;
   onClearHistory: () => void;
   onOpenChat: (chat: Chat) => void;
@@ -42,8 +43,8 @@ export default function ChatProfile({
   dark,
   onBack,
   onCall,
-  onToggleMute,
-  onToggleBlock,
+  onMuteChange,
+  onBlockChange,
   onDeleteChat,
   onClearHistory,
   onOpenChat,
@@ -79,14 +80,10 @@ export default function ChatProfile({
     status: string,
     onPress: () => void,
     destructive = false,
-    toggled?: boolean,
   ) {
     return (
       <Pressable
-        accessibilityRole={toggled === undefined ? "button" : "switch"}
-        accessibilityState={
-          toggled === undefined ? undefined : { checked: toggled }
-        }
+        accessibilityRole="button"
         accessibilityLabel={`${title}. ${status}`}
         onPress={onPress}
         style={[s.row, { borderBottomColor: colors.line }]}
@@ -104,18 +101,36 @@ export default function ChatProfile({
           </Text>
           <Text style={[s.caption, { color: colors.muted }]}>{status}</Text>
         </View>
-        <Ionicons
-          name={
-            toggled === undefined
-              ? "chevron-forward"
-              : toggled
-                ? "toggle"
-                : "toggle-outline"
-          }
-          size={toggled === undefined ? 18 : 32}
-          color={toggled ? coral : colors.muted}
-        />
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </Pressable>
+    );
+  }
+  /** Settings rows whose state is a switch, matching the platform control. */
+  function toggleRow(
+    icon: IconName,
+    title: string,
+    status: string,
+    value: boolean,
+    change: (next: boolean) => void,
+    disabled = false,
+  ) {
+    return (
+      <View style={[s.row, { borderBottomColor: colors.line }]}>
+        <Ionicons name={icon} size={23} color={coral} />
+        <View style={s.body}>
+          <Text style={[s.label, { color: colors.fg }]}>{title}</Text>
+          <Text style={[s.caption, { color: colors.muted }]}>{status}</Text>
+        </View>
+        <Switch
+          accessibilityLabel={title}
+          value={value}
+          onValueChange={change}
+          disabled={disabled}
+          trackColor={{ false: dark ? "#50574E" : "#DEDFD5", true: coral }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor={dark ? "#50574E" : "#DEDFD5"}
+        />
+      </View>
     );
   }
   return (
@@ -305,21 +320,21 @@ export default function ChatProfile({
           <Text style={[s.heading, { color: colors.fg }]}>
             Conversation settings
           </Text>
-          {actionRow(
-            chat.muted ? "notifications-off-outline" : "notifications-outline",
+          {toggleRow(
+            "notifications-off-outline",
             "Mute notifications",
-            chat.muted ? "Muted" : "Notifications on",
-            onToggleMute,
-            false,
+            chat.muted
+              ? "Muted · no system notifications"
+              : "Notifications on",
             !!chat.muted,
+            onMuteChange,
           )}
-          {actionRow(
-            chat.blocked ? "ban" : "ban-outline",
-            chat.blocked ? "Unblock contact" : "Block contact",
+          {toggleRow(
+            "ban-outline",
+            "Block contact",
             chat.blocked ? "Blocked" : "Not blocked",
-            onToggleBlock,
-            false,
             !!chat.blocked,
+            onBlockChange,
           )}
           {actionRow(
             "trash-outline",
