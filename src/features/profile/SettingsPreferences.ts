@@ -2,20 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import { setHapticsEnabled } from "../../ui/primitives";
 
 type Preferences = {
   name: string;
   bio: string;
+  username: string;
+  haptics: boolean;
   avatar: string;
   sound: boolean;
   previews: boolean;
 };
-export type SettingsProfile = Omit<Preferences, "bio">;
+export type SettingsProfile = Pick<
+  Preferences,
+  "name" | "avatar" | "sound" | "previews"
+> &
+  Partial<Pick<Preferences, "bio" | "username" | "haptics">>;
 type Sheet = "profile" | "privacy" | "info" | null;
 const STORAGE_KEY = "@messenger/settings/v1";
 const DEFAULTS: Preferences = {
   name: "Alex Morgan",
   bio: "Here for the little moments.",
+  username: "alexmorgan",
+  haptics: true,
   avatar:
     "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=85",
   sound: true,
@@ -32,6 +41,7 @@ export function useSettingsPreferences(
   const [sheet, setSheet] = useState<Sheet>(null);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
+  const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -50,6 +60,12 @@ export function useSettingsPreferences(
                   ? stored.name
                   : DEFAULTS.name,
               bio: typeof stored.bio === "string" ? stored.bio : DEFAULTS.bio,
+              username:
+                typeof stored.username === "string"
+                  ? stored.username
+                  : DEFAULTS.username,
+              haptics:
+                typeof stored.haptics === "boolean" ? stored.haptics : true,
               avatar:
                 typeof stored.avatar === "string" && stored.avatar
                   ? stored.avatar
@@ -81,8 +97,8 @@ export function useSettingsPreferences(
 
   useEffect(() => {
     if (!ready) return;
-    const { name, avatar, sound, previews } = preferences;
-    onProfileChange?.({ name, avatar, sound, previews });
+    setHapticsEnabled(preferences.haptics);
+    onProfileChange?.(preferences);
   }, [preferences, ready, onProfileChange]);
 
   // Serialize writes so a slower earlier save cannot overwrite a newer preference.
@@ -97,7 +113,8 @@ export function useSettingsPreferences(
     return write;
   }
 
-  function toggle(key: "sound" | "previews", value: boolean) {
+  function toggle(key: "sound" | "previews" | "haptics", value: boolean) {
+    if (key === "haptics") setHapticsEnabled(value);
     void persist({ [key]: value }).catch(() => {
       Alert.alert(
         "Settings not saved",
@@ -140,19 +157,30 @@ export function useSettingsPreferences(
   }
 
   function editProfile() {
+    if (!ready) return;
     setName(preferences.name);
     setBio(preferences.bio);
+    setUsername(preferences.username);
     setSheet("profile");
   }
 
   async function saveProfile() {
+    if (!ready || saving || picking) return;
     if (!name.trim()) {
       Alert.alert("Add your name", "Enter a name before saving your profile.");
       return;
     }
+    const handle = username.trim().replace(/^@/, "");
+    if (handle && !/^[a-zA-Z0-9_]{3,30}$/.test(handle)) {
+      Alert.alert(
+        "Check your username",
+        "Use 3 to 30 letters, numbers, or underscores, or leave it empty.",
+      );
+      return;
+    }
     setSaving(true);
     try {
-      await persist({ name: name.trim(), bio: bio.trim() });
+      await persist({ name: name.trim(), bio: bio.trim(), username: handle });
       setSheet(null);
     } catch {
       Alert.alert(
@@ -173,6 +201,8 @@ export function useSettingsPreferences(
     setName,
     bio,
     setBio,
+    username,
+    setUsername,
     saving,
     picking,
     avatarFailed,

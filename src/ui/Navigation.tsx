@@ -20,7 +20,7 @@ export default function Navigation({
     <View
       style={[
         s.nav,
-        { backgroundColor: colors.card, borderTopColor: colors.line },
+        { backgroundColor: colors.card, borderColor: colors.line },
       ]}
     >
       {(
@@ -51,12 +51,7 @@ export default function Navigation({
           }}
           style={s.item}
         >
-          <View
-            style={[
-              s.icon,
-              active === item.id && { backgroundColor: colors.tint },
-            ]}
-          >
+          <View style={s.icon}>
             {item.id === "settings" ? (
               <Avatar uri={avatar} size={27} />
             ) : (
@@ -75,9 +70,18 @@ export default function Navigation({
 const s = StyleSheet.create({
   nav: {
     flexDirection: "row",
-    borderTopWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 30,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 36,
+    marginHorizontal: 36,
+    marginTop: 8,
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    elevation: 3,
+    shadowColor: "#30251B",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
   },
   item: {
     flex: 1,
@@ -88,7 +92,7 @@ const s = StyleSheet.create({
   icon: {
     width: 55,
     height: 39,
-    borderRadius: 15,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
   },

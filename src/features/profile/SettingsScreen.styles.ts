@@ -1,17 +1,19 @@
 import { StyleSheet } from "react-native";
+import { palette } from "../../ui/theme";
 
 export const CORAL = "#F28B70";
 
 export function settingsColors(dark: boolean) {
+  const colors = palette(dark);
   return dark
     ? {
-        bg: "#1D211F",
-        card: "#282D29",
-        text: "#F8F4EA",
-        muted: "#ABAFA5",
-        line: "#3A4039",
-        tint: "#3F332D",
-        input: "#202520",
+        bg: colors.bg,
+        card: colors.card,
+        text: colors.fg,
+        muted: colors.muted,
+        line: colors.line,
+        tint: colors.tint,
+        input: "#302B25",
       }
     : {
         bg: "#FAF7EF",

@@ -2,7 +2,6 @@ import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
   root: { flex: 1 },
-  body: { fontFamily: "DMSans_400Regular", fontSize: 14 },
   tiny: { fontFamily: "DMSans_500Medium", fontSize: 11, letterSpacing: 0.2 },
   chatHeader: {
     flexDirection: "row",
@@ -44,58 +43,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   liveDot: { width: 7, height: 7, backgroundColor: "#DE6666", borderRadius: 4 },
-  modalWrap: { flex: 1, justifyContent: "flex-end" },
-  scrim: { ...StyleSheet.absoluteFill, backgroundColor: "#0005" },
-  sheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingBottom: 35,
-    paddingTop: 12,
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    backgroundColor: "#D9D9D1",
-    borderRadius: 3,
-    marginBottom: 16,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  sheetTitle: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 23,
-    letterSpacing: -0.6,
-    flex: 1,
-  },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 13,
-  },
-  actionIcon: {
-    width: 46,
-    height: 46,
-    backgroundColor: "#FBECE5",
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emojiGrid: { flexDirection: "row", flexWrap: "wrap", paddingBottom: 15 },
-  emojiCell: { width: "20%", alignItems: "center", paddingVertical: 13 },
-  reactionOverlay: {
-    flex: 1,
-    backgroundColor: "#0005",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reactionBar: { flexDirection: "row", borderRadius: 40, padding: 6 },
   imageViewer: {
     flex: 1,
     backgroundColor: "#101412",

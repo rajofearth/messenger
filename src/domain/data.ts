@@ -3,7 +3,16 @@ export type Message = {
   text?: string;
   mine: boolean;
   time: string;
-  kind?: "image" | "audio" | "file";
+  kind?: "image" | "video" | "audio" | "file";
+  replyTo?: {
+    id: string;
+    text: string;
+    mine: boolean;
+    kind?: "image" | "video" | "audio" | "file";
+  };
+  forwarded?: boolean;
+  deleted?: boolean;
+  createdAt?: string;
   uri?: string;
   filename?: string;
   duration?: number;
@@ -20,6 +29,14 @@ export type Chat = {
   typing?: boolean;
   group?: boolean;
   color: string;
+  username?: string;
+  bio?: string;
+  createdAt?: string;
+  memberIds?: string[];
+  adminIds?: string[];
+  muted?: boolean;
+  blocked?: boolean;
+  pinned?: boolean;
 };
 export type Story = {
   id: string;
@@ -29,6 +46,7 @@ export type Story = {
   seen: boolean;
   caption: string;
   video?: boolean;
+  ownerId?: string;
 };
 export const portrait = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=400&q=85`;

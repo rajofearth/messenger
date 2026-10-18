@@ -1,5 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Chat, Story } from "../../domain/data";
 import { filterConversations, unreadConversations } from "../../domain/model";
@@ -7,6 +16,8 @@ import { Avatar, IconButton, tap } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
 import QuickActions from "../../ui/QuickActions";
 import { s } from "./ChatsScreen.styles";
+import { groupStories } from "../../domain/stories";
+import ChatListActions, { type ChatActionTarget } from "./ChatListActions";
 
 type Props = {
   chats: Chat[];
@@ -15,6 +26,10 @@ type Props = {
   dark: boolean;
   typingId: string | null;
   onOpenChat: (chat: Chat) => void;
+  onProfile: (chat: Chat) => void;
+  onToggleMute: (chat: Chat) => void;
+  onTogglePin: (chat: Chat) => void;
+  onDeleteChat: (chat: Chat) => void;
   onStory: (index: number) => void;
   onAddStory: () => void;
   onNewConversation: () => void;
@@ -29,6 +44,10 @@ export default function ChatsScreen({
   dark,
   typingId,
   onOpenChat,
+  onProfile,
+  onToggleMute,
+  onTogglePin,
+  onDeleteChat,
   onStory,
   onAddStory,
   onNewConversation,
@@ -41,7 +60,14 @@ export default function ChatsScreen({
   const [query, setQuery] = useState("");
   const list = useRef<ScrollView>(null);
   const term = query.trim().toLowerCase();
-  const filtered = filterConversations(chats, query, tab);
+  const filtered = filterConversations(chats, query, tab).sort(
+    (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+  );
+  const groups = groupStories(stories);
+  const selfIndex = groups.findIndex((group) => group.id === "self");
+  const self = groups[selfIndex];
+  const [actions, setActions] = useState<ChatActionTarget | null>(null);
+  const longPressed = useRef(false);
 
   useEffect(() => {
     list.current?.scrollTo({ y: 0, animated: false });
@@ -53,7 +79,11 @@ export default function ChatsScreen({
   }
 
   return (
-    <View style={[s.screen, { backgroundColor: colors.bg }]}>
+    <KeyboardAvoidingView
+      style={[s.screen, { backgroundColor: colors.bg }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      enabled={search}
+    >
       <View style={s.header}>
         <Text
           accessibilityRole="header"
@@ -115,48 +145,70 @@ export default function ChatsScreen({
               <Pressable
                 style={s.storyItem}
                 accessibilityRole="button"
-                accessibilityLabel="Add your story"
-                onPress={onAddStory}
+                accessibilityLabel={
+                  self
+                    ? `Your story, ${self.seen ? "seen" : "unseen"}`
+                    : "Add your story"
+                }
+                onPress={() => (self ? onStory(selfIndex) : onAddStory())}
               >
                 <View
                   style={[
                     s.storyRing,
-                    { borderColor: colors.line, borderStyle: "dashed" },
+                    {
+                      borderColor: self
+                        ? self.seen
+                          ? colors.line
+                          : coral
+                        : colors.line,
+                      borderStyle: self ? "solid" : "dashed",
+                    },
                   ]}
                 >
-                  <Avatar uri={avatar} size={58} />
-                  <View style={[s.storyPlus, { borderColor: colors.bg }]}>
+                  <Avatar uri={self?.avatar ?? avatar} size={58} />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Add your story"
+                    hitSlop={4}
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      onAddStory();
+                    }}
+                    style={[s.storyPlus, { borderColor: colors.bg }]}
+                  >
                     <Ionicons name="add" size={17} color="white" />
-                  </View>
+                  </Pressable>
                 </View>
                 <Text style={[s.storyName, { color: colors.muted }]}>
                   Your story
                 </Text>
               </Pressable>
-              {stories.map((story, index) => (
-                <Pressable
-                  key={story.id}
-                  style={s.storyItem}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${story.name} story, ${story.seen ? "seen" : "unseen"}`}
-                  onPress={() => onStory(index)}
-                >
-                  <View
-                    style={[
-                      s.storyRing,
-                      { borderColor: story.seen ? colors.line : coral },
-                    ]}
+              {groups.map((story, index) =>
+                story.id === "self" ? null : (
+                  <Pressable
+                    key={story.id}
+                    style={s.storyItem}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${story.name} story, ${story.seen ? "seen" : "unseen"}`}
+                    onPress={() => onStory(index)}
                   >
-                    <Avatar uri={story.avatar} size={58} />
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={[s.storyName, { color: colors.fg }]}
-                  >
-                    {story.name}
-                  </Text>
-                </Pressable>
-              ))}
+                    <View
+                      style={[
+                        s.storyRing,
+                        { borderColor: story.seen ? colors.line : coral },
+                      ]}
+                    >
+                      <Avatar uri={story.avatar} size={58} />
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[s.storyName, { color: colors.fg }]}
+                    >
+                      {story.name}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
             </ScrollView>
             <View
               style={[
@@ -220,7 +272,22 @@ export default function ChatsScreen({
               key={chat.id}
               accessibilityRole="button"
               accessibilityLabel={`${chat.name}, ${chat.unread > 0 ? `${chat.unread} unread messages, ` : ""}${preview}`}
-              onPress={() => onOpenChat(chat)}
+              accessibilityHint="Long press for conversation actions"
+              onPressIn={() => {
+                longPressed.current = false;
+              }}
+              onLongPress={(event) => {
+                longPressed.current = true;
+                Keyboard.dismiss();
+                setActions({
+                  chat,
+                  x: event.nativeEvent.pageX,
+                  y: event.nativeEvent.pageY,
+                });
+              }}
+              onPress={() => {
+                if (!longPressed.current) onOpenChat(chat);
+              }}
               style={({ pressed }) => [
                 s.chatRow,
                 pressed && { backgroundColor: colors.card },
@@ -262,6 +329,22 @@ export default function ChatsScreen({
                   >
                     {preview}
                   </Text>
+                  {chat.muted && (
+                    <Ionicons
+                      name="notifications-off-outline"
+                      size={14}
+                      color={colors.muted}
+                      accessibilityLabel="Muted"
+                    />
+                  )}
+                  {chat.pinned && (
+                    <Ionicons
+                      name="pin-outline"
+                      size={14}
+                      color={colors.muted}
+                      accessibilityLabel="Pinned"
+                    />
+                  )}
                   {chat.unread > 0 && (
                     <View style={s.unread}>
                       <Text style={s.unreadText}>{chat.unread}</Text>
@@ -300,6 +383,15 @@ export default function ChatsScreen({
         onVoiceCall={onVoiceCall}
         onVideoCall={onVideoCall}
       />
-    </View>
+      <ChatListActions
+        target={actions}
+        dark={dark}
+        onClose={() => setActions(null)}
+        onProfile={onProfile}
+        onToggleMute={onToggleMute}
+        onTogglePin={onTogglePin}
+        onDeleteChat={onDeleteChat}
+      />
+    </KeyboardAvoidingView>
   );
 }

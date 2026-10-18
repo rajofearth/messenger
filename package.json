@@ -9,7 +9,7 @@
     "android:build": "node scripts/android.mjs build",
     "android:install": "node scripts/android.mjs install",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs",
+    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/conversation.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs",
     "check": "npm run typecheck && expo install --check"
   },
   "dependencies": {
@@ -25,7 +25,9 @@
     "expo-haptics": "~57.0.3",
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
+    "expo-sharing": "~57.0.23",
     "expo-status-bar": "~57.0.1",
+    "expo-video": "~57.0.5",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0"

@@ -1,159 +1,74 @@
 import React from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { IconButton, tap, type IconName } from "../../ui/primitives";
+import { tap, type IconName } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
-import { styles as s } from "./ConversationScreen.styles";
-
-export type AttachmentMenuProps = {
-  sheet: "attach" | "emoji" | null;
-  dark: boolean;
-  onClose: () => void;
-  onEmoji: (emoji: string) => void;
-  onPhoto: (camera: boolean) => void;
-  onFile: () => void;
-  onRecord: () => void;
-};
-const emojis = [
-  "😊",
-  "😂",
-  "✨",
-  "🤍",
-  "👋",
-  "🙌",
-  "❤️",
-  "😍",
-  "🎉",
-  "☕",
-  "👍",
-  "🔥",
-  "🥹",
-  "💬",
-  "🌸",
-  "🫶",
-  "😎",
-  "🤔",
-  "💛",
-  "🌈",
-  "👌",
-];
 
 export default function AttachmentMenu({
-  sheet,
   dark,
+  maxHeight,
   onClose,
-  onEmoji,
   onPhoto,
   onFile,
   onRecord,
-}: AttachmentMenuProps) {
-  const { bg, fg, muted } = palette(dark);
-  const actions: {
-    icon: IconName;
-    title: string;
-    subtitle: string;
-    run: () => void;
-  }[] = [
+}: {
+  dark: boolean;
+  maxHeight: number;
+  onClose: () => void;
+  onPhoto: (camera: boolean) => void;
+  onFile: () => void;
+  onRecord: () => void;
+}) {
+  const { card, fg } = palette(dark);
+  const actions: { icon: IconName; title: string; run: () => void }[] = [
     {
       icon: "images-outline",
-      title: "Photo library",
-      subtitle: "Share a photo from your camera roll",
+      title: "Photos and videos",
       run: () => onPhoto(false),
     },
-    {
-      icon: "camera-outline",
-      title: "Camera",
-      subtitle: "Capture something in the moment",
-      run: () => onPhoto(true),
-    },
-    {
-      icon: "document-attach-outline",
-      title: "File",
-      subtitle: "Documents, videos, audio, and more",
-      run: onFile,
-    },
-    {
-      icon: "mic-outline",
-      title: "Voice note",
-      subtitle: "Record a voice message",
-      run: onRecord,
-    },
+    { icon: "camera-outline", title: "Camera", run: () => onPhoto(true) },
+    { icon: "document-attach-outline", title: "File", run: onFile },
+    { icon: "mic-outline", title: "Voice note", run: onRecord },
   ];
   return (
-    <Modal
-      transparent
-      visible={sheet !== null}
-      animationType="slide"
-      onRequestClose={onClose}
+    <View
+      style={[styles.popup, { backgroundColor: card, maxHeight }]}
+      accessibilityViewIsModal
     >
-      <View style={s.modalWrap}>
-        <Pressable
-          style={s.scrim}
-          onPress={onClose}
-          accessibilityLabel="Dismiss menu"
-        />
-        <View style={[s.sheet, { backgroundColor: bg }]}>
-          <View style={s.sheetHandle} />
-          <View style={s.sheetHeader}>
-            <Text style={[s.sheetTitle, { color: fg }]}>
-              {sheet === "attach" ? "Attachments" : "Emoji"}
-            </Text>
-            <IconButton
-              name="close"
-              label="Close menu"
-              color={fg}
-              onPress={onClose}
-            />
-          </View>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            style={{ maxHeight: 470 }}
+      <ScrollView keyboardShouldPersistTaps="always">
+        {actions.map(({ icon, title, run }) => (
+          <Pressable
+            key={title}
+            accessibilityRole="button"
+            style={styles.row}
+            onPress={() => {
+              tap();
+              onClose();
+              run();
+            }}
           >
-            {sheet === "attach" ? (
-              actions.map((action) => (
-                <Pressable
-                  key={action.title}
-                  accessibilityRole="button"
-                  onPress={() => {
-                    tap();
-                    onClose();
-                    action.run();
-                  }}
-                  style={s.actionRow}
-                >
-                  <View style={s.actionIcon}>
-                    <Ionicons name={action.icon} size={23} color={coral} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.body, { color: fg }]}>{action.title}</Text>
-                    <Text style={[s.tiny, { color: muted, marginTop: 4 }]}>
-                      {action.subtitle}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={muted} />
-                </Pressable>
-              ))
-            ) : (
-              <View style={s.emojiGrid}>
-                {emojis.map((emoji) => (
-                  <Pressable
-                    key={emoji}
-                    accessibilityLabel={`Insert ${emoji}`}
-                    onPress={() => {
-                      tap();
-                      onEmoji(emoji);
-                      onClose();
-                    }}
-                    style={s.emojiCell}
-                  >
-                    <Text style={{ fontSize: 29 }}>{emoji}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+            <Ionicons name={icon} size={23} color={coral} />
+            <Text style={{ color: fg, fontSize: 15 }}>{title}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
+const styles = StyleSheet.create({
+  popup: {
+    position: "absolute",
+    bottom: "100%",
+    left: 16,
+    width: 240,
+    borderRadius: 18,
+    padding: 8,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    zIndex: 10,
+  },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, padding: 12 },
+});

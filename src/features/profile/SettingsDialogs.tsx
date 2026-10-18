@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 import type { useSettingsPreferences } from "./SettingsPreferences";
 
@@ -23,8 +24,22 @@ export default function SettingsDialogs({
   settings,
   colors,
 }: SettingsDialogsProps) {
-  const { sheet, setSheet, name, setName, bio, setBio, saving, saveProfile } =
-    settings;
+  const {
+    sheet,
+    setSheet,
+    name,
+    setName,
+    bio,
+    setBio,
+    username,
+    setUsername,
+    saving,
+    saveProfile,
+    picking,
+    pickAvatar,
+  } = settings;
+  const insets = useSafeAreaInsets();
+  const busy = saving || picking;
   const icon = (
     name: React.ComponentProps<typeof Ionicons>["name"],
     size = 21,
@@ -32,19 +47,29 @@ export default function SettingsDialogs({
   return (
     <Modal
       visible={sheet !== null}
-      transparent
-      animationType="fade"
+      presentationStyle="fullScreen"
+      animationType="slide"
       onRequestClose={() => {
-        if (!saving) setSheet(null);
+        if (!busy) setSheet(null);
       }}
     >
       <KeyboardAvoidingView
-        style={styles.overlay}
+        style={{
+          flex: 1,
+          backgroundColor: colors.bg,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View
           accessibilityViewIsModal
-          style={[styles.modal, { backgroundColor: colors.bg }]}
+          style={{
+            flex: 1,
+            paddingHorizontal: 24,
+            paddingTop: 16,
+            backgroundColor: colors.bg,
+          }}
         >
           <View style={styles.modalHeader}>
             <Text
@@ -60,7 +85,7 @@ export default function SettingsDialogs({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close dialog"
-              disabled={saving}
+              disabled={busy}
               hitSlop={10}
               onPress={() => setSheet(null)}
             >
@@ -69,10 +94,35 @@ export default function SettingsDialogs({
           </View>
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.modalContent}
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: 32 }}
+            style={{ flex: 1 }}
           >
             {sheet === "profile" ? (
               <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Change profile photo"
+                  disabled={busy}
+                  onPress={() => void pickAvatar()}
+                  style={[
+                    styles.edit,
+                    {
+                      alignSelf: "center",
+                      backgroundColor: colors.tint,
+                      marginBottom: 24,
+                    },
+                  ]}
+                >
+                  {picking ? (
+                    <ActivityIndicator color={colors.text} />
+                  ) : (
+                    icon("camera-outline")
+                  )}
+                  <Text style={[styles.editText, { color: colors.text }]}>
+                    Change photo
+                  </Text>
+                </Pressable>
                 <Text style={[styles.label, { color: colors.text }]}>Name</Text>
                 <TextInput
                   accessibilityLabel="Name"
@@ -80,13 +130,31 @@ export default function SettingsDialogs({
                   onChangeText={setName}
                   maxLength={50}
                   autoCapitalize="words"
-                  editable={!saving}
+                  editable={!busy}
                   style={[
                     styles.input,
                     { color: colors.text, backgroundColor: colors.input },
                   ]}
                   placeholder="Your name"
                   placeholderTextColor={colors.muted}
+                />
+                <Text style={[styles.label, { color: colors.text }]}>
+                  Username
+                </Text>
+                <TextInput
+                  accessibilityLabel="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={31}
+                  editable={!busy}
+                  placeholder="@username"
+                  placeholderTextColor={colors.muted}
+                  style={[
+                    styles.input,
+                    { color: colors.text, backgroundColor: colors.input },
+                  ]}
                 />
                 <Text style={[styles.label, { color: colors.text }]}>Bio</Text>
                 <TextInput
@@ -95,7 +163,7 @@ export default function SettingsDialogs({
                   onChangeText={setBio}
                   multiline
                   maxLength={160}
-                  editable={!saving}
+                  editable={!busy}
                   style={[
                     styles.input,
                     styles.bioInput,
@@ -109,9 +177,9 @@ export default function SettingsDialogs({
                 </Text>
                 <Pressable
                   accessibilityRole="button"
-                  disabled={saving}
+                  disabled={busy}
                   onPress={() => void saveProfile()}
-                  style={[styles.primary, { opacity: saving ? 0.65 : 1 }]}
+                  style={[styles.primary, { opacity: busy ? 0.65 : 1 }]}
                 >
                   {saving ? (
                     <ActivityIndicator color="#29372F" />

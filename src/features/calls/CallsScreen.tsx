@@ -18,6 +18,7 @@ export default function CallsScreen({
   history,
   dark,
   onCall,
+  onHistory,
   onNewConversation,
   onVoiceCall,
   onVideoCall,
@@ -25,6 +26,7 @@ export default function CallsScreen({
   history: CallRecord[];
   dark: boolean;
   onCall: (chat: Chat, video: boolean) => void;
+  onHistory: (chat: Chat) => void;
   onNewConversation: () => void;
   onVoiceCall: () => void;
   onVideoCall: () => void;
@@ -77,7 +79,9 @@ export default function CallsScreen({
         {filtered.map((record) => (
           <Pressable
             key={record.id}
-            onPress={() => onCall(record.chat, record.video)}
+            accessibilityRole="button"
+            accessibilityLabel={`View call history with ${record.chat.name}`}
+            onPress={() => onHistory(record.chat)}
             style={s.row}
           >
             <Avatar uri={record.chat.avatar} />
@@ -99,11 +103,21 @@ export default function CallsScreen({
                 </Text>
               </View>
             </View>
-            <Ionicons
-              name={record.video ? "videocam-outline" : "call-outline"}
-              size={23}
-              color={coral}
-            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Start ${record.video ? "video" : "voice"} call with ${record.chat.name}`}
+              onPress={(event) => {
+                event.stopPropagation();
+                onCall(record.chat, record.video);
+              }}
+              style={s.callButton}
+            >
+              <Ionicons
+                name={record.video ? "videocam-outline" : "call-outline"}
+                size={23}
+                color={coral}
+              />
+            </Pressable>
           </Pressable>
         ))}
         {!filtered.length && (
@@ -158,6 +172,12 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   body: { flex: 1, marginLeft: 15 },
+  callButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   name: { fontFamily: "DMSans_500Medium", fontSize: 14 },
   meta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
   caption: { fontFamily: "DMSans_400Regular", fontSize: 12 },

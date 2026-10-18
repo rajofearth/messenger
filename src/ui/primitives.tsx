@@ -3,8 +3,13 @@ import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
+let hapticsEnabled = true;
+export function setHapticsEnabled(enabled: boolean) {
+  hapticsEnabled = enabled;
+}
 export function tap() {
-  if (Platform.OS !== "web") void Haptics.selectionAsync().catch(() => {});
+  if (hapticsEnabled && Platform.OS !== "web")
+    void Haptics.selectionAsync().catch(() => {});
 }
 export function IconButton({
   name,

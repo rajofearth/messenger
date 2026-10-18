@@ -12,7 +12,10 @@ import {
 import type { Message } from "../../domain/data";
 
 export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder({
+    ...RecordingPresets.HIGH_QUALITY,
+    isMeteringEnabled: true,
+  });
   const state = useAudioRecorderState(recorder, 200);
   const [recording, setRecording] = useState(false);
   const active = useRef(false);
@@ -45,12 +48,12 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
       if (!permission.granted) {
         Alert.alert(
           "Permission needed",
-          `Allow ${camera ? "camera" : "photo library"} access in your device settings to share a photo.`,
+          `Allow ${camera ? "camera" : "photo library"} access in your device settings to share photos and videos.`,
         );
         return;
       }
       const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: ["images"],
+        mediaTypes: ["images", "videos"],
         quality: 0.85,
         allowsEditing: false,
       };
@@ -58,7 +61,12 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
       if (mounted.current && !result.canceled && result.assets[0]) {
-        onSend({ kind: "image", uri: result.assets[0].uri });
+        const asset = result.assets[0];
+        onSend({
+          kind: asset.type === "video" ? "video" : "image",
+          uri: asset.uri,
+          duration: asset.duration ? asset.duration / 1000 : undefined,
+        });
       }
     } catch {
       Alert.alert(
@@ -179,6 +187,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
   return {
     recording,
     durationMillis: state.durationMillis,
+    metering: state.metering,
     isRecording: () => active.current,
     pickPhoto,
     pickFile,

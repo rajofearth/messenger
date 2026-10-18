@@ -11,6 +11,7 @@
     },
     "android": {
       "package": "com.yashraj.messenger",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -36,9 +37,11 @@
         {
           "photosPermission": "Allow Messenger to choose photos for messages, stories, and your profile.",
           "cameraPermission": "Allow Messenger to take photos for messages and stories.",
-          "microphonePermission": false
+          "microphonePermission": "Allow Messenger to record audio when you capture a video to share."
         }
-      ]
+      ],
+      "expo-video",
+      "expo-sharing"
     ]
   }
 }

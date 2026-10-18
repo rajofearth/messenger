@@ -5,12 +5,14 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { IconButton } from "../../ui/primitives";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { palette, coral } from "../../ui/theme";
 export default function ContactEditor({
   kind,
@@ -23,6 +25,7 @@ export default function ContactEditor({
   onClose: () => void;
   onSave: (name: string, handle: string, group: boolean) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const colors = palette(dark);
@@ -40,25 +43,31 @@ export default function ContactEditor({
       );
       return;
     }
-    onSave(name, handle, kind === "group");
+    onSave(name.trim(), handle.trim(), kind === "group");
   }
   return (
     <Modal
       visible={kind !== null}
-      transparent
+      presentationStyle="fullScreen"
       animationType="slide"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        style={s.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={[
+          s.overlay,
+          {
+            backgroundColor: colors.bg,
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
+        ]}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityLabel="Dismiss editor"
-        />
-        <View style={[s.sheet, { backgroundColor: colors.bg }]}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={[s.sheet, { backgroundColor: colors.bg }]}
+        >
           <View style={s.header}>
             <Text style={[s.title, { color: colors.fg }]}>
               {kind === "group" ? "Create group" : "New contact"}
@@ -100,12 +109,16 @@ export default function ContactEditor({
               ]}
             />
           )}
-          <Pressable onPress={save} style={s.primary}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={save}
+            style={s.primary}
+          >
             <Text style={s.primaryText}>
               {kind === "group" ? "Create group" : "Add contact"}
             </Text>
           </Pressable>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -113,8 +126,7 @@ export default function ContactEditor({
 const s = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "#15251D66",
+    backgroundColor: "#FBFAF7",
   },
   sheet: {
     borderTopLeftRadius: 28,

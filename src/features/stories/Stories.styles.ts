@@ -5,6 +5,12 @@ export const styles = StyleSheet.create({
   flex: { flex: 1 },
   viewer: { flex: 1, backgroundColor: "#101512" },
   image: { ...StyleSheet.absoluteFill },
+  mediaError: {
+    color: "white",
+    textAlign: "center",
+    marginTop: "50%",
+    padding: 24,
+  },
   top: { padding: 16 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: {

@@ -1,12 +1,12 @@
 export const coral = "#EF8E76";
 export function palette(dark: boolean) {
   return {
-    bg: dark ? "#191D1B" : "#FBFAF7",
-    fg: dark ? "#F3F0EB" : "#28332E",
-    muted: dark ? "#A4ABA6" : "#92978F",
-    card: dark ? "#252B27" : "#FFFFFF",
-    line: dark ? "#333A34" : "#EEEDE7",
-    tint: dark ? "#44332C" : "#FBECE5",
+    bg: dark ? "#292622" : "#FBFAF7",
+    fg: dark ? "#FAF3E8" : "#28332E",
+    muted: dark ? "#BDB1A3" : "#92978F",
+    card: dark ? "#36312B" : "#FFFFFF",
+    line: dark ? "#4A4239" : "#EEEDE7",
+    tint: dark ? "#543D32" : "#FBECE5",
   };
 }
 export type Colors = ReturnType<typeof palette>;

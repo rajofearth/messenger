@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Chat } from "../../domain/data";
+import { palette } from "../../ui/theme";
 
 export type NewConversationScreenProps = {
   contacts: Chat[];
@@ -38,23 +39,8 @@ export default function NewConversationScreen({
   onNewGroup,
 }: NewConversationScreenProps) {
   const [search, setSearch] = useState("");
-  const colors = dark
-    ? {
-        bg: "#1D211F",
-        text: "#F8F4EA",
-        muted: "#ABAFA5",
-        line: "#3A4039",
-        input: "#282D29",
-        tint: "#3F332D",
-      }
-    : {
-        bg: "#FAF7EF",
-        text: "#29372F",
-        muted: "#858B80",
-        line: "#EFEFE7",
-        input: "#F0EEE6",
-        tint: "#FCE9DF",
-      };
+  const base = palette(dark);
+  const colors = { ...base, text: base.fg, input: base.card };
   const query = search.trim().toLowerCase();
   const people = contacts.filter((chat) => !chat.group);
   const filtered = people.filter((chat) =>
@@ -129,46 +115,49 @@ export default function NewConversationScreen({
         contentContainerStyle={s.list}
         ListHeaderComponent={
           <View>
-            {(
-              [
-                {
-                  label: "New contact",
-                  icon: "person-add-outline",
-                  onPress: onNewContact,
-                },
-                {
-                  label: "Create group",
-                  icon: "people-outline",
-                  onPress: onNewGroup,
-                },
-              ] as const
-            ).map((action) => (
-              <Pressable
-                key={action.label}
-                accessibilityRole="button"
-                accessibilityLabel={action.label}
-                onPress={action.onPress}
-                style={({ pressed }) => [s.row, pressed && s.pressed]}
-              >
-                <View style={[s.actionIcon, { backgroundColor: colors.tint }]}>
+            {mode === "message" &&
+              (
+                [
+                  {
+                    label: "New contact",
+                    icon: "person-add-outline",
+                    onPress: onNewContact,
+                  },
+                  {
+                    label: "Create group",
+                    icon: "people-outline",
+                    onPress: onNewGroup,
+                  },
+                ] as const
+              ).map((action) => (
+                <Pressable
+                  key={action.label}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                  onPress={action.onPress}
+                  style={({ pressed }) => [s.row, pressed && s.pressed]}
+                >
+                  <View
+                    style={[s.actionIcon, { backgroundColor: colors.tint }]}
+                  >
+                    <Ionicons
+                      name={action.icon}
+                      size={23}
+                      color={CORAL}
+                      accessible={false}
+                    />
+                  </View>
+                  <Text style={[s.name, { color: colors.text }]}>
+                    {action.label}
+                  </Text>
                   <Ionicons
-                    name={action.icon}
-                    size={23}
-                    color={CORAL}
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.muted}
                     accessible={false}
                   />
-                </View>
-                <Text style={[s.name, { color: colors.text }]}>
-                  {action.label}
-                </Text>
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.muted}
-                  accessible={false}
-                />
-              </Pressable>
-            ))}
+                </Pressable>
+              ))}
             <View style={[s.section, { borderTopColor: colors.line }]}>
               <Text
                 accessibilityRole="header"

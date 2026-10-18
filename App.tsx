@@ -21,7 +21,11 @@ import type { Tab } from "./src/ui/Navigation";
 import CallFlow, { CallPill } from "./src/features/calls/CallFlow";
 import { useMessenger } from "./src/state/useMessenger";
 import { useCalls } from "./src/features/calls/useCalls";
-import type { Chat } from "./src/domain/data";
+import type { Chat, Message } from "./src/domain/data";
+import { seedMessages } from "./src/domain/data";
+import ChatProfile from "./src/features/contacts/ChatProfile";
+import CallHistoryDetail from "./src/features/calls/CallHistoryDetail";
+import ForwardScreen from "./src/features/conversations/ForwardScreen";
 import { palette, coral } from "./src/ui/theme";
 
 type ComposeMode = "message" | "voice" | "video";
@@ -40,6 +44,14 @@ export default function App() {
   const [storyIndex, setStoryIndex] = useState<number | null>(null);
   const [addingStory, setAddingStory] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [detail, setDetail] = useState<{
+    id: string;
+    kind: "profile" | "history";
+  } | null>(null);
+  const [forward, setForward] = useState<Message | null>(null);
+  const detailChat =
+    messenger.chats.find((item) => item.id === detail?.id) ||
+    messenger.history.find((item) => item.chat.id === detail?.id)?.chat;
   const colors = palette(messenger.dark);
   const chat = messenger.chats.find((item) => item.id === messenger.selected);
 
@@ -47,6 +59,14 @@ export default function App() {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
       if (calls.full) {
         calls.setFull(false);
+        return true;
+      }
+      if (forward) {
+        setForward(null);
+        return true;
+      }
+      if (detail) {
+        setDetail(null);
         return true;
       }
       // The conversation handles its overlays and recording guard itself.
@@ -62,14 +82,29 @@ export default function App() {
       return false;
     });
     return () => handler.remove();
-  }, [calls.full, messenger.selected, compose, tab]);
+  }, [calls.full, messenger.selected, compose, tab, detail, forward]);
 
   function openChat(contact: Chat) {
+    setDetail(null);
+    setForward(null);
     setCompose(null);
     setTab("chats");
     messenger.openChat(contact);
   }
   function startCall(contact: Chat, video: boolean, incoming = false) {
+    if (!contact) {
+      Alert.alert("No contacts", "Add a contact before trying a call.");
+      return;
+    }
+    const currentContact =
+      messenger.chats.find((item) => item.id === contact.id) || contact;
+    if (currentContact.blocked) {
+      Alert.alert(
+        "Contact blocked",
+        "Unblock this contact from their profile before calling.",
+      );
+      return;
+    }
     if (recording) {
       Alert.alert(
         "Finish your voice note first",
@@ -77,7 +112,7 @@ export default function App() {
       );
       return;
     }
-    calls.start(contact, video, incoming);
+    calls.start(currentContact, video, incoming);
   }
   function openCall(answer = false) {
     if (recording) {
@@ -92,9 +127,16 @@ export default function App() {
   }
   useEffect(() => {
     messenger.setConversationVisible(
-      !calls.full && storyIndex === null && !addingStory,
+      !calls.full && !detail && !forward && storyIndex === null && !addingStory,
     );
-  }, [calls.full, messenger.selected, storyIndex, addingStory]);
+  }, [
+    calls.full,
+    messenger.selected,
+    storyIndex,
+    addingStory,
+    detail,
+    forward,
+  ]);
 
   function selectContact(contact: Chat) {
     if (compose === "message") openChat(contact);
@@ -143,11 +185,62 @@ export default function App() {
             />
           </View>
         )}
+        {!calls.full && detailChat && (
+          <View style={{ flex: 1 }}>
+            {detail?.kind === "history" ? (
+              <CallHistoryDetail
+                chat={detailChat}
+                history={messenger.history}
+                dark={messenger.dark}
+                onBack={() => setDetail(null)}
+                onProfile={() =>
+                  setDetail({ id: detailChat.id, kind: "profile" })
+                }
+                onCall={(video) => startCall(detailChat, video)}
+              />
+            ) : (
+              <ChatProfile
+                chat={detailChat}
+                chats={messenger.chats}
+                messages={
+                  messenger.messages[detailChat.id] || seedMessages(detailChat)
+                }
+                history={messenger.history}
+                dark={messenger.dark}
+                onBack={() => setDetail(null)}
+                onCall={(video) => startCall(detailChat, video)}
+                onToggleMute={() => messenger.toggleMute(detailChat.id)}
+                onToggleBlock={() => messenger.toggleBlock(detailChat.id)}
+                onDeleteChat={() => {
+                  messenger.deleteChat(detailChat.id);
+                  setDetail(null);
+                }}
+                onClearHistory={() => messenger.clearChat(detailChat.id)}
+                onOpenChat={openChat}
+              />
+            )}
+          </View>
+        )}
+        {!calls.full && forward && (
+          <ForwardScreen
+            chats={messenger.chats}
+            message={forward}
+            dark={messenger.dark}
+            onBack={() => setForward(null)}
+            onForward={(ids) => {
+              ids.forEach((id) => messenger.forwardMessage(forward, id));
+              setForward(null);
+            }}
+          />
+        )}
         <View
-          style={{ flex: 1, display: calls.full ? "none" : "flex" }}
-          accessibilityElementsHidden={calls.full}
+          style={{
+            flex: 1,
+            display: calls.full || detail || forward ? "none" : "flex",
+          }}
+          accessibilityElementsHidden={calls.full || !!detail || !!forward}
           importantForAccessibility={
-            calls.full ? "no-hide-descendants" : "auto"
+            calls.full || detail || forward ? "no-hide-descendants" : "auto"
           }
         >
           {calls.call && (
@@ -161,6 +254,13 @@ export default function App() {
           {chat ? (
             <ConversationScreen
               key={chat.id}
+              visible={
+                !calls.full &&
+                !detail &&
+                !forward &&
+                storyIndex === null &&
+                !addingStory
+              }
               chat={chat}
               messages={messenger.messages[chat.id] || []}
               dark={messenger.dark}
@@ -170,6 +270,9 @@ export default function App() {
               onSend={messenger.send}
               onReact={messenger.react}
               onRecordingChange={setRecording}
+              onProfile={() => setDetail({ id: chat.id, kind: "profile" })}
+              onDelete={messenger.deleteMessage}
+              onForward={setForward}
             />
           ) : compose ? (
             <NewConversationScreen
@@ -193,6 +296,9 @@ export default function App() {
               history={messenger.history}
               dark={messenger.dark}
               onCall={startCall}
+              onHistory={(contact) =>
+                setDetail({ id: contact.id, kind: "history" })
+              }
               {...actions}
             />
           ) : (
@@ -203,6 +309,12 @@ export default function App() {
               dark={messenger.dark}
               typingId={messenger.typingIds[0] || null}
               onOpenChat={openChat}
+              onProfile={(contact) =>
+                setDetail({ id: contact.id, kind: "profile" })
+              }
+              onToggleMute={(contact) => messenger.toggleMute(contact.id)}
+              onTogglePin={(contact) => messenger.togglePin(contact.id)}
+              onDeleteChat={(contact) => messenger.deleteChat(contact.id)}
               onStory={setStoryIndex}
               onAddStory={() => setAddingStory(true)}
               {...actions}

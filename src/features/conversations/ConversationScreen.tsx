@@ -8,16 +8,18 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import type { Chat, Message } from "../../domain/data";
-import { formatDuration } from "../../domain/model";
-import { Avatar, IconButton, tap } from "../../ui/primitives";
+import { Avatar, IconButton } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
-import AttachmentMenu from "./AttachmentMenu";
+import Composer from "./Composer";
+import { replySnapshot, withReply } from "./conversationModel";
+import MessageActions, { type ActionTarget } from "./MessageActions";
 import MessageBubble from "./MessageBubble";
+import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
 import { styles as s } from "./ConversationScreen.styles";
 
@@ -26,11 +28,15 @@ export type ConversationScreenProps = {
   messages: Message[];
   dark: boolean;
   typing: boolean;
+  visible?: boolean;
   onBack: () => void;
   onCall: (video: boolean) => void;
   onSend: (message: Partial<Message>) => void;
   onReact: (messageId: string, emoji: string) => void;
   onRecordingChange: (recording: boolean) => void;
+  onProfile: () => void;
+  onDelete: (id: string, everyone: boolean) => void;
+  onForward: (message: Message) => void;
 };
 
 export default function ConversationScreen({
@@ -38,67 +44,108 @@ export default function ConversationScreen({
   messages,
   dark,
   typing,
+  visible = true,
   onBack,
   onCall,
   onSend,
   onReact,
   onRecordingChange,
+  onProfile,
+  onDelete,
+  onForward,
 }: ConversationScreenProps) {
   const { bg, fg, muted, card, line } = palette(dark);
   const [draft, setDraft] = useState("");
-  const [sheet, setSheet] = useState<"attach" | "emoji" | null>(null);
-  const [reaction, setReaction] = useState<string | null>(null);
-  const [imageView, setImageView] = useState<string | null>(null);
+  const [attachmentOpen, setAttachmentOpen] = useState(false);
+  const [target, setTarget] = useState<ActionTarget | null>(null);
+  const [viewer, setViewer] = useState<Message | null>(null);
+  const [reply, setReply] = useState<Message["replyTo"] | null>(null);
   const list = useRef<ScrollView>(null);
-  const media = useMessageMedia(onSend);
+  const currentChat = useRef(chat.id);
+  currentChat.current = chat.id;
+  const send = (message: Partial<Message>) => {
+    if (chat.blocked || currentChat.current !== chat.id) return;
+    onSend(withReply(message, reply));
+    setReply(null);
+  };
+  const media = useMessageMedia(send);
   const recordingCallback = useRef(onRecordingChange);
   recordingCallback.current = onRecordingChange;
-
   useEffect(() => {
     recordingCallback.current(media.recording);
   }, [media.recording, onRecordingChange]);
   useEffect(() => () => recordingCallback.current(false), []);
   useEffect(() => {
     setDraft("");
-    setSheet(null);
-    setReaction(null);
-    setImageView(null);
+    setAttachmentOpen(false);
+    setTarget(null);
+    setViewer(null);
+    setReply(null);
   }, [chat.id]);
+  useEffect(() => {
+    if (!visible) {
+      setTarget(null);
+      setAttachmentOpen(false);
+      setViewer(null);
+    }
+  }, [visible]);
+  useEffect(() => {
+    if (
+      reply &&
+      messages.some((message) => message.id === reply.id && message.deleted)
+    )
+      setReply(null);
+    if (
+      target &&
+      !messages.some(
+        (message) => message.id === target.message.id && !message.deleted,
+      )
+    )
+      setTarget(null);
+    if (
+      viewer &&
+      !messages.some((message) => message.id === viewer.id && !message.deleted)
+    )
+      setViewer(null);
+  }, [messages, reply, target, viewer]);
 
   function guardRecording(action: () => void) {
-    if (media.isRecording()) {
+    if (media.isRecording())
       Alert.alert(
         "Finish your voice note first",
         "Send or cancel the current recording before leaving or starting a call.",
       );
-    } else action();
+    else action();
   }
-
   useEffect(() => {
+    if (!visible) return;
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
-        if (imageView) setImageView(null);
-        else if (reaction) setReaction(null);
-        else if (sheet) setSheet(null);
+        if (viewer) setViewer(null);
+        else if (target) setTarget(null);
+        else if (attachmentOpen) setAttachmentOpen(false);
         else guardRecording(onBack);
         return true;
       },
     );
     return () => subscription.remove();
-  }, [onBack, media.isRecording, imageView, reaction, sheet]);
-
+  }, [visible, onBack, media.isRecording, viewer, target, attachmentOpen]);
   function sendText() {
     const text = draft.trim();
     if (!text || media.isRecording()) return;
-    onSend({ text });
+    send({ text });
     setDraft("");
+  }
+  function selectReply(message: Message) {
+    setReply(replySnapshot(message));
+    setAttachmentOpen(false);
   }
 
   return (
     <KeyboardAvoidingView
       style={[s.root, { backgroundColor: bg }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={[s.chatHeader, { borderBottomColor: line }]}>
         <IconButton
@@ -107,19 +154,23 @@ export default function ConversationScreen({
           color={fg}
           onPress={() => guardRecording(onBack)}
         />
-        <Avatar uri={chat.avatar} size={44} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View ${chat.name}'s profile`}
+          onPress={() => guardRecording(onProfile)}
+        >
+          <Avatar uri={chat.avatar} size={44} />
+        </Pressable>
         <Pressable
           style={s.contact}
-          onPress={() =>
-            Alert.alert(
-              chat.name,
-              chat.group
-                ? "A private group for your favorite people. This is a local prototype."
-                : `${chat.online ? "Online now" : "Last seen recently"}\nMessages stay on this device in this prototype.`,
-            )
-          }
+          accessibilityRole="button"
+          accessibilityLabel={`View ${chat.name}'s profile`}
+          onPress={() => guardRecording(onProfile)}
         >
-          <Text style={[s.name, { color: fg }]}>{chat.name}</Text>
+          <Text numberOfLines={1} style={[s.name, { color: fg }]}>
+            {chat.name}
+            {chat.muted ? " · Muted" : ""}
+          </Text>
           <Text
             style={[
               s.tiny,
@@ -129,13 +180,15 @@ export default function ConversationScreen({
               },
             ]}
           >
-            {typing
-              ? "typing…"
-              : chat.group
-                ? "Your little circle"
-                : chat.online
-                  ? "● Online"
-                  : "Last seen recently"}
+            {chat.blocked
+              ? "Blocked"
+              : typing
+                ? "typing…"
+                : chat.group
+                  ? "Your little circle"
+                  : chat.online
+                    ? "● Online"
+                    : "Last seen recently"}
           </Text>
         </Pressable>
         <IconButton
@@ -151,152 +204,99 @@ export default function ConversationScreen({
           onPress={() => guardRecording(() => onCall(true))}
         />
       </View>
-      <ScrollView
-        ref={list}
-        style={s.root}
-        contentContainerStyle={s.messageList}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() =>
-          list.current?.scrollToEnd({ animated: true })
-        }
-      >
-        <View style={s.dateChip}>
-          <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
-        </View>
-        {messages.map((message, index) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            dark={dark}
-            showTimestamp={
-              index === messages.length - 1 ||
-              messages[index + 1]?.mine !== message.mine
-            }
-            onReact={setReaction}
-            onViewImage={setImageView}
-          />
-        ))}
-        {typing && (
-          <View style={[s.typing, { backgroundColor: card }]}>
-            <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
+      <View style={s.root}>
+        <ScrollView
+          ref={list}
+          style={s.root}
+          contentContainerStyle={s.messageList}
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={() => setAttachmentOpen(false)}
+          onContentSizeChange={() =>
+            list.current?.scrollToEnd({ animated: true })
+          }
+        >
+          <View style={s.dateChip}>
+            <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
           </View>
-        )}
-      </ScrollView>
-      <View style={[s.composer, { backgroundColor: card }]}>
-        {media.recording ? (
-          <>
-            <IconButton
-              name="trash-outline"
-              label="Cancel recording"
-              color="#DE6666"
-              onPress={() => void media.cancelRecord()}
+          {messages.map((message, index) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              dark={dark}
+              visible={visible}
+              showTimestamp={
+                index === messages.length - 1 ||
+                messages[index + 1]?.mine !== message.mine
+              }
+              onActions={(next) => {
+                setAttachmentOpen(false);
+                setTarget(next);
+              }}
+              onReact={onReact}
+              onViewMedia={setViewer}
             />
-            <View style={s.liveDot} />
-            <Text style={[s.body, { color: fg, flex: 1 }]}>
-              Recording{" "}
-              {formatDuration(Math.floor(media.durationMillis / 1000))}
-            </Text>
-            <IconButton
-              name="send"
-              label="Send voice note"
-              background={coral}
-              color="white"
-              onPress={() => void media.record()}
-            />
-          </>
-        ) : (
-          <>
-            <IconButton
-              name="add"
-              label="Attach media"
-              color={muted}
-              onPress={() => setSheet("attach")}
-            />
-            <TextInput
-              accessibilityLabel="Message"
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Message"
-              placeholderTextColor={muted}
-              style={[s.messageInput, { color: fg }]}
-              multiline
-              maxLength={4000}
-            />
-            <IconButton
-              name="happy-outline"
-              label="Choose emoji"
-              color={muted}
-              onPress={() => setSheet("emoji")}
-            />
-            <IconButton
-              name={draft.trim() ? "arrow-up" : "mic-outline"}
-              label={draft.trim() ? "Send message" : "Record voice note"}
-              background={coral}
-              color="white"
-              onPress={() => (draft.trim() ? sendText() : void media.record())}
-            />
-          </>
+          ))}
+          {typing && (
+            <View style={[s.typing, { backgroundColor: card }]}>
+              <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
+            </View>
+          )}
+        </ScrollView>
+        {attachmentOpen && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Dismiss attachments"
+            onPress={() => setAttachmentOpen(false)}
+          />
         )}
       </View>
-      <AttachmentMenu
-        sheet={sheet}
+      <Composer
         dark={dark}
-        onClose={() => setSheet(null)}
-        onEmoji={(emoji) => setDraft((value) => value + emoji)}
-        onPhoto={(camera) => void media.pickPhoto(camera)}
-        onFile={() => void media.pickFile()}
-        onRecord={() => void media.record()}
+        draft={draft}
+        setDraft={setDraft}
+        reply={reply}
+        onCancelReply={() => setReply(null)}
+        onSend={sendText}
+        media={media}
+        attachmentOpen={visible && attachmentOpen}
+        setAttachmentOpen={setAttachmentOpen}
+        disabled={!!chat.blocked}
+      />
+      <MessageActions
+        target={visible ? target : null}
+        dark={dark}
+        onClose={() => setTarget(null)}
+        onReact={onReact}
+        onReply={selectReply}
+        onForward={(message) => guardRecording(() => onForward(message))}
+        onDelete={onDelete}
       />
       <Modal
-        transparent
-        visible={reaction !== null}
-        animationType="fade"
-        onRequestClose={() => setReaction(null)}
-      >
-        <Pressable
-          style={s.reactionOverlay}
-          onPress={() => setReaction(null)}
-          accessibilityLabel="Dismiss reactions"
-        >
-          <View style={[s.reactionBar, { backgroundColor: card }]}>
-            {["🤍", "😂", "😍", "👍", "🔥", "✨"].map((emoji) => (
-              <Pressable
-                key={emoji}
-                accessibilityLabel={`React ${emoji}`}
-                onPress={() => {
-                  tap();
-                  if (reaction) onReact(reaction, emoji);
-                  setReaction(null);
-                }}
-              >
-                <Text style={{ fontSize: 30, padding: 9 }}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-      <Modal
-        visible={imageView !== null}
+        visible={visible && viewer !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setImageView(null)}
+        onRequestClose={() => setViewer(null)}
       >
         <View style={s.imageViewer}>
           <View style={s.imageClose}>
             <IconButton
               name="close"
-              label="Close image"
+              label="Close media"
               color="white"
-              onPress={() => setImageView(null)}
+              onPress={() => setViewer(null)}
             />
           </View>
-          {imageView && (
-            <Image
-              source={{ uri: imageView }}
-              style={{ width: "100%", height: "80%" }}
-              resizeMode="contain"
-            />
-          )}
+          {visible &&
+            viewer?.uri &&
+            (viewer.kind === "video" ? (
+              <VideoAttachment uri={viewer.uri} />
+            ) : (
+              <Image
+                source={{ uri: viewer.uri }}
+                style={{ width: "100%", height: "80%" }}
+                resizeMode="contain"
+              />
+            ))}
         </View>
       </Modal>
     </KeyboardAvoidingView>
