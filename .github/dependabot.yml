@@ -6,13 +6,26 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     # Routine bumps travel together so one PR carries the minor and patch
-    # updates. Major bumps stay separate: Expo and React Native have to move
-    # together, so each one needs its own review.
+    # updates. The exceptions below are the SDK-locked packages: Expo pins
+    # almost everything to the SDK, so they only move during a coordinated
+    # SDK upgrade with `npx expo install --fix`.
     groups:
       minor-and-patch:
         update-types:
           - minor
           - patch
+    ignore:
+      # In this stack a major version of any package means a new Expo SDK.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # React Native minor releases are breaking, and Expo pins React and
+      # React Native per SDK. Both move with the SDK, never one PR at a time.
+      - dependency-name: react
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: react-native
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: "/"
