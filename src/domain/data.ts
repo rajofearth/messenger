@@ -13,6 +13,10 @@ export type Message = {
   forwarded?: boolean;
   deleted?: boolean;
   createdAt?: string;
+  albumId?: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
   uri?: string;
   filename?: string;
   duration?: number;

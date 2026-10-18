@@ -1,5 +1,12 @@
 import React, { useRef, useState } from "react";
-import { Text, TextInput, View, useWindowDimensions } from "react-native";
+import {
+  Alert,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { KeyboardMediaInput } from "../../ui/KeyboardMediaInput";
 import type { Message } from "../../domain/data";
 import { formatDuration } from "../../domain/model";
 import { IconButton } from "../../ui/primitives";
@@ -113,8 +120,14 @@ export default function Composer({
                 if (!disabled) setAttachmentOpen(!attachmentOpen);
               }}
             />
-            <TextInput
+            <KeyboardMediaInput
               ref={input}
+              onMedia={(item) => {
+                if (!disabled) media.receiveKeyboardMedia(item);
+              }}
+              onMediaError={({ message }) =>
+                Alert.alert("Keyboard attachment unavailable", message)
+              }
               accessibilityLabel="Message"
               editable={!disabled}
               value={draft}

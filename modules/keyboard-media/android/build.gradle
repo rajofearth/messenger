@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.keyboardmedia'
+version = '1.0.0'
+
+android {
+  namespace 'expo.modules.keyboardmedia'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Expo core does not export its implementation dependency on React Android.
+  // The React Native Gradle plugin supplies the installed RN version.
+  implementation 'com.facebook.react:react-android'
+}
+
+// AndroidX Core is exported by expo-modules-core; RN exports AppCompat.

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { Alert, Image, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import type { Message } from "../../domain/data";
@@ -242,6 +243,7 @@ export default function MessageBubble({
           <Image
             source={{ uri: m.uri }}
             style={s.chatImage}
+            contentFit="cover"
             accessibilityLabel="Photo attachment"
           />
         ) : m.kind === "audio" ? (

@@ -129,19 +129,19 @@ export default function SettingsScreen({
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={styles.header}>
-        {page === "settings" && (
+      {page === "settings" && (
+        <View style={styles.header}>
           <IconButton
             name="arrow-back"
             label="Back to My Profile"
             color={colors.text}
             onPress={() => setPage("profile")}
           />
-        )}
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {page === "profile" ? "My Profile" : "Settings"}
-        </Text>
-      </View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Settings
+          </Text>
+        </View>
+      )}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}

@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
@@ -19,6 +19,9 @@ import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
 import MessageBubble from "./MessageBubble";
+import MediaAlbum from "./MediaAlbum";
+import AlbumViewer from "./AlbumViewer";
+import { groupMediaMessages } from "../../domain/mediaAlbums";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
 import { styles as s } from "./ConversationScreen.styles";
@@ -59,6 +62,11 @@ export default function ConversationScreen({
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [target, setTarget] = useState<ActionTarget | null>(null);
   const [viewer, setViewer] = useState<Message | null>(null);
+  const [album, setAlbum] = useState<{ ids: string[]; initialId: string } | null>(null);
+  const rows = useMemo(() => groupMediaMessages(messages), [messages]);
+  const albumMessages = album
+    ? messages.filter((message) => album.ids.includes(message.id) && !message.deleted)
+    : [];
   const [reply, setReply] = useState<Message["replyTo"] | null>(null);
   const list = useRef<ScrollView>(null);
   const currentChat = useRef(chat.id);
@@ -80,6 +88,7 @@ export default function ConversationScreen({
     setAttachmentOpen(false);
     setTarget(null);
     setViewer(null);
+    setAlbum(null);
     setReply(null);
   }, [chat.id]);
   useEffect(() => {
@@ -87,6 +96,7 @@ export default function ConversationScreen({
       setTarget(null);
       setAttachmentOpen(false);
       setViewer(null);
+      setAlbum(null);
     }
   }, [visible]);
   useEffect(() => {
@@ -107,7 +117,9 @@ export default function ConversationScreen({
       !messages.some((message) => message.id === viewer.id && !message.deleted)
     )
       setViewer(null);
-  }, [messages, reply, target, viewer]);
+    if (album && !messages.some((message) => album.ids.includes(message.id) && !message.deleted))
+      setAlbum(null);
+  }, [messages, reply, target, viewer, album]);
 
   function guardRecording(action: () => void) {
     if (media.isRecording())
@@ -122,7 +134,8 @@ export default function ConversationScreen({
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
-        if (viewer) setViewer(null);
+        if (album) setAlbum(null);
+        else if (viewer) setViewer(null);
         else if (target) setTarget(null);
         else if (attachmentOpen) setAttachmentOpen(false);
         else guardRecording(onBack);
@@ -130,7 +143,7 @@ export default function ConversationScreen({
       },
     );
     return () => subscription.remove();
-  }, [visible, onBack, media.isRecording, viewer, target, attachmentOpen]);
+  }, [visible, onBack, media.isRecording, viewer, album, target, attachmentOpen]);
   function sendText() {
     const text = draft.trim();
     if (!text || media.isRecording()) return;
@@ -218,24 +231,33 @@ export default function ConversationScreen({
           <View style={s.dateChip}>
             <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
           </View>
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              dark={dark}
-              visible={visible}
-              showTimestamp={
-                index === messages.length - 1 ||
-                messages[index + 1]?.mine !== message.mine
-              }
-              onActions={(next) => {
+          {rows.map((row, index) => {
+            const message = row.type === "album" ? row.messages[0] : row.message;
+            const next = rows[index + 1];
+            const nextMine = next?.type === "album" ? next.messages[0].mine : next?.message.mine;
+            const shared = {
+              dark,
+              visible,
+              showTimestamp: index === rows.length - 1 || nextMine !== message.mine,
+              onActions: (nextTarget: ActionTarget) => {
                 setAttachmentOpen(false);
-                setTarget(next);
-              }}
-              onReact={onReact}
-              onViewMedia={setViewer}
-            />
-          ))}
+                setTarget(nextTarget);
+              },
+              onReact,
+            };
+            return row.type === "album" ? (
+              <MediaAlbum
+                key={row.id}
+                {...shared}
+                messages={row.messages}
+                onViewMedia={(selected) => setAlbum({
+                  ids: row.messages.map((item) => item.id), initialId: selected.id,
+                })}
+              />
+            ) : (
+              <MessageBubble key={message.id} {...shared} message={message} onViewMedia={setViewer} />
+            );
+          })}
           {typing && (
             <View style={[s.typing, { backgroundColor: card }]}>
               <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
@@ -271,6 +293,20 @@ export default function ConversationScreen({
         onForward={(message) => guardRecording(() => onForward(message))}
         onDelete={onDelete}
       />
+      {album && (
+        <AlbumViewer
+          key={album.initialId}
+          messages={albumMessages}
+          initialId={album.initialId}
+          visible={visible}
+          onClose={() => setAlbum(null)}
+          onActions={(nextTarget) => {
+            setAttachmentOpen(false);
+            setTarget(nextTarget);
+          }}
+          onReact={onReact}
+        />
+      )}
       <Modal
         visible={visible && viewer !== null}
         transparent
@@ -294,7 +330,7 @@ export default function ConversationScreen({
               <Image
                 source={{ uri: viewer.uri }}
                 style={{ width: "100%", height: "80%" }}
-                resizeMode="contain"
+                contentFit="contain"
               />
             ))}
         </View>

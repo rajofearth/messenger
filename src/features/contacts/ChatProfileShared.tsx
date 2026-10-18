@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Alert,
-  Image,
   Linking,
   Modal,
   Pressable,
@@ -11,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
@@ -120,7 +120,7 @@ export default function ChatProfileShared({
               style={[s.tile, { backgroundColor: colors.card }]}
             >
               {message.kind === "image" && message.uri ? (
-                <Image source={{ uri: message.uri }} style={s.thumbnail} />
+                <Image source={{ uri: message.uri }} contentFit="cover" style={s.thumbnail} />
               ) : (
                 <Ionicons name="videocam-outline" size={32} color={coral} />
               )}
@@ -209,7 +209,7 @@ export default function ChatProfileShared({
                 <Image
                   accessibilityLabel="Shared image"
                   source={{ uri: selected.uri }}
-                  resizeMode="contain"
+                  contentFit="contain"
                   style={s.fullImage}
                   onError={() => setFailed(true)}
                 />

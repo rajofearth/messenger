@@ -131,12 +131,6 @@ export default function ChatsScreen({
       >
         {!term && (
           <>
-            <Text
-              accessibilityRole="header"
-              style={[s.sectionTitle, { color: colors.fg }]}
-            >
-              Stories
-            </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}

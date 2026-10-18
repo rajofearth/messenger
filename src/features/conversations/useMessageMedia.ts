@@ -10,6 +10,8 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 import type { Message } from "../../domain/data";
+import type { KeyboardMedia } from "../../ui/KeyboardMediaInput";
+import { saveKeyboardMedia } from "../../services/keyboardMedia";
 
 export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
   const recorder = useAudioRecorder({
@@ -54,19 +56,31 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
       }
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ["images", "videos"],
-        quality: 0.85,
+        quality: camera ? 0.85 : 1,
         allowsEditing: false,
+        allowsMultipleSelection: !camera,
+        selectionLimit: 0,
+        orderedSelection: true,
       };
       const result = camera
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
       if (mounted.current && !result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        onSend({
-          kind: asset.type === "video" ? "video" : "image",
-          uri: asset.uri,
-          duration: asset.duration ? asset.duration / 1000 : undefined,
-        });
+        const albumId =
+          result.assets.length > 1
+            ? `album-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            : undefined;
+        for (const asset of result.assets) {
+          onSend({
+            kind: asset.type === "video" ? "video" : "image",
+            uri: asset.uri,
+            mimeType: asset.mimeType ?? undefined,
+            albumId,
+            width: asset.width,
+            height: asset.height,
+            duration: asset.duration ? asset.duration / 1000 : undefined,
+          });
+        }
       }
     } catch {
       Alert.alert(
@@ -75,6 +89,18 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
       );
     } finally {
       busy.current = false;
+    }
+  }
+
+  function receiveKeyboardMedia(media: KeyboardMedia) {
+    if (!mounted.current || active.current || busy.current) return;
+    try {
+      onSend(saveKeyboardMedia(media));
+    } catch {
+      Alert.alert(
+        "Could not attach keyboard media",
+        "Choose a GIF or image under 25 MB and try again.",
+      );
     }
   }
 
@@ -190,6 +216,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
     metering: state.metering,
     isRecording: () => active.current,
     pickPhoto,
+    receiveKeyboardMedia,
     pickFile,
     record,
     cancelRecord,
