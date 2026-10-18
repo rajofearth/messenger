@@ -21,6 +21,24 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Messenger to record voice notes you choose to send.",
+          "enableBackgroundRecording": false
+        }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Messenger to choose photos for messages, stories, and your profile.",
+          "cameraPermission": "Allow Messenger to take photos for messages and stories.",
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }

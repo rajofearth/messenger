@@ -1,0 +1,55 @@
+import { StyleSheet } from "react-native";
+
+export const styles = StyleSheet.create({
+  body: { fontFamily: "DMSans_400Regular", fontSize: 14 },
+  tiny: { fontFamily: "DMSans_500Medium", fontSize: 11, letterSpacing: 0.2 },
+  messageRow: { alignItems: "flex-start", marginTop: 10 },
+  bubble: {
+    maxWidth: "83%",
+    borderRadius: 19,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  bubbleMine: { borderBottomRightRadius: 5 },
+  bubbleTheirs: { borderBottomLeftRadius: 5 },
+  messageText: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  messageMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 5,
+    marginHorizontal: 3,
+    marginBottom: 3,
+  },
+  chatImage: { width: 220, height: 250, borderRadius: 15 },
+  reaction: {
+    position: "absolute",
+    bottom: -12,
+    right: 10,
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    elevation: 2,
+  },
+  voice: {
+    flexDirection: "row",
+    gap: 9,
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  voicePlay: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#FFF9F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wave: { flexDirection: "row", gap: 2, alignItems: "center", height: 32 },
+  file: { flexDirection: "row", gap: 10, alignItems: "center", width: 210 },
+});

@@ -1,0 +1,326 @@
+import React, { useState } from "react";
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import { CORAL, styles } from "./CallScreen.styles";
+import Control from "./CallControl";
+
+export type CallScreenProps = {
+  name: string;
+  avatar: string;
+  video: boolean;
+  seconds: number;
+  onBack: () => void;
+  onEnd: () => void;
+  onChat: () => void;
+};
+
+const REMOTE_PORTRAIT =
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1400&q=85";
+const LOCAL_PORTRAIT =
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80";
+
+function duration(seconds: number): string {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  const minutes = Math.floor(total / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export default function CallScreen({
+  name,
+  avatar,
+  video,
+  seconds,
+  onBack,
+  onEnd,
+  onChat,
+}: CallScreenProps) {
+  const [cameraOn, setCameraOn] = useState(video);
+  const [muted, setMuted] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [frontCamera, setFrontCamera] = useState(true);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const [remoteFailed, setRemoteFailed] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const showingVideo = cameraOn;
+  const displayName = name.trim() || "Your contact";
+  const initials = displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="light-content" backgroundColor="#161B20" />
+      {showingVideo && !remoteFailed && (
+        <Image
+          source={{ uri: avatar.replace("w=400", "w=1400") }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+          accessible={false}
+          onError={() => setRemoteFailed(true)}
+        />
+      )}
+      <LinearGradient
+        colors={
+          showingVideo && !remoteFailed
+            ? [
+                "rgba(12,17,21,0.72)",
+                "rgba(12,17,21,0.03)",
+                "rgba(12,17,21,0.25)",
+                "#10171EF2",
+              ]
+            : ["#303333", "#25272B", "#131A21", "#10171E"]
+        }
+        locations={[0, 0.35, 0.58, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <Pressable
+            onPress={onBack}
+            accessibilityRole="button"
+            accessibilityLabel="Back to conversation"
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="chevron-back" size={25} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.headerIdentity}>
+            <Text style={styles.name} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <View style={styles.connection}>
+              <View style={styles.connectionDot} />
+              <Text style={styles.connectionText}>
+                Connected · {duration(seconds)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.stage}>
+          {(!showingVideo || remoteFailed) && (
+            <View style={styles.audioIdentity}>
+              <View style={styles.avatarHalo}>
+                <View style={styles.avatarRing}>
+                  {avatar.trim() && !avatarFailed ? (
+                    <Image
+                      source={{ uri: avatar }}
+                      style={styles.avatar}
+                      onError={() => setAvatarFailed(true)}
+                      accessibilityLabel={`${displayName}'s avatar`}
+                    />
+                  ) : (
+                    <View style={[styles.avatar, styles.initialsBackground]}>
+                      <Text style={styles.initials}>{initials}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.audioName}>{displayName}</Text>
+              <Text style={styles.audioSubtitle}>
+                {showingVideo ? "Video preview unavailable" : "Audio call"}
+              </Text>
+            </View>
+          )}
+          {showingVideo && (
+            <View
+              style={styles.preview}
+              accessibilityLabel={`Your simulated ${frontCamera ? "front" : "rear"} camera preview`}
+            >
+              {!previewFailed ? (
+                <Image
+                  source={{
+                    uri: frontCamera ? REMOTE_PORTRAIT : LOCAL_PORTRAIT,
+                  }}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                  onError={() => setPreviewFailed(true)}
+                />
+              ) : (
+                <Ionicons name="person" size={38} color={CORAL} />
+              )}
+              <LinearGradient
+                colors={["transparent", "#00000099"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.previewLabel}>
+                <Text style={styles.youText}>You</Text>
+                <Ionicons
+                  name={muted ? "mic-off" : "mic"}
+                  size={13}
+                  color="#FFFFFF"
+                />
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.bottom}>
+          <View style={styles.callNote}>
+            <View style={styles.smallDot} />
+            <Text style={styles.callNoteText}>
+              Demo call · No camera or microphone in use
+            </Text>
+          </View>
+          <View style={styles.dock}>
+            <BlurView
+              intensity={45}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.dockTint} />
+            <View style={styles.controls}>
+              <Control
+                icon={cameraOn ? "videocam-outline" : "videocam-off-outline"}
+                label={cameraOn ? "Turn video off" : "Turn video on"}
+                active={!cameraOn}
+                onPress={() => setCameraOn((value) => !value)}
+              />
+              <Control
+                icon={muted ? "mic-off-outline" : "mic-outline"}
+                label={muted ? "Turn microphone on" : "Turn microphone off"}
+                active={muted}
+                onPress={() => setMuted((value) => !value)}
+              />
+              <Control
+                icon="chatbubble-outline"
+                label="Open chat"
+                onPress={onChat}
+              />
+              <Control
+                icon="ellipsis-horizontal"
+                label="More options"
+                active={optionsVisible}
+                onPress={() => setOptionsVisible(true)}
+              />
+              <Control icon="call" label="End call" danger onPress={onEnd} />
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      <Modal
+        visible={optionsVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setOptionsVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="Close call options"
+            onPress={() => setOptionsVisible(false)}
+          />
+          <SafeAreaView
+            edges={["bottom", "left", "right"]}
+            style={styles.sheet}
+            accessibilityViewIsModal
+          >
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeading}>
+              <Text style={styles.sheetTitle} accessibilityRole="header">
+                Call options
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close call options"
+                onPress={() => setOptionsVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={23} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={styles.sheetContent}>
+              <View style={styles.optionRow}>
+                <View style={styles.optionIcon}>
+                  <Ionicons
+                    name={speakerOn ? "volume-high-outline" : "ear-outline"}
+                    size={23}
+                    color={CORAL}
+                  />
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>Speaker</Text>
+                  <Text style={styles.optionSubtitle}>
+                    {speakerOn ? "Speaker selected" : "Earpiece selected"}
+                  </Text>
+                </View>
+                <Switch
+                  value={speakerOn}
+                  onValueChange={setSpeakerOn}
+                  trackColor={{ false: "#4A4D52", true: CORAL }}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel="Use speaker, simulated"
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Switch to ${frontCamera ? "rear" : "front"} camera, simulated`}
+                onPress={() => {
+                  setFrontCamera((value) => !value);
+                  setPreviewFailed(false);
+                }}
+                style={({ pressed }) => [
+                  styles.optionRow,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={styles.optionIcon}>
+                  <Ionicons
+                    name="camera-reverse-outline"
+                    size={24}
+                    color={CORAL}
+                  />
+                </View>
+                <View style={styles.optionCopy}>
+                  <Text style={styles.optionTitle}>Switch camera</Text>
+                  <Text style={styles.optionSubtitle}>
+                    {frontCamera
+                      ? "Front camera selected"
+                      : "Rear camera selected"}{" "}
+                    · mock preview
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={19} color="#A7ABB0" />
+              </Pressable>
+              <View style={styles.simulationNotice}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={CORAL}
+                />
+                <Text style={styles.simulationText}>
+                  Simulated call. Controls update this screen only. No audio,
+                  video, or device settings are changed.
+                </Text>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </View>
+      </Modal>
+    </View>
+  );
+}
