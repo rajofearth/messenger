@@ -18,13 +18,19 @@ updates:
       # In this stack a major version of any package means a new Expo SDK.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      # React Native minor releases are breaking, and Expo pins React and
-      # React Native per SDK. Both move with the SDK, never one PR at a time.
+      # Expo pins the React stack exactly, per SDK. These only move during a
+      # coordinated SDK upgrade (`npx expo install --fix`), never as a
+      # Dependabot PR: react-native minors break the typecheck on their own
+      # (see PR #6) and react/React Native must ship matching versions.
       - dependency-name: react
-        update-types: ["version-update:semver-minor"]
-      - dependency-name: react-native
-        update-types: ["version-update:semver-minor"]
       - dependency-name: "@types/react"
+      - dependency-name: react-native
+      - dependency-name: "react-native-*"
+      # Expo-published packages track the SDK release train too. Patch
+      # releases still flow; minor releases wait for the SDK.
+      - dependency-name: expo
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "expo-*"
         update-types: ["version-update:semver-minor"]
 
   - package-ecosystem: github-actions
