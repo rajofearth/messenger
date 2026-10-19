@@ -8,6 +8,45 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-10-19
+
+The theme now follows the device by default and can be pinned to Light or
+Dark, and both system bars, native dialogs and the root background follow the
+choice. The release APK also drops the library translations: 15,680,467 bytes
+(14.95 MiB) to 14,926,315 bytes (14.23 MiB).
+
+### Added
+
+- System theme support. Settings offers **System**, **Light** and **Dark**;
+  System follows the Android setting, including changes while the app is
+  running. The choice is stored in the typed repository, and records written
+  before the option existed (`{ dark: true/false }`) keep their pinned theme.
+- `expo-system-ui` with `userInterfaceStyle: "automatic"`, which is what makes
+  Android follow the device theme, and `expo-navigation-bar` (with
+  `enforceContrast` off, so the bar stays transparent like the status bar),
+  which keeps the navigation-bar buttons on the same light/dark rule as the
+  status bar. `src/ui/useSystemAppearance.ts` also gives native dialogs and
+  the root view background the active theme, and remembers the background for
+  the next launch.
+- Unit tests for `resolveDark` and for the `{ dark }` to `{ theme }`
+  appearance migration.
+
+### Changed
+
+- The Settings "Dark mode" switch is now a System / Light / Dark control. The
+  full-screen call UI keeps light system-bar icons because its chrome is
+  always dark.
+- Only English resources are packaged. `plugins/withEnglishOnlyResources.js`
+  adds `resConfigs "en"` to `defaultConfig`, which removes around a hundred
+  locales of strings that AndroidX, Material and Play Services libraries ship:
+  754,152 bytes against the published v0.0.2 APK. Density, night mode, screen
+  size and layout-direction resources are untouched.
+
+Device testing was not performed for this release. The theme control, the
+navigation-bar styling and the trimmed resource table should be checked on a
+physical Android device, especially with the system in Dark mode and the app
+pinned to Light; the camera note from v0.0.2 still applies.
+
 ## [0.0.2] - 2026-10-19
 
 No features were removed. The Android (`arm64-v8a`) release APK falls from
@@ -94,6 +133,7 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/rajofearth/messenger/releases/tag/v0.0.3
 [0.0.2]: https://github.com/rajofearth/messenger/releases/tag/v0.0.2
 [0.0.1]: https://github.com/rajofearth/messenger/releases/tag/v0.0.1

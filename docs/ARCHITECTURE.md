@@ -20,15 +20,15 @@ Intended direction: `features` and `state` depend on `domain`, `data`, `services
 
 The test runs with `npm test` (Node's `node:test`, using built-in TypeScript stripping) and checks exactly three things.
 
-1. **File size.** `App.tsx`, every `.ts`/`.tsx` file under `src/`, and every `.kt` file under `modules/*/android/src` must be 500 lines or fewer, counted after trimming trailing whitespace. The failure message asks for a focused module to be extracted. At the time of writing the largest file is `src/state/useMessenger.ts` at 482 lines, so the limit is close.
+1. **File size.** `App.tsx`, every `.ts`/`.tsx` file under `src/`, and every `.kt` file under `modules/*/android/src` must be 500 lines or fewer, counted after trimming trailing whitespace. The failure message asks for a focused module to be extracted. At the time of writing the largest file is `src/state/useMessenger.ts` at 488 lines, so the limit is close.
 2. **No imports back into the app entry point.** Every file except `App.tsx` is checked against the regular expression `/from\s+["'][^"']*\/App(?:\.tsx?)?["']/`, so any static `import ... from ".../App"` or `".../App.tsx"` fails. Only static `from` imports are scanned; a `require()` or a dynamic `import()` would not be caught.
 3. **Domain purity.** Files in `src/domain` must not import from `react`, `react-native`, anything starting with `expo` or `@react-native`, or any path whose text contains `features/`, `state/` or `ui/`. The rule does not forbid `src/data`, and no domain file imports it today.
 
-Three current dependency directions sit outside the ideal picture, and it is worth knowing them before moving code. `src/state/useMessenger.ts` imports `setHapticsEnabled` from `src/ui/primitives.tsx`; `src/state/useNotificationActions.ts` imports `src/features/calls/pendingCall.ts`; `src/services/keyboardMedia.ts` imports the `KeyboardMedia` type from `src/ui/KeyboardMediaInput.tsx`. The test only enforces the three rules above, not general layer boundaries.
+Three current dependency directions sit outside the ideal picture, and it is worth knowing them before moving code. `src/state/useMessenger.ts` imports `setHapticsEnabled` from `src/ui/primitives.tsx`; `src/state/useNotificationActions.ts` imports `src/features/calls/pendingCall.ts`; `src/services/keyboardMedia.ts` imports the `KeyboardMedia` type from `src/ui/KeyboardMediaInput.tsx`; and `src/state/useThemePreference.ts` imports `resolveDark` from `src/ui/theme.ts`. The test only enforces the three rules above, not general layer boundaries.
 
 ## Data flow in `useMessenger`
 
-`src/state/useMessenger.ts` owns the app state. The slices are `chats`, `messages` (a record keyed by chat id), `stories`, `history`, `dark` (appearance), `profile`, `selected`, `typingIds`, and a `loaded` flag.
+`src/state/useMessenger.ts` owns the app state. The slices are `chats`, `messages` (a record keyed by chat id), `stories`, `history`, the appearance preference (`theme`, resolved by `src/state/useThemePreference.ts` into the `dark` flag screens consume), `profile`, `selected`, `typingIds`, and a `loaded` flag.
 
 ### Startup
 
@@ -38,9 +38,15 @@ Three current dependency directions sit outside the ideal picture, and it is wor
 4. If anything throws, the seeded demo data stays and startup still completes: the `catch` is empty and the `finally` sets `loaded`. `App.tsx` renders a loading view until fonts are ready and `loaded` is true.
 5. The stored `haptics` preference is pushed into the module-level `setHapticsEnabled` switch in `src/ui/primitives.tsx`.
 
+### Appearance and system bars
+
+The stored preference is one of `system`, `light` or `dark`. `src/state/useThemePreference.ts` combines it with the device scheme through `resolveDark` (`src/ui/theme.ts`) and exposes the resulting `dark` flag, so every screen keeps receiving a plain boolean. Records written before the system option existed stored `{ dark: boolean }`; `normalizeAppearance` in `src/data/appearance.ts` maps them to a pinned theme as they load, so an existing choice is never silently reset. The preference is saved by the hook when the user changes it, not by a `useMessenger` effect.
+
+`src/ui/useSystemAppearance.ts` pushes the choice to native surfaces: `Appearance.setColorScheme` forces the AppCompat night mode for a pinned theme and releases it with `"unspecified"` for `system`, which native dialogs follow, and `SystemUI.setBackgroundColorAsync` (`expo-system-ui`) paints the root view behind the app and remembers the color for the next launch. `App.tsx` renders `expo-status-bar` and `expo-navigation-bar` components with the same mapping — light icons over dark backgrounds — and the full-screen call UI adds light icons on top because its chrome is always dark.
+
 ### Persistence
 
-Every slice has its own effect. Each effect compares the current value with the last value it wrote (`savedChats`, `savedStories`, `savedHistory`, `savedDark`, and a `savedThreads` map for messages) and returns early when the identity is unchanged. Messages are written per thread, one repository key per chat. All writes are fire-and-forget with an empty `catch`, so a storage failure never blocks the UI.
+Every slice has its own effect. Each effect compares the current value with the last value it wrote (`savedChats`, `savedStories`, `savedHistory`, and a `savedThreads` map for messages) and returns early when the identity is unchanged. Messages are written per thread, one repository key per chat. All writes are fire-and-forget with an empty `catch`, so a storage failure never blocks the UI. The appearance preference is the exception: `useThemePreference` writes it directly when the control changes, because there is no second writer to guard against.
 
 ### Lazy conversation loading
 
@@ -67,11 +73,11 @@ After a send, a 2600 ms timer is set. Only the newest timer per chat survives, a
 
 ### Keys
 
-`src/data/messengerRepository.ts` composes keys from `STORE_VERSION` in `src/data/store.ts`, currently `v2`, under the `messenger/` namespace. The keys are `messenger/v2/chats`, `stories`, `history`, `appearance`, `settings`, `pending-call`, and one `messenger/v2/messages/<chatId>` per conversation. Deleting a conversation calls `saveMessages(chatId, null)`, which removes the key.
+`src/data/messengerRepository.ts` composes keys from `STORE_VERSION` in `src/data/store.ts`, currently `v2`, under the `messenger/` namespace. The keys are `messenger/v2/chats`, `stories`, `history`, `appearance`, `settings`, `pending-call`, and one `messenger/v2/messages/<chatId>` per conversation. Deleting a conversation calls `saveMessages(chatId, null)`, which removes the key. The `appearance` value is `{ theme }`; `loadAppearance` normalizes the older `{ dark }` shape through `src/data/appearance.ts`.
 
 ### Legacy migration
 
-`migrateLegacy()` reads two old keys: `messenger-prototype-v1` (a single blob holding chats, messages, stories, history and `dark`) and `@messenger/settings/v1`. Each field is copied to its slice with defensive checks (`Array.isArray`, `typeof`), messages are split into per-chat keys, and both legacy keys are removed afterwards, including when the blob cannot be parsed. There is no migration counter. The upgrade is one-time because the source keys are deleted, not because a flag records it.
+`migrateLegacy()` reads two old keys: `messenger-prototype-v1` (a single blob holding chats, messages, stories, history and `dark`) and `@messenger/settings/v1`. Each field is copied to its slice with defensive checks (`Array.isArray`, `typeof`), messages are split into per-chat keys, the blob's `dark` flag becomes a pinned `{ theme }` appearance record, and both legacy keys are removed afterwards, including when the blob cannot be parsed. There is no migration counter. The upgrade is one-time because the source keys are deleted, not because a flag records it.
 
 One stale comment: `src/data/records.ts` says version bumps are handled in `src/state/migrations.ts`, but that file does not exist. The version marker is `STORE_VERSION` in `src/data/store.ts`, and the legacy path is `migrateLegacy`.
 

@@ -18,17 +18,26 @@ import {
 import SettingsDialogs from "./SettingsDialogs";
 import { IconButton, tap } from "../../ui/primitives";
 import { useNotificationSettings } from "../../notifications/useNotificationSettings";
+import type { ThemePreference } from "../../ui/theme";
+
+const THEMES: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 export type SettingsScreenProps = {
   dark: boolean;
-  onDarkChange: (value: boolean) => void;
+  theme: ThemePreference;
+  onThemeChange: (value: ThemePreference) => void;
   onIncoming: () => void;
   onProfileChange?: (profile: SettingsProfile) => void;
 };
 
 export default function SettingsScreen({
   dark,
-  onDarkChange,
+  theme,
+  onThemeChange,
   onIncoming,
   onProfileChange,
 }: SettingsScreenProps) {
@@ -68,6 +77,12 @@ export default function SettingsScreen({
     editProfile,
   } = settings;
   const colors = settingsColors(dark);
+  const themeNote =
+    theme === "system"
+      ? `Following your device, ${dark ? "dark" : "light"} right now`
+      : theme === "dark"
+        ? "Always dark"
+        : "Always light";
 
   const icon = (
     name: React.ComponentProps<typeof Ionicons>["name"],
@@ -252,13 +267,48 @@ export default function SettingsScreen({
           <>
             {section("APPEARANCE")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
-              {switchRow(
-                "Dark mode",
-                dark ? "On" : "Off",
-                "moon-outline",
-                dark,
-                onDarkChange,
-              )}
+              <View style={styles.row}>
+                <View style={[styles.rowIcon, { backgroundColor: colors.tint }]}>
+                  {icon("contrast-outline")}
+                </View>
+                <View style={styles.rowCopy}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>
+                    Theme
+                  </Text>
+                  <Text style={[styles.rowSubtitle, { color: colors.muted }]}>
+                    {themeNote}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.segment, { backgroundColor: colors.input }]}>
+                {THEMES.map((option) => {
+                  const active = theme === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => {
+                        tap();
+                        onThemeChange(option.value);
+                      }}
+                      style={[
+                        styles.segmentOption,
+                        active && styles.segmentActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          { color: active ? "#29372F" : colors.muted },
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
             {section("NOTIFICATIONS")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>

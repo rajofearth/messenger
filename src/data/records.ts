@@ -5,8 +5,15 @@
  */
 
 import type { Chat, Message, Story } from "../domain/data";
+import type { ThemePreference } from "../ui/theme";
 
 export type AppearanceRecord = {
+  /** Theme chosen in Settings; "system" follows the device. */
+  theme: ThemePreference;
+};
+
+/** Shape written before the theme control gained its "system" option. */
+export type LegacyAppearanceRecord = {
   dark: boolean;
 };
 

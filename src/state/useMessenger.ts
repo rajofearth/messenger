@@ -15,7 +15,9 @@ import {
   refreshChatPreview,
 } from "../domain/messageActions";
 import { setHapticsEnabled } from "../ui/primitives";
+import type { ThemePreference } from "../ui/theme";
 import { messengerRepository } from "../data/messengerRepository";
+import { useThemePreference } from "./useThemePreference";
 
 export type Profile = {
   name: string;
@@ -53,7 +55,8 @@ export function useMessenger() {
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [stories, setStories] = useState(initialStories);
   const [history, setHistory] = useState<CallRecord[]>([]);
-  const [dark, setDark] = useState(false);
+  const [storedTheme, setStoredTheme] = useState<ThemePreference | undefined>();
+  const { theme, setTheme, dark } = useThemePreference(storedTheme);
   const [loaded, setLoaded] = useState(false);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [selected, setSelected] = useState<string | null>(null);
@@ -68,7 +71,6 @@ export function useMessenger() {
   const savedChats = useRef<Chat[] | null>(null);
   const savedStories = useRef<Story[] | null>(null);
   const savedHistory = useRef<CallRecord[] | null>(null);
-  const savedDark = useRef<boolean | null>(null);
   const savedThreads = useRef(new Map<string, Message[]>());
   const threads = useRef(new Map<string, Promise<Message[]>>());
   function updateMessages(
@@ -111,10 +113,7 @@ export function useMessenger() {
           savedHistory.current = storedHistory;
           setHistory(storedHistory);
         }
-        if (appearance) {
-          savedDark.current = appearance.dark;
-          setDark(appearance.dark);
-        }
+        if (appearance) setStoredTheme(appearance.theme);
         if (settings) {
           setHapticsEnabled(settings.haptics !== false);
           setProfile({
@@ -152,11 +151,6 @@ export function useMessenger() {
     savedHistory.current = history;
     void messengerRepository.saveHistory(history).catch(() => {});
   }, [history, loaded]);
-  useEffect(() => {
-    if (!loaded || savedDark.current === dark) return;
-    savedDark.current = dark;
-    void messengerRepository.saveAppearance(dark).catch(() => {});
-  }, [dark, loaded]);
   useEffect(() => {
     if (!loaded) return;
     for (const [id, thread] of Object.entries(messages)) {
@@ -461,7 +455,8 @@ export function useMessenger() {
     stories,
     history,
     dark,
-    setDark,
+    theme,
+    setTheme,
     loaded,
     profile,
     setProfile,

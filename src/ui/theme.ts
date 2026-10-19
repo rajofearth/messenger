@@ -1,4 +1,21 @@
 export const coral = "#EF8E76";
+
+/** How the app chooses its palette: follow the device, or pin one theme. */
+export type ThemePreference = "system" | "light" | "dark";
+
+/** The device scheme as React Native reports it, including "unspecified". */
+export type DeviceScheme = "light" | "dark" | "unspecified" | null | undefined;
+
+/** The palette to draw with, combining the stored preference and the device. */
+export function resolveDark(
+  theme: ThemePreference,
+  scheme: DeviceScheme,
+): boolean {
+  if (theme === "dark") return true;
+  if (theme === "light") return false;
+  return scheme === "dark";
+}
+
 export function palette(dark: boolean) {
   return {
     bg: dark ? "#292622" : "#FBFAF7",

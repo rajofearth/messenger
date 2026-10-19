@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  BackHandler,
+  StyleSheet,
+  useColorScheme,
+  View,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { NavigationBar } from "expo-navigation-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFonts } from "expo-font";
@@ -25,6 +32,7 @@ import ChatProfile from "./src/features/contacts/ChatProfile";
 import CallHistoryDetail from "./src/features/calls/CallHistoryDetail";
 import ForwardScreen from "./src/features/conversations/ForwardScreen";
 import { palette, coral } from "./src/ui/theme";
+import { useSystemAppearance } from "./src/ui/useSystemAppearance";
 import { useCallNotifications } from "./src/features/calls/useCallNotifications";
 import { forgetIncomingCall, rememberIncomingCall } from "./src/features/calls/pendingCall";
 import { useMessageNotifications } from "./src/notifications/useMessageNotifications";
@@ -60,6 +68,8 @@ export default function App() {
     messenger.chats.find((item) => item.id === detail?.id) ||
     messenger.history.find((item) => item.chat.id === detail?.id)?.chat;
   const colors = palette(messenger.dark);
+  const systemDark = useColorScheme() === "dark";
+  useSystemAppearance(messenger.theme, colors.bg);
   const chat = messenger.chats.find((item) => item.id === messenger.selected);
 
   useEffect(() => {
@@ -226,7 +236,7 @@ export default function App() {
 
   if ((!fonts && !fontError) || !messenger.loaded) {
     return (
-      <View style={s.loading}>
+      <View style={[s.loading, { backgroundColor: palette(systemDark).bg }]}>
         <Ionicons name="chatbubble-ellipses" size={42} color={coral} />
       </View>
     );
@@ -238,6 +248,8 @@ export default function App() {
         edges={calls.full ? [] : ["top", "bottom"]}
       >
         <StatusBar style={calls.full || messenger.dark ? "light" : "dark"} />
+        {/* On Android the navigation bar buttons follow the same rule. */}
+        <NavigationBar style={calls.full || messenger.dark ? "light" : "dark"} />
         {calls.call && (
           <View
             style={{ flex: 1, display: calls.full ? "flex" : "none" }}
@@ -364,7 +376,8 @@ export default function App() {
           ) : tab === "settings" ? (
             <SettingsScreen
               dark={messenger.dark}
-              onDarkChange={messenger.setDark}
+              theme={messenger.theme}
+              onThemeChange={messenger.setTheme}
               onProfileChange={messenger.setProfile}
               onIncoming={() => ringIncoming(messenger.chats[0], true)}
             />
@@ -441,6 +454,5 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FBFAF7",
   },
 });

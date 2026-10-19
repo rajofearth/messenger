@@ -68,7 +68,7 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 - **Stories.** One ring per person, plus a self ring for your own uploads, with per-item captions and no forced cropping. Tap to advance, hold to pause, swipe to change people. Your own story items can be deleted.
 - **Calls.** Voice and video calls from any conversation, with history, a connecting state, mute, speaker, camera flip and a return-to-chat pill that keeps the call running. The video call screen shows your real front or rear camera in the picture-in-picture view; the remote video is a placeholder image because there is no second participant.
 - **Profiles.** Contact and group profiles with shared media, documents, links, call history, dates, members and admins, plus mute and block switches that persist. Edit your own name, username, bio and photo, with the current photo shown before you replace it.
-- **Settings.** Appearance, haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
+- **Settings.** A theme control that follows the device by default or pins Light or Dark; the choice is stored on the device, and the status bar, navigation bar, native dialogs and root background follow it. Haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
 
 ## Android system notifications
 
@@ -101,7 +101,7 @@ src/features/               Screens grouped by area: chats, conversations, conta
 src/ui/                     Shared primitives, theme, quick actions, navigation
 modules/system-notifications/  Kotlin: Android call and message notifications
 modules/keyboard-media/        Kotlin: rich content from third-party keyboards
-plugins/                    Config plugins; keeps unused barcode scanner code out of the APK
+plugins/                    Config plugins; keep unused barcode scanner code and non-English resources out of the APK
 scripts/                    Android build helper and the Node test files
 ```
 

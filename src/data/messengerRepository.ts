@@ -8,10 +8,13 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createStore, STORE_VERSION, type StorageDriver, type Store } from "./store";
+import { normalizeAppearance } from "./appearance";
+import type { ThemePreference } from "../ui/theme";
 import type {
   AppearanceRecord,
   CallHistoryRecord,
   ChatRecord,
+  LegacyAppearanceRecord,
   LegacySnapshot,
   MessageRecord,
   PendingCallRecord,
@@ -35,8 +38,12 @@ export function createMessengerRepository(
 ) {
   const repository = {
     store,
-    loadAppearance: () => store.load<AppearanceRecord>("appearance"),
-    saveAppearance: (dark: boolean) => store.save("appearance", { dark }),
+    loadAppearance: async () =>
+      normalizeAppearance(
+        await store.load<AppearanceRecord | LegacyAppearanceRecord>("appearance"),
+      ),
+    saveAppearance: (theme: ThemePreference) =>
+      store.save("appearance", { theme }),
     loadChats: () => store.load<ChatRecord[]>("chats"),
     saveChats: (chats: ChatRecord[]) => store.save("chats", chats),
     loadStories: () => store.load<StoryRecord[]>("stories"),
@@ -78,7 +85,9 @@ export function createMessengerRepository(
         if (Array.isArray(saved.stories)) await store.save("stories", saved.stories);
         if (Array.isArray(saved.history)) await store.save("history", saved.history);
         if (typeof saved.dark === "boolean") {
-          await store.save("appearance", { dark: saved.dark });
+          await store.save("appearance", {
+            theme: saved.dark ? "dark" : "light",
+          });
         }
         if (saved.messages && typeof saved.messages === "object") {
           for (const [chatId, thread] of Object.entries(saved.messages)) {

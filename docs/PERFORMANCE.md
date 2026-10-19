@@ -4,12 +4,13 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 15,680,499 bytes
-(14.95 MiB) in the current build** — 64.0% smaller, in two stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,926,315 bytes
+(14.23 MiB) in the current build** — 65.7% smaller, in three stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
-(14.95 MiB). The stage table and the per-entry breakdown are under "Measured
+(14.95 MiB). Keeping only English resources brought it to 14,926,315 bytes
+(14.23 MiB). The stage table and the per-entry breakdown are under "Measured
 APK size".
 
 ### Build configuration in `app.json`
@@ -68,6 +69,23 @@ The bundled `.ttf` resources fell from 38 files, 2,609,365 stored bytes (about
 three DM Sans weights, Ionicons and a 2 KiB Roboto resource that arrives from
 another dependency.
 
+### Only English resources are packaged
+
+Every AndroidX, Material and Play Services library ships its interface strings
+translated into around a hundred locales. Resource shrinking leaves them alone
+because they are reachable from the merged resources, so about a hundred
+languages sat in `resources.arsc` even though the app's own UI is
+English-only. `plugins/withEnglishOnlyResources.js` writes `resConfigs "en"`
+into `defaultConfig` in the generated `android/app/build.gradle`, which tells
+AAPT2 to keep English and the default configuration only.
+
+The resource table fell from 1,284,976 to 515,120 stored bytes and the APK
+from 15,680,499 to 14,926,315 bytes (14.23 MiB). `resConfigs` filters locale
+qualifiers only: density, night mode, screen size, orientation and
+layout-direction resources are untouched, so adaptive icons, `values-night`
+and `ldrtl` layouts keep working. The app itself has no translated strings to
+lose.
+
 ### One ABI per release build
 
 Both build paths pass `-PreactNativeArchitectures=arm64-v8a`:
@@ -81,7 +99,7 @@ The generated `android/gradle.properties` default is `reactNativeArchitectures=a
 
 | Option | Current state | Why it was not changed |
 | --- | --- | --- |
-| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (1,597,160 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 0.8 MiB; the size goal is met without it, so the faster startup stays. |
+| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (1,607,120 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 0.8 MiB; the size goal is met without it, so the faster startup stays. |
 | `enablePngCrunchInReleaseBuilds` | Not set in `app.json`. The generated project keeps it on (`android.enablePngCrunchInReleaseBuilds=true`, and the Gradle fallback is `'true'`). | This is the setting that reduces asset size; turning it off would grow the APK to save build time only. |
 | Metro `inlineRequires` | Not overridden. There is no `metro.config.js` in the repository, so bundling uses the Expo and Metro defaults. | Inline requires move module initialisation to first use, which affects startup and bundle layout. Changing it without before/after `adb shell am start -W` numbers would be a guess. |
 
@@ -95,26 +113,29 @@ Each figure is the same working tree, the same Expo config and the same
 | --- | --- | --- |
 | Before size work (default minification and packaging) | 43,537,847 bytes (41.52 MiB) | - |
 | v0.0.1 (R8 minification and resource shrinking) | 35,628,346 bytes (33.98 MiB) | **-7,909,501 bytes, -18.2%** |
-| Current (compressed libraries, barcode scanner removed, fonts trimmed) | 15,680,499 bytes (14.95 MiB) | **-19,947,847 bytes, -56.0%** against v0.0.1, -64.0% overall |
+| v0.0.2 (compressed libraries, barcode scanner removed, fonts trimmed) | 15,680,499 bytes (14.95 MiB) | **-19,947,847 bytes, -56.0%** against v0.0.1, -64.0% overall |
+| Current v0.0.3 (English-only resources; system theme support) | 14,926,315 bytes (14.23 MiB) | **-754,184 bytes, -4.8%** against v0.0.2, -65.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
 compression variation. The v0.0.2 APK published there is 15,680,467 bytes,
-32 bytes below this local build for the same reason.
+32 bytes below this local build for the same reason. The v0.0.3 figure in this
+file is the local build; the published size is recorded here once the release
+is out.
 
 Where the size went, read from the archives with
 `[System.IO.Compression.ZipFile]::OpenRead` and grouped by top-level entry.
 The bytes below are stored sizes, so the `lib/` row compares the two packaging
 modes:
 
-| Entry group | v0.0.1 | Current | Notes |
-| --- | --- | --- | --- |
-| `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | Both changes: libraries are deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. |
-| `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. |
-| `res/` | 3.36 MiB, 1015 entries | 1.13 MiB, 938 entries | Font trimming is most of it; the remaining entries are shrunk resources. |
-| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | The 880,888 bytes of MLKit `.tflite` models are gone, and the JS bundle fell from 1,936,336 to 1,597,160 bytes. The bundle is still stored uncompressed. |
-| `resources.arsc` | 1.36 MiB | 1.23 MiB | Smaller resource table after shrinking. |
-| Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | Unchanged in substance. |
+| Entry group | v0.0.1 | v0.0.2 | Current | Notes |
+| --- | --- | --- | --- | --- |
+| `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. Unchanged since v0.0.2. |
+| `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed. |
+| `res/` | 3.36 MiB, 1015 entries | 1.13 MiB, 938 entries | 1.13 MiB, 938 entries | Font trimming is most of the v0.0.2 drop. The locale filter does not touch `res/`: compiled `values` resources live in `resources.arsc`. |
+| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 1,607,120 bytes, about 10 KB more than v0.0.2 with the theme code, still stored uncompressed. |
+| `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. |
+| Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | Unchanged in substance. |
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging
@@ -204,5 +225,5 @@ There is no automated performance harness here. No baseline for startup, frame t
 - **FlashList was not added.** The lists hold nine seeded chats and threads of a handful of messages. A new dependency and a new list API would not pay for themselves at this volume, and there is no measured jank to justify the swap.
 - **No deep virtualisation experiments.** No fixed row heights, no `getItemLayout`, no cell-recycling tricks beyond what `FlatList` and `expo-image` already provide. The reasons are in the `getItemLayout` section: variable font scale and content-dependent rows.
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
-- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.95 MiB there is no reason to take that trade without on-device startup numbers.
+- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.23 MiB there is no reason to take that trade without on-device startup numbers.
 - **No JS-level profiling.** Hermes is on (`hermesEnabled=true` in the generated `android/gradle.properties`), but no sampling or tracing run has been recorded in this repository.
