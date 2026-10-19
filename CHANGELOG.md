@@ -8,6 +8,41 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-19
+
+No features were removed. The Android (`arm64-v8a`) release APK falls from
+35,632,330 bytes (33.98 MiB) to 15,680,499 bytes (14.95 MiB): 56% smaller than
+v0.0.1 and 64% smaller than the first builds.
+
+### Changed
+
+- Release APKs now store native libraries compressed (`useLegacyPackaging`).
+  This is the largest single saving; the trade is a slower install and first
+  launch, when Android extracts the libraries. `docs/PERFORMANCE.md` records
+  the measurements and the reasoning.
+- `App.tsx` loads the three DM Sans weights it uses through direct imports and
+  takes `useFonts` from `expo-font`; it previously pulled in all eighteen
+  weights. Bundled font files drop from 38 to 5.
+- Icon imports load the Ionicons module directly instead of the
+  `@expo/vector-icons` package root, which bundled every icon family's glyph
+  map and font. Ionicons is the only family the UI uses.
+- `expo-camera` is built from source
+  (`expo.autolinking.android.buildFromSource`), and
+  `plugins/withBarcodeScannerDisabled.js` plus `app.json` rules remove the
+  barcode scanner the module would otherwise link.
+
+### Removed
+
+- The unused barcode scanner that `expo-camera` ships with: MLKit's
+  `libbarhopper_v3.so` (4,946,720 bytes), 880,888 bytes of TensorFlow Lite
+  models and their Java classes. The app has no barcode feature; the live
+  camera preview, photo capture and video recording are unchanged, and
+  `android.permission.CAMERA` is still declared.
+
+The camera path changed at native build time, so a physical-device pass over
+video calls is still required; the other device-test limitations from v0.0.1
+stand.
+
 ## [0.0.1] - 2026-10-18
 
 The first public release, for Android (`arm64-v8a`).
@@ -59,5 +94,6 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/rajofearth/messenger/releases/tag/v0.0.2
 [0.0.1]: https://github.com/rajofearth/messenger/releases/tag/v0.0.1

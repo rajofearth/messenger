@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import type { CallRecord } from "../../state/useMessenger";
 import { Avatar, IconButton, type IconName } from "../../ui/primitives";

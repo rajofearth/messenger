@@ -2,7 +2,7 @@
   "expo": {
     "name": "Messenger",
     "slug": "messenger",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -43,13 +43,15 @@
       "expo-video",
       "expo-sharing",
       "expo-image",
+      "./plugins/withBarcodeScannerDisabled",
       [
         "expo-build-properties",
         {
           "android": {
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "# Keep the app's own Expo modules. Expo's default rules already keep\n# module constructors and manifest components; this only pins the two\n# local modules so renamed classes can never break a release build.\n-keep class expo.modules.keyboardmedia.** { *; }\n-keep class expo.modules.systemnotifications.** { *; }\n"
+            "useLegacyPackaging": true,
+            "extraProguardRules": "# Keep the app's own Expo modules. Expo's default rules already keep\n# module constructors and manifest components; this only pins the two\n# local modules so renamed classes can never break a release build.\n-keep class expo.modules.keyboardmedia.** { *; }\n-keep class expo.modules.systemnotifications.** { *; }\n\n# MLKit's barcode scanner is compileOnly (see\n# plugins/withBarcodeScannerDisabled.js), so expo-camera's barcode paths\n# reference classes that are not in the APK. Without these rules R8 fails\n# the release build over them; with them, the paths stay unreachable: the\n# analyzer is only created when JS asks for barcode scanning, and the\n# native availability check reports the scanner as unavailable.\n-dontwarn com.google.android.gms.tasks.**\n-dontwarn com.google.mlkit.**\n"
           }
         }
       ]

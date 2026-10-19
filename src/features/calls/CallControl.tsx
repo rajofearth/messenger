@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { CORAL, styles } from "./CallScreen.styles";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];

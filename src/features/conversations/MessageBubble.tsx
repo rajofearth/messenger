@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import type { Message } from "../../domain/data";
 import type { ActionTarget } from "./MessageActions";

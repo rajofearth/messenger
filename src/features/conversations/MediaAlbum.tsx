@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Message } from "../../domain/data";
 import { albumOverflowCount } from "../../domain/mediaAlbums";
 import { palette, coral } from "../../ui/theme";

@@ -2,13 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Alert, BackHandler, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import {
-  useFonts,
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_700Bold,
-} from "@expo-google-fonts/dm-sans";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useFonts } from "expo-font";
+import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
+import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
+import { DMSans_700Bold } from "@expo-google-fonts/dm-sans/700Bold";
 import ChatsScreen from "./src/features/chats/ChatsScreen";
 import CallsScreen from "./src/features/calls/CallsScreen";
 import ConversationScreen from "./src/features/conversations/ConversationScreen";

@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Avatar, tap } from "./primitives";
 import { coral, palette } from "./theme";
 export type Tab = "chats" | "calls" | "settings";

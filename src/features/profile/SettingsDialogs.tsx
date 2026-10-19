@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearAvatarCache } from "../../data/avatars";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";

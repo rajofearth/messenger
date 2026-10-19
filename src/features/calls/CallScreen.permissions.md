@@ -4,28 +4,23 @@
 
 This does not implement call transport, record video, or capture microphone audio. The remote image and audio controls remain simulated. `App.tsx` and the call state hook were not changed.
 
-## Parent setup required
+## Native setup
 
-The compatible `expo-camera` dependency and lockfile are installed. Native configuration is outside this change's ownership, so the parent must add the following plugin entry to `expo.plugins` in `app.json`:
+The compatible `expo-camera` dependency and lockfile are installed, and `CallScreenCamera.tsx` is its only consumer. On Android the camera permission comes from the module's own manifest (`android.permission.CAMERA`), so no `expo-camera` entry in `expo.plugins` is needed; microphone permission for voice notes is configured separately through the audio plugin.
 
-```json
-[
-  "expo-camera",
-  {
-    "cameraPermission": "Allow Messenger to show your local camera preview during video calls.",
-    "recordAudioAndroid": false,
-    "barcodeScannerEnabled": false
-  }
-]
-```
+Barcode scanning is disabled at build time because the app never scans a barcode and the scanner accounts for roughly 6 MB of the APK:
 
-Keep existing audio and image-picker permission configuration. `recordAudioAndroid: false` stops this plugin from adding recording permission; it does not remove microphone permission needed by voice notes or other plugins.
+- `package.json` lists `expo-camera` under `expo.autolinking.android.buildFromSource`, so Gradle builds the module from `node_modules` instead of using the prebuilt AAR whose POM depends on MLKit at runtime.
+- `plugins/withBarcodeScannerDisabled.js` writes `expo.camera.barcode-scanner-enabled=false` into `android/gradle.properties`, which makes the module compile its MLKit dependencies as `compileOnly`.
+- `app.json`'s `extraProguardRules` adds `-dontwarn` rules for the resulting missing classes; the barcode paths stay unreachable because the module's own availability check fails at runtime.
 
-Run the project's native prebuild/build workflow and install a new development build. Installing the JavaScript dependency alone does not add the native camera module to an existing app binary. For manually maintained native projects, ensure Android declares `android.permission.CAMERA` and iOS defines `NSCameraUsageDescription`; prefer the Expo plugin to configure these.
+The live preview, capture and recording are unaffected. `docs/PERFORMANCE.md` records the measured effect.
+
+Run the project's native prebuild/build workflow and install the new APK. `npm run android:build` only regenerates the native project when `android/` is missing, so run `npm run android:prebuild` first after changing `app.json` or the plugins. Installing the JavaScript dependency alone does not add native modules to an existing app binary.
 
 ## Validation
 
-Run `node --test src/features/calls/CallScreenCamera.test.mjs` explicitly. The root test script was left unchanged because package edits are limited to dependencies.
+`src/features/calls/CallScreenCamera.test.mjs` runs as part of `npm test`.
 
 Device checks still required on Android and iOS:
 

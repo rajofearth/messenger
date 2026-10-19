@@ -1,6 +1,6 @@
 import React from "react";
 import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
 let hapticsEnabled = true;
