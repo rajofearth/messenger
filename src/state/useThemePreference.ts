@@ -7,14 +7,14 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useColorScheme } from "react-native";
 import { messengerRepository } from "../data/messengerRepository";
 import { resolveDark } from "../ui/theme";
 import type { ThemePreference } from "../ui/theme";
+import { useDeviceScheme } from "./useDeviceScheme";
 
 export function useThemePreference(stored: ThemePreference | undefined) {
   const [theme, setTheme] = useState<ThemePreference>("system");
-  const scheme = useColorScheme();
+  const scheme = useDeviceScheme();
   const applied = useRef<ThemePreference | null>(null);
 
   useEffect(() => {
@@ -30,5 +30,11 @@ export function useThemePreference(stored: ThemePreference | undefined) {
     void messengerRepository.saveAppearance(next).catch(() => {});
   }
 
-  return { theme, setTheme: update, dark: resolveDark(theme, scheme) };
+  return {
+    theme,
+    setTheme: update,
+    dark: resolveDark(theme, scheme),
+    // The device scheme on its own, for the loading screen and native chrome.
+    systemDark: scheme === "dark",
+  };
 }

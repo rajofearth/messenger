@@ -6,7 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.5] - 2026-10-19
+
+The app follows the device theme while it runs. Until this release, a switch
+between light and dark only reached the app at the next start: React Native read
+the scheme from the activity, and the activity's configuration was pinned to the
+value the device had when the app was created. The device is now read directly,
+and the system theme follows it live. This release also turns on Gradle build
+caching for every build.
 
 ### Changed
 
@@ -26,6 +33,37 @@ and this project adheres to
   build. The release variant shares its compilation with `:app:assembleRelease`,
   so the test no longer pulls the whole debug dependency graph into a build
   that only ships release artifacts.
+
+### Fixed
+
+- The **System** theme follows the device while the app is running, in both
+  directions, without a restart. `Appearance` reported nothing because an app
+  that sets a night mode — `userInterfaceStyle: "automatic"` does, through
+  `expo-system-ui` — hands AppCompat a configuration that Android re-applies on
+  every later configuration change, freezing the activity's scheme at the value
+  it had when the activity was created. `modules/device-scheme`, a new Kotlin
+  Expo module, reads the application context instead, whose resources Android
+  updates in place, and `src/state/useDeviceScheme.ts` keeps that value live;
+  `useColorScheme` is now only the fallback where the module is absent.
+- Native surfaces follow too: for the **System** theme,
+  `src/ui/useSystemAppearance.ts` now resolves the device's current scheme for
+  `Appearance.setColorScheme` instead of `"unspecified"`, because AppCompat
+  ignores a repeat of the night mode it already has and so could not apply a
+  switch that arrived later. Pinned themes are unchanged.
+
+### Size
+
+The arm64-v8a APK grows by 3,756 bytes against the published v0.0.4, which is
+the comparison the release check makes: **14,959,243 bytes (14.27 MiB) to
+14,962,999 bytes (14.27 MiB), +0.03%**. The local v0.0.4 build is 36 bytes
+larger than the published one, so against it the growth is 3,720, and that is
+what the entries below are measured with. All of it is the new module: the
+JavaScript bundle grows by 1,688 bytes (to 1,633,748) for the bridge, the hook
+and the parser, the other three bundled assets by 11 (`assets/app.config` is 12
+larger with the new keep rule, `baseline.profm` a byte smaller), and the Kotlin
+module and its manifest entries add 2,021 bytes of stored dex. The native
+libraries (5,896,334 bytes), `res/`, `resources.arsc` and the packaged metadata
+are unchanged.
 
 ## [0.0.4] - 2026-10-19
 
@@ -224,7 +262,8 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/rajofearth/messenger/releases/tag/v0.0.5
 [0.0.4]: https://github.com/rajofearth/messenger/releases/tag/v0.0.4
 [0.0.3]: https://github.com/rajofearth/messenger/releases/tag/v0.0.3
 [0.0.2]: https://github.com/rajofearth/messenger/releases/tag/v0.0.2

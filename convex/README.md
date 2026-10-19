@@ -38,7 +38,7 @@ functions. Publishing a release is then just:
 ```sh
 npm run android:build
 node scripts/update-manifest.mjs \
-  --url "https://github.com/<owner>/<repo>/releases/download/v0.0.4/messenger-0.0.4-arm64-v8a.apk"
+  --url "https://github.com/<owner>/<repo>/releases/download/v0.0.5/messenger-0.0.5-arm64-v8a.apk"
 npx convex run --prod releases:publish '<the JSON it printed>'
 ```
 

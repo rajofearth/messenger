@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.0.4   | Yes       |
+| 0.0.5   | Yes       |
 
 Only the latest release is supported. Older builds, locally built APKs and
 anything running in Expo Go are not supported.

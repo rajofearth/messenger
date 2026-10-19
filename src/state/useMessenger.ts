@@ -56,7 +56,7 @@ export function useMessenger() {
   const [stories, setStories] = useState(initialStories);
   const [history, setHistory] = useState<CallRecord[]>([]);
   const [storedTheme, setStoredTheme] = useState<ThemePreference | undefined>();
-  const { theme, setTheme, dark } = useThemePreference(storedTheme);
+  const { theme, setTheme, dark, systemDark } = useThemePreference(storedTheme);
   const [loaded, setLoaded] = useState(false);
   const [profile, setProfile] = useState<Profile>(DEFAULT_PROFILE);
   const [selected, setSelected] = useState<string | null>(null);
@@ -457,6 +457,7 @@ export function useMessenger() {
     dark,
     theme,
     setTheme,
+    systemDark,
     loaded,
     profile,
     setProfile,

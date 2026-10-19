@@ -11,8 +11,8 @@ Intended direction: `features` and `state` depend on `domain`, `data`, `services
 | Composition | `App.tsx` | Screen selection, hook wiring, Android back handling, the notification preference switch. No feature markup. |
 | Screens | `src/features/<area>/` | One folder per area: `chats`, `conversations`, `contacts`, `calls`, `profile`, `stories`. Screen components, their stylesheets, and feature-local hooks such as `useCalls` and `useMessageMedia`. |
 | Shared UI | `src/ui/` | Presentational primitives (`primitives.tsx`, `Navigation.tsx`, `QuickActions.tsx`, `theme.ts`), `KeyboardMediaInput`, `UpdatePrompt.tsx`, `openAttachment`. |
-| App state | `src/state/` | `useMessenger.ts` (all persisted app state), `useAppUpdater.ts` (the single update controller), `useNotificationActions.ts` (notification action handling). |
-| Native bridges | `src/services/` | `systemNotifications.ts`, `keyboardMedia.ts` and `appUpdater.ts`. Thin typed wrappers, no app logic. |
+| App state | `src/state/` | `useMessenger.ts` (all persisted app state), `useAppUpdater.ts` (the single update controller), `useNotificationActions.ts` (notification action handling), `useThemePreference.ts` and `useDeviceScheme.ts` (the theme preference and the live device scheme it follows). |
+| Native bridges | `src/services/` | `systemNotifications.ts`, `keyboardMedia.ts`, `appUpdater.ts` and `deviceScheme.ts`. Thin typed wrappers, no app logic. |
 | Persistence | `src/data/` | `messengerRepository.ts` (the backend seam), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`, `updateFeed.ts` (the release-feed client). |
 | Domain | `src/domain/` | `data.ts` (types and seed data), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`, `updates.ts`. Pure functions and types only. |
 
@@ -24,7 +24,7 @@ The test runs with `npm test` (Node's `node:test`, using built-in TypeScript str
 2. **No imports back into the app entry point.** Every file except `App.tsx` is checked against the regular expression `/from\s+["'][^"']*\/App(?:\.tsx?)?["']/`, so any static `import ... from ".../App"` or `".../App.tsx"` fails. Only static `from` imports are scanned; a `require()` or a dynamic `import()` would not be caught.
 3. **Domain purity.** Files in `src/domain` must not import from `react`, `react-native`, anything starting with `expo` or `@react-native`, or any path whose text contains `features/`, `state/` or `ui/`. The rule does not forbid `src/data`, and no domain file imports it today.
 
-Three current dependency directions sit outside the ideal picture, and it is worth knowing them before moving code. `src/state/useMessenger.ts` imports `setHapticsEnabled` from `src/ui/primitives.tsx`; `src/state/useNotificationActions.ts` imports `src/features/calls/pendingCall.ts`; `src/services/keyboardMedia.ts` imports the `KeyboardMedia` type from `src/ui/KeyboardMediaInput.tsx`; and `src/state/useThemePreference.ts` imports `resolveDark` from `src/ui/theme.ts`. The test only enforces the three rules above, not general layer boundaries.
+Five current dependency directions sit outside the ideal picture, and it is worth knowing them before moving code. `src/state/useMessenger.ts` imports `setHapticsEnabled` from `src/ui/primitives.tsx`; `src/state/useNotificationActions.ts` imports `src/features/calls/pendingCall.ts`; `src/services/keyboardMedia.ts` imports the `KeyboardMedia` type from `src/ui/KeyboardMediaInput.tsx`; `src/state/useThemePreference.ts` imports `resolveDark` and `src/services/deviceScheme.ts` imports `parseDeviceScheme` from `src/ui/theme.ts`. The test only enforces the three rules above, not general layer boundaries.
 
 ## Data flow in `useMessenger`
 
@@ -42,7 +42,9 @@ Three current dependency directions sit outside the ideal picture, and it is wor
 
 The stored preference is one of `system`, `light` or `dark`. `src/state/useThemePreference.ts` combines it with the device scheme through `resolveDark` (`src/ui/theme.ts`) and exposes the resulting `dark` flag, so every screen keeps receiving a plain boolean. Records written before the system option existed stored `{ dark: boolean }`; `normalizeAppearance` in `src/data/appearance.ts` maps them to a pinned theme as they load, so an existing choice is never silently reset. The preference is saved by the hook when the user changes it, not by a `useMessenger` effect.
 
-`src/ui/useSystemAppearance.ts` pushes the choice to native surfaces: `Appearance.setColorScheme` forces the AppCompat night mode for a pinned theme and releases it with `"unspecified"` for `system`, which native dialogs follow, and `SystemUI.setBackgroundColorAsync` (`expo-system-ui`) paints the root view behind the app and remembers the color for the next launch. `App.tsx` renders `expo-status-bar` and `expo-navigation-bar` components with the same mapping — light icons over dark backgrounds — and the full-screen call UI adds light icons on top because its chrome is always dark.
+The device scheme does not come from `useColorScheme`. React Native reads it from the running activity, and an app that sets a night mode — `userInterfaceStyle: "automatic"` sets AppCompat's "follow the system" one, through `expo-system-ui`, on every activity create — gives AppCompat a configuration that Android re-applies on every later configuration change. The activity keeps the scheme the device had when it was created, so `Appearance` sees nothing to report and a theme switch made while the app runs only reaches the next activity. `modules/device-scheme` reads the application context instead, whose resources Android updates in place, and `src/state/useDeviceScheme.ts` keeps the reported scheme live, falling back to `useColorScheme` where the module is absent. `modules/device-scheme/README.md` is the contract for why and how to verify it.
+
+`src/ui/useSystemAppearance.ts` pushes the choice to native surfaces: `Appearance.setColorScheme` sets the AppCompat night mode for a pinned theme, and for `system` it resolves to the device's current scheme rather than `"unspecified"`, because AppCompat ignores a repeat of the mode it already has and could not follow a later switch; `SystemUI.setBackgroundColorAsync` (`expo-system-ui`) paints the root view behind the app and remembers the color for the next launch. `App.tsx` renders `expo-status-bar` and `expo-navigation-bar` components with the same mapping — light icons over dark backgrounds — and the full-screen call UI adds light icons on top because its chrome is always dark.
 
 ### Persistence
 
@@ -197,7 +199,7 @@ The seam is `src/data/messengerRepository.ts`. `messengerRepository` is a single
 - No OTA JavaScript updates yet. A release is offered as a whole APK, so the download is the full size every time; the OTA bundle tier is the next step.
 - No call audio and no remote video. The video call screen shows your own camera in the picture-in-picture view; the remote participant is a placeholder photo, because there is no second participant.
 - Storage is local and unencrypted; the README tells users not to enter sensitive information.
-- Native features are Android-only. `system-notifications` and `keyboard-media` do nothing on iOS and web, and neither exists in Expo Go.
+- Native features are Android-only. `system-notifications` and `keyboard-media` do nothing on iOS and web, and neither exists in Expo Go; `device-scheme` falls back to React Native's `useColorScheme` where it is absent.
 - Notification actions other than answer/open do not run while JavaScript is dead; they are queued.
 - The architecture test's rules are narrow: size, no App imports, domain purity. Layer boundaries between `features`, `state` and `services` are convention, as the three exceptions above show.
 - Sample avatars and story media are remote Unsplash URLs, size-parameterised but still network downloads.

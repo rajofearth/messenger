@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveDark } from "./theme.ts";
+import { parseDeviceScheme, resolveDark } from "./theme.ts";
 
 test("a pinned theme overrides the device scheme", () => {
   assert.equal(resolveDark("dark", "light"), true);
@@ -18,4 +18,15 @@ test("an unknown device scheme keeps the light palette", () => {
   assert.equal(resolveDark("system", "unspecified"), false);
   assert.equal(resolveDark("system", null), false);
   assert.equal(resolveDark("system", undefined), false);
+});
+
+test("a native payload counts only when it names a scheme", () => {
+  assert.equal(parseDeviceScheme("dark"), "dark");
+  assert.equal(parseDeviceScheme("light"), "light");
+  assert.equal(parseDeviceScheme("unspecified"), null);
+  assert.equal(parseDeviceScheme("Dark"), null);
+  assert.equal(parseDeviceScheme(null), null);
+  assert.equal(parseDeviceScheme(undefined), null);
+  assert.equal(parseDeviceScheme(""), null);
+  assert.equal(parseDeviceScheme(1), null);
 });

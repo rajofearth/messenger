@@ -16,6 +16,11 @@ export function resolveDark(
   return scheme === "dark";
 }
 
+/** A scheme as native code reports it; anything else means "unknown". */
+export function parseDeviceScheme(value: unknown): "light" | "dark" | null {
+  return value === "dark" || value === "light" ? value : null;
+}
+
 export function palette(dark: boolean) {
   return {
     bg: dark ? "#292622" : "#FBFAF7",

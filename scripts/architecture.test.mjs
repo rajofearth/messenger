@@ -20,6 +20,7 @@ test("application source files stay under 500 lines", () => {
     "modules/keyboard-media/android/src",
     "modules/system-notifications/android/src",
     "modules/app-updater/android/src",
+    "modules/device-scheme/android/src",
   ].map((directory) => path.join(root, directory));
   function nativeSources(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

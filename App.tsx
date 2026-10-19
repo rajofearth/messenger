@@ -3,7 +3,6 @@ import {
   Alert,
   BackHandler,
   StyleSheet,
-  useColorScheme,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -71,8 +70,8 @@ export default function App() {
     messenger.chats.find((item) => item.id === detail?.id) ||
     messenger.history.find((item) => item.chat.id === detail?.id)?.chat;
   const colors = palette(messenger.dark);
-  const systemDark = useColorScheme() === "dark";
-  useSystemAppearance(messenger.theme, colors.bg);
+  const systemDark = messenger.systemDark;
+  useSystemAppearance(messenger.theme, colors.bg, systemDark);
   const chat = messenger.chats.find((item) => item.id === messenger.selected);
 
   useEffect(() => {
