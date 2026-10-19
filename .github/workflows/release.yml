@@ -273,8 +273,9 @@ jobs:
             echo "Release $TAG already exists; replacing its assets."
             gh release upload "$TAG" "${assets[@]}" --clobber
           else
+            target=$(git rev-parse HEAD)
             gh release create "$TAG" "${assets[@]}" \
-              --target "$TAG" \
+              --target "$target" \
               --title "Messenger $VERSION" \
               --notes-file artifacts/release/notes.md
           fi
