@@ -111,6 +111,9 @@ export function useMessageNotifications({
         if (result?.posted === true) announced.current.set(chat.id, last);
         void avatarPromise.then(() => {
           if (cancelled) return;
+          const resolvedSelfAvatar = self.avatarUri ? avatars[self.avatarUri] : undefined;
+          const resolvedChatAvatar = avatars[chat.avatar];
+          if (result?.posted === true && !resolvedSelfAvatar && !resolvedChatAvatar) return;
           const updated = messagePayload({
             chat,
             messages: thread,

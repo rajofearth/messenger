@@ -26,7 +26,60 @@ test("save rejects when the storage write fails and can be retried", async () =>
 
   await assert.rejects(store.save("profile", { name: "Alex" }), /offline/);
   await store.flush();
-  assert.deepEqual(await store.load("profile"), { name: "Alex" });
+  assert.equal(values.get("test/profile"), JSON.stringify({ name: "Alex" }));
+  assert.equal(attempts, 2);
+});
+
+test("a failed key does not reject an independent save", async () => {
+  const values = new Map();
+  let failed = false;
+  const store = createStore({
+    read: async (key) => values.get(key) ?? null,
+    write: async (key, value) => {
+      if (key === "test/broken" && !failed) {
+        failed = true;
+        throw new Error("broken key");
+      }
+      if (value === null) values.delete(key);
+      else values.set(key, value);
+    },
+    keys: async () => [...values.keys()],
+  }, "test");
+
+  const broken = store.save("broken", { value: 1 });
+  const healthy = store.save("healthy", { value: 2 });
+
+  await assert.rejects(broken, /broken key/);
+  await healthy;
+  assert.equal(values.get("test/healthy"), JSON.stringify({ value: 2 }));
+  assert.equal(values.has("test/broken"), false);
+});
+
+test("a failed key is retried by a later flush", async () => {
+  const values = new Map();
+  let attempts = 0;
+  const store = createStore({
+    read: async (key) => values.get(key) ?? null,
+    write: async (key, value) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("offline");
+      if (value === null) values.delete(key);
+      else values.set(key, value);
+    },
+    keys: async () => [...values.keys()],
+  }, "test");
+
+  await assert.rejects(
+    store.save("profile", { name: "Alex", count: 2 }),
+    /offline/,
+  );
+  assert.equal(values.has("test/profile"), false);
+
+  await store.flush();
+  assert.equal(
+    values.get("test/profile"),
+    JSON.stringify({ name: "Alex", count: 2 }),
+  );
   assert.equal(attempts, 2);
 });
 

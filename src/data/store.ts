@@ -30,40 +30,70 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
   const memory = new Map<string, unknown>();
   const reading = new Map<string, Promise<unknown>>();
   const generations = new Map<string, number>();
-  const queue = new Map<string, string | null>();
-  const writes = new Map<string, Promise<void>>();
+  type QueuedWrite = {
+    value: string | null;
+    failed: boolean;
+    promise: Promise<void>;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  };
+  const queue = new Map<string, QueuedWrite>();
   const full = (key: string) => `${namespace}/${key}`;
 
   async function drain(): Promise<void> {
-    while (queue.size) {
-      const [key, value] = queue.entries().next().value as [
-        string,
-        string | null,
-      ];
+    const attempted = new Set<QueuedWrite>();
+    let failed = false;
+    let firstError: unknown;
+
+    while (true) {
+      const next = [...queue.entries()].find(
+        ([, write]) => !attempted.has(write),
+      );
+      if (!next) break;
+
+      const [key, queued] = next;
+      attempted.add(queued);
       queue.delete(key);
-      const write = driver.write(key, value);
-      writes.set(key, write);
       try {
-        await write;
+        await driver.write(key, queued.value);
+        queued.resolve();
       } catch (error) {
+        failed = true;
+        firstError ??= error;
+        queued.failed = true;
+        queued.reject(error);
         // Keep the failed value queued so a later flush/save can retry it, but
-        // let the caller observe that this write was not durable.
-        if (!queue.has(key)) queue.set(key, value);
-        throw error;
-      } finally {
-        writes.delete(key);
+        // do not replace a newer value saved while this write was in flight.
+        if (!queue.has(key)) queue.set(key, queued);
       }
+    }
+
+    if (failed) {
+      throw firstError;
     }
   }
 
-  let flushing: Promise<void> = Promise.resolve();
+  function queuedWrite(value: string | null): QueuedWrite {
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((done, fail) => {
+      resolve = done;
+      reject = fail;
+    });
+    return { value, failed: false, promise, resolve, reject };
+  }
+
+  let flushing: Promise<void> | null = null;
 
   function schedule(): Promise<void> {
-    const run = flushing.then(drain);
-    // A failed run must not poison future writes, while its own promise still
-    // rejects so save callers never mistake memory-only state for durability.
-    flushing = run.catch(() => undefined);
-    return run;
+    if (flushing) return flushing;
+
+    const run = Promise.resolve().then(drain);
+    const scheduled = run.finally(() => {
+      if (flushing === scheduled) flushing = null;
+    });
+    flushing = scheduled;
+    return scheduled;
   }
 
   return {
@@ -98,8 +128,17 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
     save: async <T>(key: string, value: T | null) => {
       generations.set(key, (generations.get(key) ?? 0) + 1);
       memory.set(key, value ?? undefined);
-      queue.set(full(key), value === null ? null : JSON.stringify(value));
-      await schedule();
+      const storageKey = full(key);
+      const serialized = value === null ? null : JSON.stringify(value);
+      let queued = queue.get(storageKey);
+      if (!queued || queued.failed) {
+        queued = queuedWrite(serialized);
+        queue.set(storageKey, queued);
+      } else {
+        queued.value = serialized;
+      }
+      void schedule().catch(() => undefined);
+      await queued.promise;
     },
     keys: () => driver.keys(),
     flush: () => schedule(),

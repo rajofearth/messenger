@@ -76,7 +76,7 @@ export function useCallNotifications(call: Call | null, enabled: boolean) {
         ).catch(() => undefined);
       // Only a settled post may be remembered, or a failed one would never be
       // retried while the call state stays the same.
-        if (result?.posted === true) published.current = signature;
+        if (!cancelled && result?.posted === true) published.current = signature;
       };
       await post();
       const avatarUri = await avatarPromise;

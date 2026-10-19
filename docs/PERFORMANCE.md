@@ -137,7 +137,7 @@ Where the size went, read from the archives with
 The bytes below are stored sizes, so the `lib/` row compares the two packaging
 modes:
 
-| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | Current v0.0.5 | Notes |
+| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | v0.0.5 | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. Unchanged since v0.0.2; the updater and the device-scheme module add no native library. |
 | `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | 5,400,457 bytes (5.15 MiB) in 2 files, 12,928,160 unpacked | 5,402,478 bytes (5.15 MiB) in 2 files, 12,931,744 unpacked | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed, the updater module 7,571 and the device-scheme module 2,021. |

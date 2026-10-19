@@ -32,7 +32,7 @@ export function palette(dark: boolean) {
     // Dark text keeps normal-size outgoing copy above 4.5:1 on the coral
     // bubbles in both themes; the muted variant is for secondary labels.
     outgoingFg: dark ? "#120805" : "#3A1710",
-    outgoingMuted: dark ? "#3B2119" : "#54251A",
+    outgoingMuted: dark ? "#24100C" : "#54251A",
   };
 }
 export type Colors = ReturnType<typeof palette>;

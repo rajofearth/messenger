@@ -52,3 +52,7 @@ test("outgoing message text meets normal-copy contrast in both themes", () => {
   assert.ok(contrast(light.outgoingFg, "#F4A18B") >= 4.5);
   assert.ok(contrast(dark.outgoingFg, "#B86B57") >= 4.5);
 });
+
+test("dark outgoing muted text meets normal-copy contrast", () => {
+  assert.ok(contrast(palette(true).outgoingMuted, "#B86B57") >= 4.5);
+});
