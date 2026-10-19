@@ -13,7 +13,7 @@ and this project adheres to
 The theme now follows the device by default and can be pinned to Light or
 Dark, and both system bars, native dialogs and the root background follow the
 choice. The release APK also drops the library translations: 15,680,467 bytes
-(14.95 MiB) to 14,926,315 bytes (14.23 MiB).
+(14.95 MiB) to 14,926,279 bytes (14.23 MiB).
 
 ### Added
 
@@ -39,7 +39,7 @@ choice. The release APK also drops the library translations: 15,680,467 bytes
 - Only English resources are packaged. `plugins/withEnglishOnlyResources.js`
   adds `resConfigs "en"` to `defaultConfig`, which removes around a hundred
   locales of strings that AndroidX, Material and Play Services libraries ship:
-  754,152 bytes against the published v0.0.2 APK. Density, night mode, screen
+  754,188 bytes against the published v0.0.2 APK. Density, night mode, screen
   size and layout-direction resources are untouched.
 
 Device testing was not performed for this release. The theme control, the
