@@ -99,7 +99,8 @@ Each figure is the same working tree, the same Expo config and the same
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
-compression variation.
+compression variation. The v0.0.2 APK published there is 15,680,467 bytes,
+32 bytes below this local build for the same reason.
 
 Where the size went, read from the archives with
 `[System.IO.Compression.ZipFile]::OpenRead` and grouped by top-level entry.

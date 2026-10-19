@@ -11,7 +11,7 @@ and this project adheres to
 ## [0.0.2] - 2026-10-19
 
 No features were removed. The Android (`arm64-v8a`) release APK falls from
-35,632,330 bytes (33.98 MiB) to 15,680,499 bytes (14.95 MiB): 56% smaller than
+35,632,330 bytes (33.98 MiB) to 15,680,467 bytes (14.95 MiB): 56% smaller than
 v0.0.1 and 64% smaller than the first builds.
 
 ### Changed
