@@ -29,6 +29,10 @@ env:
   NDK_VERSION: 27.1.12297006
   BUILD_TOOLS_VERSION: 36.0.0
   PLATFORM_VERSION: android-36
+  # Baked into the JavaScript bundle at build time. Set this repository
+  # variable to the Convex site URL once the update backend exists; an empty
+  # value ships the app with the updater visibly unconfigured.
+  EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
 
 jobs:
   release:
@@ -82,16 +86,6 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Releasing $tag"
 
-      - name: Cache Gradle
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
       # android/ is generated and gitignored, so every release starts from the
       # Expo config. This also means the build always matches app.json.
       - name: Generate the Android project
@@ -112,6 +106,22 @@ jobs:
           echo "Installing: ${missing[*]}"
           yes | "$sdkmanager" --licenses > /dev/null || true
           "$sdkmanager" --install "${missing[@]}"
+
+      # Restores the Gradle User Home cache written by the warm-up job in
+      # ci.yml: dependencies, compiled build scripts, transformed jars and the
+      # local build cache that org.gradle.caching=true fills. GitHub scopes a
+      # cache to the ref that wrote it and tags are never reused, so a tag can
+      # only read the default branch's entries; the warm-up job exists to keep
+      # those fresh. This runs after prebuild because setup-gradle also
+      # validates android/gradle/wrapper against the Gradle checksums, and the
+      # wrapper only exists once the project is generated.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # A tag can never read back an entry it wrote, so it must not write
+          # one; a manual dispatch from a branch may write like the warm-up
+          # job does.
+          cache-read-only: ${{ github.ref_type == 'tag' }}
 
       # Release signing is optional. With the four ANDROID_* secrets set, the
       # APK is signed with that key; without them it falls back to the debug
@@ -140,7 +150,12 @@ jobs:
             echo "RELEASE_SIGNING=0" >> "$GITHUB_ENV"
             echo "::warning::ANDROID_KEYSTORE_BASE64 is not set, so the APK will be signed with the generated debug key."
           fi
-          ./gradlew :keyboard-media:testDebugUnitTest :app:assembleRelease "${args[@]}"
+          # The module's own tests run on the release variant, which shares its
+          # compilation with :app:assembleRelease; a debug-variant test would
+          # compile the whole debug dependency graph (expo-modules-core and
+          # every Expo module) for nothing. Both variants run the same JVM
+          # tests.
+          ./gradlew :keyboard-media:testReleaseUnitTest :app:assembleRelease "${args[@]}"
 
       - name: Inspect the APK signature
         working-directory: android
@@ -168,6 +183,23 @@ jobs:
             if [ -n "${baseline:-}" ]; then
               echo "Comparing against $previous ($baseline bytes)"
               args+=(--baseline "$baseline" --baseline-label "$previous")
+            fi
+            # Android refuses to install a build whose versionCode is not
+            # higher than the installed one, so read the real previous APK.
+            mkdir -p "$RUNNER_TEMP/previous"
+            if gh release download "$previous" --pattern "*.apk" --dir "$RUNNER_TEMP/previous" --clobber; then
+              previous_apk=$(find "$RUNNER_TEMP/previous" -name "*.apk" -print -quit)
+              if [ -n "$previous_apk" ]; then
+                aapt2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+                previous_code=$("$aapt2" dump badging "$previous_apk" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)
+                if [ -n "$previous_code" ]; then
+                  args+=(--baseline-version-code "$previous_code")
+                else
+                  echo "::warning::Could not read the versionCode from $previous; the regression check was skipped."
+                fi
+              fi
+            else
+              echo "::warning::Could not download the APK from $previous; the versionCode regression check was skipped."
             fi
           fi
           node scripts/release-check.mjs "${args[@]}"
@@ -236,6 +268,28 @@ jobs:
               --title "Messenger $VERSION" \
               --notes-file artifacts/release/notes.md
           fi
+
+      # The feed is one small JSON document on Convex; the APK itself stays on
+      # the GitHub release that was just published, so the manifest points at a
+      # URL that provably exists. Without a deploy key the app simply ships
+      # unconfigured; that is a warning, not a failed release.
+      - name: Publish the update feed
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CONVEX_DEPLOY_KEY:-}" ]; then
+            echo "::warning::CONVEX_DEPLOY_KEY is not set; the update feed was not published."
+            exit 0
+          fi
+          npx convex deploy
+          manifest=$(node scripts/update-manifest.mjs \
+            "artifacts/release/messenger-$VERSION-arm64-v8a.apk" \
+            --url "https://github.com/$REPOSITORY/releases/download/$TAG/messenger-$VERSION-arm64-v8a.apk")
+          npx convex run --prod releases:publish "$manifest"
 
       - name: Refresh the release notes (best effort)
         if: ${{ always() }}

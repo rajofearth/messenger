@@ -1,0 +1,176 @@
+name: Gradle bench
+
+# TEMPORARY: exists only on the perf/gradle-cache-bench branch to measure the
+# release pipeline change from the Gradle caching work. Not meant to be merged;
+# the durable warm-up job lives in .github/workflows/ci.yml.
+
+on:
+  push:
+    branches: ["perf/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
+  NDK_VERSION: 27.1.12297006
+  BUILD_TOOLS_VERSION: 36.0.0
+  PLATFORM_VERSION: android-36
+
+jobs:
+  # Run 1: exactly the release build, cold, and write the caches. This is the
+  # timing a release has today; it is also what the master warm-up job costs.
+  cold:
+    name: Cold (writes the cache)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          missing=()
+          [ -d "$ANDROID_HOME/ndk/$NDK_VERSION" ] || missing+=("ndk;$NDK_VERSION")
+          [ -d "$ANDROID_HOME/platforms/$PLATFORM_VERSION" ] || missing+=("platforms;$PLATFORM_VERSION")
+          [ -d "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION" ] || missing+=("build-tools;$BUILD_TOOLS_VERSION")
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "All required SDK packages are already installed."
+            exit 0
+          fi
+          echo "Installing: ${missing[*]}"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "${missing[@]}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # A non-default branch is read-only by default; the cold run exists
+          # to write the entries the warm run restores.
+          cache-read-only: false
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew :keyboard-media:testReleaseUnitTest :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain --max-workers 4
+
+      - name: Inspect the APK
+        working-directory: android
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs "$apk" | head -6
+          unzip -l "$apk" | grep -c '^.*lib/arm64-v8a/.*\.so$' | xargs -I {} echo "Packaged arm64-v8a libraries: {}"
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle' && echo "JavaScript bundle: present"
+          stat -c '%s bytes' "$apk"
+
+      - name: Run the slim-build gate
+        run: node scripts/release-check.mjs android/app/build/outputs/apk/release/app-release.apk
+
+  # Run 2: the same build with the caches the cold job wrote. Tag releases use
+  # this path (read-only, restoring the default branch's entries).
+  warm:
+    name: Warm (restores the cache)
+    needs: cold
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          missing=()
+          [ -d "$ANDROID_HOME/ndk/$NDK_VERSION" ] || missing+=("ndk;$NDK_VERSION")
+          [ -d "$ANDROID_HOME/platforms/$PLATFORM_VERSION" ] || missing+=("platforms;$PLATFORM_VERSION")
+          [ -d "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION" ] || missing+=("build-tools;$BUILD_TOOLS_VERSION")
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "All required SDK packages are already installed."
+            exit 0
+          fi
+          echo "Installing: ${missing[*]}"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "${missing[@]}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew :keyboard-media:testReleaseUnitTest :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain --max-workers 4
+
+      - name: Inspect the APK
+        working-directory: android
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs "$apk" | head -6
+          unzip -l "$apk" | grep -c '^.*lib/arm64-v8a/.*\.so$' | xargs -I {} echo "Packaged arm64-v8a libraries: {}"
+          unzip -l "$apk" | grep -q 'assets/index.android.bundle' && echo "JavaScript bundle: present"
+          stat -c '%s bytes' "$apk"
+
+      - name: Run the slim-build gate
+        run: node scripts/release-check.mjs android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-warm-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7

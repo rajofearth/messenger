@@ -4,6 +4,7 @@
 // against the CI APK. What each check protects is written up in AGENTS.md.
 //
 //   node scripts/release-check.mjs [apk] [--baseline <bytes>] [--baseline-label <name>]
+//                                  [--baseline-version-code <n>]
 //
 // Without an argument it inspects artifacts/messenger-local.apk, which is what
 // `npm run android:build` writes. Exits non-zero when a check fails, so a
@@ -28,7 +29,7 @@ const FORBIDDEN_LIBRARIES = ["libbarhopper_v3.so"];
 const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
   console.log(
-    "Usage: node scripts/release-check.mjs [apk] [--baseline <bytes>] [--baseline-label <name>]",
+    "Usage: node scripts/release-check.mjs [apk] [--baseline <bytes>] [--baseline-label <name>] [--baseline-version-code <n>]",
   );
   process.exit(0);
 }
@@ -36,6 +37,7 @@ if (argv.includes("--help") || argv.includes("-h")) {
 let apkArgument;
 let baseline;
 let baselineLabel = "the previous release";
+let baselineVersionCode;
 for (let index = 0; index < argv.length; index += 1) {
   const argument = argv[index];
   if (argument === "--baseline") {
@@ -43,6 +45,9 @@ for (let index = 0; index < argv.length; index += 1) {
     index += 1;
   } else if (argument === "--baseline-label") {
     baselineLabel = argv[index + 1];
+    index += 1;
+  } else if (argument === "--baseline-version-code") {
+    baselineVersionCode = Number(argv[index + 1]);
     index += 1;
   } else if (argument.startsWith("--")) {
     console.error(`Unknown option: ${argument}`);
@@ -53,6 +58,14 @@ for (let index = 0; index < argv.length; index += 1) {
   } else {
     apkArgument = argument;
   }
+}
+
+if (
+  baselineVersionCode !== undefined &&
+  (!Number.isInteger(baselineVersionCode) || baselineVersionCode < 1)
+) {
+  console.error("--baseline-version-code must be a positive integer");
+  process.exit(2);
 }
 
 const mib = (bytes) => `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
@@ -87,6 +100,28 @@ if (packageConfig.version === version) {
     `app.json says ${version} but package.json says ${packageConfig.version}`,
     "bump both in the release commit",
   );
+}
+
+const versionCode = appConfig.expo?.android?.versionCode;
+if (Number.isInteger(versionCode) && versionCode >= 1) {
+  ok(`versionCode ${versionCode} is a positive integer`);
+} else {
+  fail(
+    `expo.android.versionCode is ${versionCode ?? "missing"}; Android needs a positive integer to order installs`,
+    "set expo.android.versionCode in app.json and bump it for every release",
+  );
+}
+if (baselineVersionCode !== undefined && Number.isInteger(versionCode)) {
+  if (versionCode > baselineVersionCode) {
+    ok(
+      `versionCode ${versionCode} is newer than ${baselineLabel}'s ${baselineVersionCode}`,
+    );
+  } else {
+    fail(
+      `versionCode ${versionCode} is not newer than ${baselineLabel}'s ${baselineVersionCode}`,
+      "bump expo.android.versionCode; Android will not install an equal or lower version code over the old app",
+    );
+  }
 }
 
 const apkPath = apkArgument
@@ -181,7 +216,7 @@ console.log(
 const aapt2 = findAapt2();
 if (!aapt2) {
   warn(
-    "aapt2 was not found, so the locale and versionName checks were skipped (set ANDROID_HOME or AAPT2)",
+    "aapt2 was not found, so the locale, versionName and versionCode checks were skipped (set ANDROID_HOME or AAPT2)",
   );
 } else {
   try {
@@ -191,6 +226,15 @@ if (!aapt2) {
       ok(`APK reports versionName ${versionName}`);
     } else {
       fail(`APK reports versionName ${versionName ?? "unknown"} but app.json says ${version}`);
+    }
+    const apkVersionCode = /versionCode='([^']*)'/.exec(badging)?.[1];
+    if (apkVersionCode === String(versionCode)) {
+      ok(`APK reports versionCode ${apkVersionCode}`);
+    } else {
+      fail(
+        `APK reports versionCode ${apkVersionCode ?? "unknown"} but app.json says ${versionCode}`,
+        "prebuild and rebuild; the APK would be rejected as a downgrade",
+      );
     }
     const configurations = execFileSync(aapt2, ["dump", "configurations", apkPath], {
       encoding: "utf8",

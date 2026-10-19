@@ -38,6 +38,8 @@ import { forgetIncomingCall, rememberIncomingCall } from "./src/features/calls/p
 import { useMessageNotifications } from "./src/notifications/useMessageNotifications";
 import { useNotificationBridge } from "./src/notifications/useNotificationBridge";
 import { useNotificationActions } from "./src/state/useNotificationActions";
+import { useAppUpdater } from "./src/state/useAppUpdater";
+import UpdatePrompt from "./src/ui/UpdatePrompt";
 import {
   isSystemNotificationsAvailable,
   setConversationMuted,
@@ -53,6 +55,7 @@ export default function App() {
   });
   const messenger = useMessenger();
   const calls = useCalls(messenger.addCall);
+  const updates = useAppUpdater();
   const [tab, setTab] = useState<Tab>("chats");
   const [compose, setCompose] = useState<ComposeMode | null>(null);
   const [editor, setEditor] = useState<"contact" | "group" | null>(null);
@@ -233,6 +236,22 @@ export default function App() {
     onVoiceCall: () => setCompose("voice"),
     onVideoCall: () => setCompose("video"),
   };
+  /**
+   * The update prompt only appears over the chat list. A release notice must
+   * not land on top of a call, a story, the editor, or a conversation.
+   */
+  const updatePromptFits =
+    tab === "chats" &&
+    !chat &&
+    !compose &&
+    !detail &&
+    !forward &&
+    !editor &&
+    storyIndex === null &&
+    !addingStory &&
+    !calls.full &&
+    !calls.call &&
+    !recording;
 
   if ((!fonts && !fontError) || !messenger.loaded) {
     return (
@@ -377,6 +396,7 @@ export default function App() {
             <SettingsScreen
               dark={messenger.dark}
               theme={messenger.theme}
+              updates={updates}
               onThemeChange={messenger.setTheme}
               onProfileChange={messenger.setProfile}
               onIncoming={() => ringIncoming(messenger.chats[0], true)}
@@ -444,6 +464,11 @@ export default function App() {
           onSeen={messenger.markStorySeen}
           onDelete={messenger.deleteStory}
           onShare={messenger.shareStory}
+        />
+        <UpdatePrompt
+          updates={updates}
+          dark={messenger.dark}
+          visible={updatePromptFits}
         />
       </SafeAreaView>
     </SafeAreaProvider>

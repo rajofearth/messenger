@@ -8,6 +8,77 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-10-19
+
+The app can now update itself. A small release feed tells it when a newer build
+exists; it downloads and verifies the APK, handles Android's "install unknown
+apps" permission, and hands the file to the system installer. The feed is served
+from Convex, while the APK itself stays on the GitHub release. This is also the
+first release that can be signed with a project keystore, so anyone updating
+from an older debug-signed APK has to install this one by hand once.
+
+### Added
+
+- In-app updates, with a launch prompt and an **Updates** card in Settings. The
+  prompt appears over the chat list only, never over a call, story or dialog;
+  a dismissed release is not offered again, while a mandatory release or one
+  above the installed build's floor (`minVersionCode`) keeps asking. Both
+  surfaces report download progress and offer cancel, retry, the permission
+  step, and the final install.
+- `modules/app-updater`, a Kotlin Expo module that reads the installed
+  `versionName`/`versionCode`, downloads to `cacheDir/updates/` with streaming
+  SHA-256 verification (reusing an already verified file), cancels an in-flight
+  download, clears the cache, reports the "install unknown apps" state, opens
+  the matching system settings, and starts Android's package installer through
+  a `FileProvider` that exposes only the staged APK directory.
+  `plugins/withUpdateInstaller.js` adds `REQUEST_INSTALL_PACKAGES` and that
+  provider to the generated manifest.
+- `src/domain/updates.ts` validates the feed as untrusted input: https-only
+  download URLs, a 64-hex digest, bounded sizes and notes, and `versionCode` as
+  the only ordering key. `src/data/updateFeed.ts` is the small feed client
+  (10 s timeout, 256 KiB body cap), and `src/state/useAppUpdater.ts` is the
+  single update controller per app run. A build without
+  `EXPO_PUBLIC_UPDATE_FEED_URL` reports "no update feed" instead of pointing at
+  a placeholder.
+- `convex/` holds the control plane: a `releases` table, an internal
+  `releases:publish` mutation, `releases:latest`, and the
+  `GET /updates/manifest?versionCode=N` HTTP action. `convex/lib/manifest.ts`
+  mirrors the client's checks, refuses a publish below the current version
+  code, and answers `{"upToDate":true}` to a build that has caught up. The
+  deploy key needs only `deployment:deploy` and
+  `deployment:functions:runInternalMutations`.
+- `scripts/update-manifest.mjs` hashes the built APK, reads the matching
+  `CHANGELOG.md` section as the prompt notes, and prints the document
+  `releases:publish` expects. The release workflow deploys the Convex functions
+  and publishes the feed after the GitHub release exists, and warns instead of
+  failing when `CONVEX_DEPLOY_KEY` is not set.
+- The slim-build gate now checks that `expo.android.versionCode` is a positive
+  integer, that the APK reports the same version code, and, when the workflow
+  passed the previous release's version code, that the new one moved past it.
+  Tests cover the feed round trip (server output through the app's parser),
+  the changelog-to-notes conversion and the release script's argument handling.
+
+### Changed
+
+- The version code moves from 1 to 4, so Android will accept this build as an
+  update over the previous ones. `versionName` and `package.json` say 0.0.4.
+- Release builds can now be signed with a project keystore through the four
+  `ANDROID_*` secrets, and the README documents generating one. Switching from
+  the generated debug key is a one-time break: Android refuses to install an
+  APK signed by a different key over the old one, so that install must be
+  sideloaded after an uninstall, and an uninstall clears the app's local data.
+
+### Size
+
+The arm64-v8a APK grows by 32,860 bytes: **14,926,315 bytes (14.23 MiB) to
+14,959,175 bytes (14.27 MiB), +0.2%**. Most of it is the new JavaScript: the
+bundle grows by 24,848 bytes (to 1,631,968) and the assets around it by 50
+bytes, for the prompt, the Settings card, the feed client and the update rules.
+The Kotlin module and its manifest entries add 7,571 bytes of stored dex, and
+the remaining 391 bytes are spread across `resources.arsc` and packaged
+property files. The native libraries are unchanged at 5,896,334 bytes.
+
+
 ## [0.0.3] - 2026-10-19
 
 The theme now follows the device by default and can be pinned to Light or
@@ -133,7 +204,8 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/rajofearth/messenger/releases/tag/v0.0.4
 [0.0.3]: https://github.com/rajofearth/messenger/releases/tag/v0.0.3
 [0.0.2]: https://github.com/rajofearth/messenger/releases/tag/v0.0.2
 [0.0.1]: https://github.com/rajofearth/messenger/releases/tag/v0.0.1

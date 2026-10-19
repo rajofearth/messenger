@@ -19,6 +19,8 @@ import SettingsDialogs from "./SettingsDialogs";
 import { IconButton, tap } from "../../ui/primitives";
 import { useNotificationSettings } from "../../notifications/useNotificationSettings";
 import type { ThemePreference } from "../../ui/theme";
+import type { AppUpdater } from "../../state/useAppUpdater";
+import UpdateSection from "./UpdateSection";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -32,6 +34,8 @@ export type SettingsScreenProps = {
   onThemeChange: (value: ThemePreference) => void;
   onIncoming: () => void;
   onProfileChange?: (profile: SettingsProfile) => void;
+  /** The app-wide updater, so the card and the launch prompt share one state. */
+  updates: AppUpdater;
 };
 
 export default function SettingsScreen({
@@ -40,6 +44,7 @@ export default function SettingsScreen({
   onThemeChange,
   onIncoming,
   onProfileChange,
+  updates,
 }: SettingsScreenProps) {
   const settings = useSettingsPreferences(onProfileChange);
   const notifications = useNotificationSettings();
@@ -375,6 +380,13 @@ export default function SettingsScreen({
               permission row opens the system screen when it is blocked. Call
               actions answer or decline; message actions reply, mark read, or
               mute without opening the app.
+            </Text>
+            {section("UPDATES")}
+            <UpdateSection updates={updates} colors={colors} />
+            <Text style={[styles.note, { color: colors.muted }]}>
+              Updates download from this app's release feed and are checked
+              against their published checksum. Android confirms the install,
+              which replaces the app in place and keeps your chats and settings.
             </Text>
             {section("FEEDBACK")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>

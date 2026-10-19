@@ -68,3 +68,11 @@ export type PendingCallRecord = {
   /** Ringing window in milliseconds, matching the notification timeout. */
   timeoutMs: number;
 };
+
+/**
+ * The release a user has already declined. Kept per version code rather than
+ * as a flag, so the next release is offered again.
+ */
+export type UpdateRecord = {
+  dismissedVersionCode: number;
+};

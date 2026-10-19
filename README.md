@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/rajofearth/messenger?include_prereleases&sort=semver)](https://github.com/rajofearth/messenger/releases)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-A messenger interface for Android, built with Expo SDK 57 and React Native 0.86. Chats, media albums, stories, calls and profiles are all interactive, and calls and messages arrive as real Android system notifications with working action buttons. State lives on the device: there is no server, no account and no push service.
+A messenger interface for Android, built with Expo SDK 57 and React Native 0.86. Chats, media albums, stories, calls and profiles are all interactive, and calls and messages arrive as real Android system notifications with working action buttons. State lives on the device: there is no account, no message server and no push service. The only server is an optional release feed that tells the app when a newer build exists.
 
 The point of the project is the client architecture. Everything the app knows is read through one typed repository (`src/data/messengerRepository.ts`) and one cache (`src/data/cache.ts`), so a real backend can replace the local store without touching a single screen. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -59,6 +59,7 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 | `npm run android:build` | Release APK, arm64-v8a, copied to `artifacts/messenger-local.apk` |
 | `npm run android:install` | Installs the built APK over adb and starts it |
 | `npm run android` | Alias for `android:build` |
+| `npm run release:check` | Typecheck, tests and the slim-build gate over `artifacts/messenger-local.apk` |
 
 ## Features
 
@@ -69,6 +70,7 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 - **Calls.** Voice and video calls from any conversation, with history, a connecting state, mute, speaker, camera flip and a return-to-chat pill that keeps the call running. The video call screen shows your real front or rear camera in the picture-in-picture view; the remote video is a placeholder image because there is no second participant.
 - **Profiles.** Contact and group profiles with shared media, documents, links, call history, dates, members and admins, plus mute and block switches that persist. Edit your own name, username, bio and photo, with the current photo shown before you replace it.
 - **Settings.** A theme control that follows the device by default or pins Light or Dark; the choice is stored on the device, and the status bar, navigation bar, native dialogs and root background follow it. Haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
+- **Updates.** When the build has a release feed, the app checks it at launch, offers the new version with its download size and notes, downloads and SHA-256 verifies the APK in the background, and then hands it to Android's installer after handling the "install unknown apps" permission. Settings always reports the current state, and a dismissed release is only re-offered when the next one exists. Updates only arrive while the app can run; there is no background updater.
 
 ## Android system notifications
 
@@ -111,13 +113,30 @@ Features depend on `src/domain`, `src/data` and `src/ui`, never on `App.tsx`. `n
 
 ## Releases
 
-A release is one version bump and one tag. Push a tag named `v<version>` where `<version>` matches `expo.version` in `app.json`; [`.github/workflows/release.yml`](.github/workflows/release.yml) then runs the tests, regenerates the Android project, builds a signed arm64-v8a APK, verifies the signature and publishes it with its SHA-256 checksum on a public GitHub release. The same workflow can be started by hand from the Actions tab.
+A release is one version bump and one tag. Push a tag named `v<version>` where `<version>` matches `expo.version` in `app.json`, with `expo.android.versionCode` bumped above the last release's; [`.github/workflows/release.yml`](.github/workflows/release.yml) then runs the tests, regenerates the Android project, builds a signed arm64-v8a APK, verifies the signature, refuses a version-code regression, and publishes the APK with its SHA-256 checksum on a public GitHub release. The same workflow can be started by hand from the Actions tab.
 
-Set `ANDROID_KEYSTORE_BASE64` (a base64-encoded keystore), `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` as repository secrets to sign with your own key. Without them the workflow falls back to Expo's debug keystore and says so in the release notes.
+Set `ANDROID_KEYSTORE_BASE64` (a base64-encoded keystore), `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` as repository secrets to sign with your own key. Without them the workflow falls back to Expo's debug keystore and says so in the release notes. Generate the release key once and keep it safe: Android identifies an app by its signing key, so a lost key ends in-place updates for good.
+
+```sh
+keytool -genkeypair -v -keystore release.keystore -alias messenger \
+  -keyalg RSA -keysize 4096 -validity 10000
+# Linux/macOS
+base64 -w0 release.keystore
+# PowerShell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("release.keystore"))
+```
+
+The first release signed with a new key cannot install over a build signed with another one, because Android refuses the signature change. Those users uninstall once (which clears the app's local data) and sideload that APK by hand; every later release can install in place from inside the app.
+
+### The update feed
+
+The app checks for a newer build only when the APK was built with `EXPO_PUBLIC_UPDATE_FEED_URL` pointing at a manifest endpoint. Set it as a repository **variable** so the workflow bakes it in, and `CONVEX_DEPLOY_KEY` as a secret so the same workflow deploys the Convex functions and publishes the new release to the feed after the GitHub release exists. [convex/README.md](convex/README.md) has the one-time setup, the required key permissions, and the manual publish command. Without either value the release still succeeds; the app simply reports that the build has no update feed.
 
 ## Known limitations
 
-- No backend, no push, no accounts. Replies and calls are simulated while the app process is alive.
+- No backend for app data, no push, no accounts. Replies and calls are simulated while the app process is alive.
+- The in-app updater only runs when the build was published with a feed URL, and it cannot install silently: Android always shows its installer, and the "install unknown apps" switch must be on.
+- Switching from the generated debug key to a real release keystore needs one manual uninstall and reinstall, because Android refuses to update across a signature change.
 - Block, mute, forwarding and deletion change local state only.
 - Story uploads never expire, and picked media uses app-managed cache locations that the OS may reclaim.
 - Media and avatar images load from Unsplash over the network; bundled fonts work offline.

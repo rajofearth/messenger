@@ -20,6 +20,7 @@ import type {
   PendingCallRecord,
   SettingsRecord,
   StoryRecord,
+  UpdateRecord,
 } from "./records";
 export const asyncStorageDriver: StorageDriver = {
   read: (key) => AsyncStorage.getItem(key),
@@ -61,6 +62,9 @@ export function createMessengerRepository(
     loadPendingCall: () => store.load<PendingCallRecord>("pending-call"),
     savePendingCall: (call: PendingCallRecord | null) =>
       store.save("pending-call", call),
+    loadDismissedRelease: () => store.load<UpdateRecord>("update"),
+    saveDismissedRelease: (record: UpdateRecord | null) =>
+      store.save("update", record),
     /**
      * One-time upgrade from the single saved blob and the old settings key to
      * versioned slices. Returns true when anything was migrated.

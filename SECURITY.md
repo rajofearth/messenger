@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.0.1   | Yes       |
+| 0.0.4   | Yes       |
 
 Only the latest release is supported. Older builds, locally built APKs and
 anything running in Expo Go are not supported.
@@ -29,9 +29,10 @@ deadline. Reports will be acknowledged as soon as possible.
 
 ## Scope
 
-Messenger is a local prototype. It has no backend, no accounts, no push
+Messenger is a local prototype. It has no backend for app data, no accounts, no push
 notifications and no network messaging, and it stores its state unencrypted on
-the device. Most findings that would matter for a hosted app do not apply here.
+the device. The only server is the optional release feed, which stores no user
+data. Most findings that would matter for a hosted app do not apply here.
 The parts worth attention are:
 
 - **System notifications** (`modules/system-notifications/`): PendingIntent
@@ -42,6 +43,13 @@ The parts worth attention are:
   URIs a keyboard sends. Accepted files are capped at 25 MiB and copied into
   app-owned storage, so anything that bypasses that cap, the MIME checks or the
   cleanup, or that writes outside the intended storage location, is interesting.
+- **In-app updater** (`modules/app-updater/`): the download path and its SHA-256
+  verification, the `FileProvider` surface (it must expose only the staged APK
+  directory under the cache), the install intent and the "install unknown apps"
+  handling, and the release feed that supplies the download URL and digest
+  (`convex/`, validated by `src/domain/updates.ts`). A downloaded APK still has
+  to be signed by the same key as the installed app for Android to install it,
+  but anything that bypasses either check is a finding.
 - **Release workflow**: `.github/workflows/release.yml` and the signing secrets
   it consumes. Never paste real secrets or keystores into an issue.
 

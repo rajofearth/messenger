@@ -70,3 +70,76 @@ jobs:
       # that TypeScript tolerates) without paying for a native build.
       - name: Export Android bundle
         run: npx expo export --platform android --output-dir artifacts/ci-bundle --max-workers 2
+
+  gradle-warmup:
+    name: Warm the Gradle cache
+    # GitHub scopes a cache entry to the ref that wrote it: a tag can never
+    # read back its own entries, only the default branch's. This job runs the
+    # same Gradle build as a release on master, so the Gradle User Home cache
+    # (dependencies, compiled build scripts, the local build cache filled by
+    # org.gradle.caching=true) is fresh when the next tag restores it in
+    # .github/workflows/release.yml. Without it every release starts cold;
+    # with it the release build restores R8, lint and the Kotlin compiles
+    # instead of recomputing them (docs/PERFORMANCE.md, "Build times").
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # Keep in step with .github/workflows/release.yml.
+      EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
+      NDK_VERSION: 27.1.12297006
+      BUILD_TOOLS_VERSION: 36.0.0
+      PLATFORM_VERSION: android-36
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      # android/ is generated and gitignored, so the warm-up has to generate
+      # the same project a release would; prebuild is deterministic for a
+      # given commit and app.json.
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install missing Android SDK packages
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          missing=()
+          [ -d "$ANDROID_HOME/ndk/$NDK_VERSION" ] || missing+=("ndk;$NDK_VERSION")
+          [ -d "$ANDROID_HOME/platforms/$PLATFORM_VERSION" ] || missing+=("platforms;$PLATFORM_VERSION")
+          [ -d "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION" ] || missing+=("build-tools;$BUILD_TOOLS_VERSION")
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "All required SDK packages are already installed."
+            exit 0
+          fi
+          echo "Installing: ${missing[*]}"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "${missing[@]}"
+
+      # No cache-read-only here: writes are the point of this job, and
+      # setup-gradle writes only on the default branch by default.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Mirrors the release invocation, minus signing: the four ANDROID_*
+      # secrets are only read by the release workflow, so the APK packaging
+      # tasks may miss the cache there, but R8, lint, the Kotlin compiles and
+      # resource processing do not depend on signing.
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew :keyboard-media:testReleaseUnitTest :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain --max-workers 4

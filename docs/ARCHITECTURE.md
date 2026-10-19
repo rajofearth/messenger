@@ -1,6 +1,6 @@
 # Architecture
 
-A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger prototype. There is no backend, no push service and no real accounts. Everything the app shows is produced by the app itself from seeded state in `src/domain/data.ts`; the only network traffic is Unsplash image downloads.
+A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger prototype. There is no backend for app data, no push service and no real accounts. Everything the app shows is produced by the app itself from seeded state in `src/domain/data.ts`; the network traffic is Unsplash image downloads and, when the build was configured with one, the release feed that offers a newer APK.
 
 ## Layers and allowed dependency direction
 
@@ -10,11 +10,11 @@ Intended direction: `features` and `state` depend on `domain`, `data`, `services
 | --- | --- | --- |
 | Composition | `App.tsx` | Screen selection, hook wiring, Android back handling, the notification preference switch. No feature markup. |
 | Screens | `src/features/<area>/` | One folder per area: `chats`, `conversations`, `contacts`, `calls`, `profile`, `stories`. Screen components, their stylesheets, and feature-local hooks such as `useCalls` and `useMessageMedia`. |
-| Shared UI | `src/ui/` | Presentational primitives (`primitives.tsx`, `Navigation.tsx`, `QuickActions.tsx`, `theme.ts`), `KeyboardMediaInput`, `openAttachment`. |
-| App state | `src/state/` | `useMessenger.ts` (all persisted app state) and `useNotificationActions.ts` (notification action handling). |
-| Native bridges | `src/services/` | `systemNotifications.ts` and `keyboardMedia.ts`. Thin typed wrappers, no app logic. |
-| Persistence | `src/data/` | `messengerRepository.ts` (the backend seam), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`. |
-| Domain | `src/domain/` | `data.ts` (types and seed data), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`. Pure functions and types only. |
+| Shared UI | `src/ui/` | Presentational primitives (`primitives.tsx`, `Navigation.tsx`, `QuickActions.tsx`, `theme.ts`), `KeyboardMediaInput`, `UpdatePrompt.tsx`, `openAttachment`. |
+| App state | `src/state/` | `useMessenger.ts` (all persisted app state), `useAppUpdater.ts` (the single update controller), `useNotificationActions.ts` (notification action handling). |
+| Native bridges | `src/services/` | `systemNotifications.ts`, `keyboardMedia.ts` and `appUpdater.ts`. Thin typed wrappers, no app logic. |
+| Persistence | `src/data/` | `messengerRepository.ts` (the backend seam), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`, `updateFeed.ts` (the release-feed client). |
+| Domain | `src/domain/` | `data.ts` (types and seed data), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`, `updates.ts`. Pure functions and types only. |
 
 ### What `scripts/architecture.test.mjs` enforces
 
@@ -145,6 +145,40 @@ The Kotlin module lives in `modules/system-notifications/android/src/main/java/e
 
 `modules/system-notifications/README.md` is the contract for the module. Its limits matter: no remote push, no foreground service, no microphone or call kept alive, answer/open only launch the app, other actions wait for a running JS consumer or the next launch, and the device acceptance checklist has not been verified on hardware.
 
+## The update pipeline
+
+Releases can be offered inside the app. Tier one, shipped, downloads the next APK and hands it to Android's installer; tier two, not built yet, is reserved for an OTA JavaScript bundle so not every release costs a full download.
+
+### Feed contract
+
+The app asks one endpoint with the version code Android reports for the installed build:
+
+```text
+GET https://<deployment>.convex.site/updates/manifest?versionCode=4
+```
+
+The answer is either `{"upToDate":true}` or the manifest object (`versionCode`, `versionName`, `apkUrl`, `apkSha256`, `apkBytes`, `minVersionCode`, `mandatory`, `notes`). The document is untrusted: `src/domain/updates.ts` parses and bounds every field, `versionCode` is the only ordering key, and an unreadable or failed request is `unknown`, never "up to date". `minVersionCode` and `mandatory` decide whether the prompt can be dismissed (`decideUpdate`), and dismissal is remembered per version code (`saveDismissedRelease`). A build that is at least as new as the feed's release is `current`; the endpoint deliberately answers `{"upToDate":true}` without the download URL in that case.
+
+The endpoint URL is baked into the bundle at build time from `EXPO_PUBLIC_UPDATE_FEED_URL` (`src/data/updateFeed.ts`). A build without it reports "This build has no update feed" in Settings and never prompts.
+
+### Client flow
+
+`src/state/useAppUpdater.ts` is the only update state in an app run; `App.tsx` owns it and passes it to the launch prompt (`src/ui/UpdatePrompt.tsx`) and the Settings card (`src/features/profile/UpdateSection.tsx`). The sequence is: read the installed version from native, check the feed, download and verify when the user agrees, then call `installApk`. When the app becomes active again after the installer has run, it re-reads the installed version, clears the cached APK and the pending prompt if the install succeeded, and restores a retry if it did not. The prompt is only drawn when no call, story or dialog is on screen, so an update never interrupts something in progress.
+
+### Native side
+
+`modules/app-updater` is a Kotlin Expo module:
+
+- `AppUpdaterModule.kt` reads `versionName`/`versionCode` through `PackageManager`, reports `canInstall` from `canRequestPackageInstalls` (true below API 26, where it is a global setting), opens the per-app install-permission screen and the app's settings page, and starts the installer with `Intent.ACTION_VIEW` plus the `application/vnd.android.package-archive` type.
+- The FileProvider authority is `${applicationId}.fileprovider` and it exposes only `cache-path updates/`, so the installer can read the staged APK and nothing else. `plugins/withUpdateInstaller.js` writes the `REQUEST_INSTALL_PACKAGES` permission, the provider and `res/xml/file_paths.xml` into the generated manifest.
+- `ApkDownloader.kt` streams the URL to `cacheDir/updates/update-<first 12 hex of the digest>.apk`, verifies SHA-256 while writing, renames `.part` only after the digest matches, keeps one download at a time, refuses non-https URLs (except in debuggable builds), follows redirects by hand because GitHub redirects to a CDN, and caps the file at 200 MiB, the same `MAX_APK_BYTES` the feed parser enforces. A file that already matches the digest is reused without a download.
+
+### Server side
+
+`convex/` holds the control plane: a `releases` table, `releases:publish` (internal mutation), `releases:latest`, and the `/updates/manifest` HTTP action. `convex/lib/manifest.ts` mirrors the client's checks and runs before every publish, so the feed cannot serve a document the app would reject; a publish below the current head is refused, and re-publishing the same version replaces its row so a retried workflow is safe. The APK itself is not stored in Convex: it stays on the GitHub release, and the manifest points at that asset. The release workflow runs `npx convex deploy` plus `releases:publish` after the release exists; `scripts/update-manifest.mjs` hashes the real APK and turns the matching `CHANGELOG.md` section into the `notes` field. See `convex/README.md` for the one-time setup. Without `CONVEX_DEPLOY_KEY` the workflow skips the feed and warns; the app ships unconfigured instead.
+
+Two checks stand between the feed and a replaced app: the digest must match the bytes that arrive, and Android must verify the new APK's signature against the installed build before it installs anything. A compromised feed can offer a newer version, but it cannot produce one that Android will install.
+
 ## Adding a feature
 
 - A pure rule, type or seed shape goes in `src/domain/`.
@@ -159,7 +193,8 @@ The seam is `src/data/messengerRepository.ts`. `messengerRepository` is a single
 
 ## Deliberate non-goals and known limitations
 
-- No backend, push, accounts or network messaging. Replies and calls are simulated with timers.
+- No backend for app data, push, accounts or network messaging. Replies and calls are simulated with timers. The one server is the optional release feed, which stores no user data.
+- No OTA JavaScript updates yet. A release is offered as a whole APK, so the download is the full size every time; the OTA bundle tier is the next step.
 - No call audio and no remote video. The video call screen shows your own camera in the picture-in-picture view; the remote participant is a placeholder photo, because there is no second participant.
 - Storage is local and unencrypted; the README tells users not to enter sensitive information.
 - Native features are Android-only. `system-notifications` and `keyboard-media` do nothing on iOS and web, and neither exists in Expo Go.
