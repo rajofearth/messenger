@@ -4,13 +4,13 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,959,175 bytes
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,959,279 bytes
 (14.27 MiB) in the current build** — 65.6% smaller, in four stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.95 MiB). Keeping only English resources brought it to 14,926,315 bytes
-(14.23 MiB), and the in-app updater added 32,860 bytes for 14,959,175 bytes
+(14.23 MiB), and the in-app updater added 32,964 bytes for 14,959,279 bytes
 (14.27 MiB). The stage table and the per-entry breakdown are under "Measured
 APK size".
 
@@ -100,7 +100,7 @@ The generated `android/gradle.properties` default is `reactNativeArchitectures=a
 
 | Option | Current state | Why it was not changed |
 | --- | --- | --- |
-| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (1,631,968 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 0.8 MiB; the size goal is met without it, so the faster startup stays. |
+| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (1,632,060 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 0.8 MiB; the size goal is met without it, so the faster startup stays. |
 | `enablePngCrunchInReleaseBuilds` | Not set in `app.json`. The generated project keeps it on (`android.enablePngCrunchInReleaseBuilds=true`, and the Gradle fallback is `'true'`). | This is the setting that reduces asset size; turning it off would grow the APK to save build time only. |
 | Metro `inlineRequires` | Not overridden. There is no `metro.config.js` in the repository, so bundling uses the Expo and Metro defaults. | Inline requires move module initialisation to first use, which affects startup and bundle layout. Changing it without before/after `adb shell am start -W` numbers would be a guess. |
 
@@ -116,15 +116,16 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.0.1 (R8 minification and resource shrinking) | 35,628,346 bytes (33.98 MiB) | **-7,909,501 bytes, -18.2%** |
 | v0.0.2 (compressed libraries, barcode scanner removed, fonts trimmed) | 15,680,499 bytes (14.95 MiB) | **-19,947,847 bytes, -56.0%** against v0.0.1, -64.0% overall |
 | v0.0.3 (English-only resources; system theme support) | 14,926,315 bytes (14.23 MiB) | **-754,184 bytes, -4.8%** against v0.0.2, -65.7% overall |
-| Current v0.0.4 (in-app updater; versionCode 4) | 14,959,175 bytes (14.27 MiB) | **+32,860 bytes, +0.2%** against v0.0.3, -65.6% overall |
+| Current v0.0.4 (in-app updater; versionCode 4) | 14,959,279 bytes (14.27 MiB) | **+32,964 bytes, +0.2%** against v0.0.3, -65.6% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
 compression variation. The v0.0.2 APK published there is 15,680,467 bytes,
 32 bytes below this local build for the same reason. The published v0.0.3 APK
 is 14,926,279 bytes, 36 bytes below the local build of the same commit. The
-v0.0.4 figure is from the local build; if the published APK differs, it will
-be by the same kind of compression rounding, not by a source change.
+v0.0.4 figure is from the release-signed local build, whose bundle carries the
+production feed URL; if the published APK differs, it will be by the same kind
+of compression rounding, not by a source change.
 
 Where the size went, read from the archives with
 `[System.IO.Compression.ZipFile]::OpenRead` and grouped by top-level entry.
@@ -136,7 +137,7 @@ modes:
 | `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. Unchanged since v0.0.2; the updater adds no native library. |
 | `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | 5,400,457 bytes (5.15 MiB) in 2 files, 12,928,160 unpacked | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed and the updater module 7,571. |
 | `res/` | 3.36 MiB, 1015 entries | 1.13 MiB, 938 entries | 1.13 MiB, 938 entries | 1,190,160 bytes (1.14 MiB), 939 entries | Font trimming is most of the v0.0.2 drop. The locale filter does not touch `res/`: compiled `values` resources live in `resources.arsc`. The updater adds one provider paths XML. |
-| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | 1,636,756 bytes (1.56 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 1,631,968 bytes, 24,848 more than v0.0.3 for the updater, and is still stored uncompressed. |
+| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | 1,636,848 bytes (1.56 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 1,632,060 bytes, 24,940 more than v0.0.3 for the updater, and is still stored uncompressed. |
 | `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. |
 | Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | 163,883 bytes (0.16 MiB) | Packages, Kotlin metadata and property files; effectively unchanged in substance. |
 

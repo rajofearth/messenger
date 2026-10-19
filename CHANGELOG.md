@@ -70,13 +70,14 @@ from an older debug-signed APK has to install this one by hand once.
 
 ### Size
 
-The arm64-v8a APK grows by 32,860 bytes: **14,926,315 bytes (14.23 MiB) to
-14,959,175 bytes (14.27 MiB), +0.2%**. Most of it is the new JavaScript: the
-bundle grows by 24,848 bytes (to 1,631,968) and the assets around it by 50
-bytes, for the prompt, the Settings card, the feed client and the update rules.
-The Kotlin module and its manifest entries add 7,571 bytes of stored dex, and
-the remaining 391 bytes are spread across `resources.arsc` and packaged
-property files. The native libraries are unchanged at 5,896,334 bytes.
+The arm64-v8a APK grows by 32,964 bytes: **14,926,315 bytes (14.23 MiB) to
+14,959,279 bytes (14.27 MiB), +0.2%**. Most of it is the new JavaScript: the
+bundle grows by 24,940 bytes (to 1,632,060), which is the prompt, the Settings
+card, the feed client and the update rules plus the feed URL inlined at build
+time; the assets around it grow by 62 bytes. The Kotlin module and its manifest
+entries add 7,571 bytes of stored dex, and the remaining 391 bytes are spread
+across `resources.arsc` and packaged property files. The native libraries are
+unchanged at 5,896,334 bytes.
 
 
 ## [0.0.3] - 2026-10-19
