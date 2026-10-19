@@ -79,7 +79,7 @@ export function useMessageNotifications({
     let cancelled = false;
     void (async () => {
       const avatars: Record<string, string | undefined> = {};
-      await Promise.all(
+      const avatarPromise = Promise.all(
         [self.avatarUri, ...targets.map((chat) => chat.avatar)]
           .filter((uri): uri is string => !!uri)
           .map(async (uri) => {
@@ -97,10 +97,7 @@ export function useMessageNotifications({
           self: {
             id: "self",
             name: self.name,
-            avatarUri: self.avatarUri ? avatars[self.avatarUri] : undefined,
-          },
-          avatars: {
-            [chat.id]: avatars[chat.avatar],
+            avatarUri: undefined,
           },
           previews,
           sound,
@@ -111,7 +108,19 @@ export function useMessageNotifications({
         // Only a posted notification counts as announced. A refused post (no
         // permission, channel off) stays eligible, so granting permission later
         // does not silently swallow the message.
-        if (!result || result.posted) announced.current.set(chat.id, last);
+        if (result?.posted === true) announced.current.set(chat.id, last);
+        void avatarPromise.then(() => {
+          if (cancelled) return;
+          const updated = messagePayload({
+            chat,
+            messages: thread,
+            self: { id: "self", name: self.name, avatarUri: self.avatarUri ? avatars[self.avatarUri] : undefined },
+            avatars: { [chat.id]: avatars[chat.avatar] },
+            previews,
+            sound,
+          });
+          if (updated) void showMessage(updated).catch(() => {});
+        });
       }
     })();
     return () => {

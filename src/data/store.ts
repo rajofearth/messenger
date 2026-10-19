@@ -29,6 +29,7 @@ export const STORE_VERSION = "v2";
 export function createStore(driver: StorageDriver, namespace: string): Store {
   const memory = new Map<string, unknown>();
   const reading = new Map<string, Promise<unknown>>();
+  const generations = new Map<string, number>();
   const queue = new Map<string, string | null>();
   const writes = new Map<string, Promise<void>>();
   const full = (key: string) => `${namespace}/${key}`;
@@ -44,6 +45,11 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
       writes.set(key, write);
       try {
         await write;
+      } catch (error) {
+        // Keep the failed value queued so a later flush/save can retry it, but
+        // let the caller observe that this write was not durable.
+        if (!queue.has(key)) queue.set(key, value);
+        throw error;
       } finally {
         writes.delete(key);
       }
@@ -53,8 +59,11 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
   let flushing: Promise<void> = Promise.resolve();
 
   function schedule(): Promise<void> {
-    flushing = flushing.then(drain).catch(drain);
-    return flushing;
+    const run = flushing.then(drain);
+    // A failed run must not poison future writes, while its own promise still
+    // rejects so save callers never mistake memory-only state for durability.
+    flushing = run.catch(() => undefined);
+    return run;
   }
 
   return {
@@ -63,6 +72,7 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
       if (memory.has(key)) return memory.get(key) as T;
       const pending = reading.get(key) as Promise<T | undefined> | undefined;
       if (pending) return pending;
+      const generation = generations.get(key) ?? 0;
       const request = driver
         .read(full(key))
         .then((raw) => {
@@ -76,7 +86,7 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
           }
         })
         .then((value) => {
-          memory.set(key, value);
+          if ((generations.get(key) ?? 0) === generation) memory.set(key, value);
           return value as T | undefined;
         })
         .finally(() => {
@@ -86,6 +96,7 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
       return request;
     },
     save: async <T>(key: string, value: T | null) => {
+      generations.set(key, (generations.get(key) ?? 0) + 1);
       memory.set(key, value ?? undefined);
       queue.set(full(key), value === null ? null : JSON.stringify(value));
       await schedule();

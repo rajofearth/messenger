@@ -83,10 +83,14 @@ export default function ConversationScreen({
   const pinned = useRef(true);
   const currentChat = useRef(chat.id);
   currentChat.current = chat.id;
-  // The newest message owns the viewport again whenever the thread grows.
+  // A newly selected thread starts pinned; later content changes must not steal
+  // the reader's place when they have scrolled up.
   useEffect(() => {
     pinned.current = true;
     list.current?.scrollToEnd({ animated: true });
+  }, [chat.id]);
+  useEffect(() => {
+    if (pinned.current) list.current?.scrollToEnd({ animated: true });
   }, [tail]);
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
