@@ -202,6 +202,64 @@ Only conversations opened since launch have their messages in memory (the `messa
 - **Coalesced writes.** `createStore` queues writes in a `Map` keyed by the full storage key, so a burst of state changes for the same key collapses to the newest value and the queue drains in order. Memory is updated synchronously inside `save`, so no read ever waits for disk.
 - **500-line modules.** The limit in `scripts/architecture.test.mjs` is a maintainability rule. Small files stay navigable and keep the layer checks meaningful. It is not a measured runtime win: imports compile away, and the only real cost of splitting a file is developer time.
 
+## Build times
+
+Measured on 2026-10-19 for the v0.0.4 tree: Expo 57, React Native 0.86, Android
+Gradle Plugin 8.12, the Gradle 9.3.1 wrapper, JDK 17. Gradle's build cache and
+configuration cache are on for every build: the
+`plugins/withGradlePerformance.js` config plugin appends
+`org.gradle.caching=true`, `org.gradle.configuration-cache=true`,
+`org.gradle.configuration-cache.problems=warn` and
+`org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g` to the generated
+`android/gradle.properties`, so every `expo prebuild` keeps them. CI persists
+them with `gradle/actions/setup-gradle`.
+
+### Continuous integration
+
+Every row is the `:keyboard-media:testReleaseUnitTest :app:assembleRelease`
+step on `ubuntu-24.04` with `--max-workers 4`; the job totals include npm,
+prebuild and the SDK install.
+
+| Run | Gradle build step | Job total | Tasks |
+| --- | --- | --- | --- |
+| v0.0.3 release, before any of this | 8m 25s | 9m 42s | 446 executed, 0 restored |
+| Bench, empty cache | 8m 20s | 9m 47s | 406 executed, 52 restored |
+| Bench, cache restored (three commits) | 2m 05s - 3m 42s | 3m 12s - 4m 55s | 284 executed, 174 restored |
+| v0.0.4 release, first tag with the new workflow | 8m 28s | 9m 44s | cold: a tag can only read `master` entries, and none existed yet |
+
+Setup spends about 15s restoring nine entries (1.37 GB): dependencies, artifact
+transforms, the wrapper, compiled build scripts and the local build cache. On
+the warm runs the 174 restored tasks include every `compileReleaseKotlin`,
+several `lintVitalAnalyzeRelease` and the Expo and React Native Gradle plugin
+builds. The JavaScript bundle, R8, dexing, packaging and the native libraries
+still run every time; they are the 2-3.5 minutes that remain, and the spread
+inside that range is runner speed.
+
+`Warm the Gradle cache` in `.github/workflows/ci.yml` runs the same release
+build on every push to `master` and never on pull requests, and writes the
+cache. `release.yml` sets `cache-read-only` on tags, so a release only reads and
+can never evict the entry the next release restores.
+
+### Locally
+
+One machine for every row: Snapdragon X Plus, 8 cores, 15.6 GB, Windows,
+`--max-workers 2`, JDK 17, warm Gradle user home.
+
+| Scenario | Without the caches | With the caches |
+| --- | --- | --- |
+| Nothing changed since the last build | 5s | 2s |
+| `android/app/build` and `android/build` deleted | 65.7s | 59.3s |
+| `node_modules` and `android/` deleted, `npm ci` + `expo prebuild` + build | - | 3m 31s, 155 tasks restored |
+
+The no-change row is the configuration cache: the rebuild skips the
+configuration phase, which otherwise runs Expo's Node-based autolinking on
+every invocation. The app-wipe row restores 16 tasks, R8 and lint among them.
+The reinstall row is dominated by work no cache covers: the CMake/ninja
+compile of `expo-modules-core` and the app's native code, and the JavaScript
+bundle; the 1m 41s of `npm ci` and 3s of prebuild sit on top of the 3m 31s.
+Part of the local series ran on battery with a CI release building on the same
+machine, so the seconds move by about 10% between sessions.
+
 ## How to measure
 
 Run from the repository root.
@@ -233,3 +291,4 @@ There is no automated performance harness here. No baseline for startup, frame t
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
 - **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.27 MiB there is no reason to take that trade without on-device startup numbers.
 - **No JS-level profiling.** Hermes is on (`hermesEnabled=true` in the generated `android/gradle.properties`), but no sampling or tracing run has been recorded in this repository.
+- **JDK 21 was not adopted, and JDK 26/27 are not options.** The build runs on JDK 17, which is also Android Gradle Plugin 8.12's target. An app-wipe build on JDK 21 took 88.1s against 65.7s on JDK 17 over an identical task set on this Windows-on-ARM machine (one run each; x86 Linux numbers elsewhere differ), so 21 buys nothing here. JDK 26 needs Gradle 9.4 and JDK 27 needs Gradle 9.8; the wrapper ships 9.3.1, which supports JVM 17-25. The measured win was caching, which is JDK-independent.

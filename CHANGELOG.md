@@ -18,7 +18,7 @@ and this project adheres to
   the second; 174 of 458 tasks were restored instead of executed, including
   every Kotlin compile and the Expo and React Native Gradle plugin builds.
   An empty-cache build still takes 8m 20s, so nothing regressed. Locally, an
-  unchanged rebuild takes 2s instead of 6.5s. The four properties
+  unchanged rebuild takes 2s instead of about 5s. The four properties
   (`org.gradle.caching`, `org.gradle.configuration-cache`, the daemon
   `jvmargs` and the configuration-cache problem mode) are written by
   `plugins/withGradlePerformance.js`, so they survive every `expo prebuild`.
