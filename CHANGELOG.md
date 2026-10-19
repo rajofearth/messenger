@@ -8,6 +8,25 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Gradle build caching is on for every build, and CI keeps the cache warm.
+  A `Warm the Gradle cache` job runs on pushes to `master` and writes it;
+  pull requests and tag builds only read it, so a release never rewrites the
+  cache it restored. On the bench runs the release build step fell from
+  8m 25s (v0.0.3, no cache) to 3m 42s on the first warm build and 2m 03s on
+  the second; 174 of 458 tasks were restored instead of executed, including
+  every Kotlin compile and the Expo and React Native Gradle plugin builds.
+  An empty-cache build still takes 8m 20s, so nothing regressed. Locally, an
+  unchanged rebuild takes 2s instead of 6.5s. The four properties
+  (`org.gradle.caching`, `org.gradle.configuration-cache`, the daemon
+  `jvmargs` and the configuration-cache problem mode) are written by
+  `plugins/withGradlePerformance.js`, so they survive every `expo prebuild`.
+- `:keyboard-media`'s unit tests run on the release variant in the release
+  build. The release variant shares its compilation with `:app:assembleRelease`,
+  so the test no longer pulls the whole debug dependency graph into a build
+  that only ships release artifacts.
+
 ## [0.0.4] - 2026-10-19
 
 The app can now update itself. A small release feed tells it when a newer build
@@ -70,8 +89,8 @@ from an older debug-signed APK has to install this one by hand once.
 
 ### Size
 
-The arm64-v8a APK grows by 32,964 bytes: **14,926,315 bytes (14.23 MiB) to
-14,959,279 bytes (14.27 MiB), +0.2%**. Most of it is the new JavaScript: the
+The arm64-v8a APK grows by 32,964 bytes: **14,926,279 bytes (14.23 MiB) to
+14,959,243 bytes (14.27 MiB), +0.2%**. Most of it is the new JavaScript: the
 bundle grows by 24,940 bytes (to 1,632,060), which is the prompt, the Settings
 card, the feed client and the update rules plus the feed URL inlined at build
 time; the assets around it grow by 62 bytes. The Kotlin module and its manifest

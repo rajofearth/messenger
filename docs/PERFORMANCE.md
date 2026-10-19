@@ -122,10 +122,11 @@ The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
 compression variation. The v0.0.2 APK published there is 15,680,467 bytes,
 32 bytes below this local build for the same reason. The published v0.0.3 APK
-is 14,926,279 bytes, 36 bytes below the local build of the same commit. The
-v0.0.4 figure is from the release-signed local build, whose bundle carries the
-production feed URL; if the published APK differs, it will be by the same kind
-of compression rounding, not by a source change.
+is 14,926,279 bytes, 36 bytes below the local build of the same commit, and the
+published v0.0.4 APK is 14,959,243 bytes, 36 bytes below the release-signed
+local build: 32 of them deflate rounding in `lib/` and 4 in `resources.arsc`,
+while the bundle, assets, dex and `res/` are identical in both. The v0.0.4 row
+above is from that local build, whose bundle carries the production feed URL.
 
 Where the size went, read from the archives with
 `[System.IO.Compression.ZipFile]::OpenRead` and grouped by top-level entry.
