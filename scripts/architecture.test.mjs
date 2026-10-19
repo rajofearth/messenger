@@ -63,3 +63,57 @@ test("domain model does not depend on React Native, storage, state hooks, or scr
     );
   }
 });
+test("every test file is registered in the npm test script", () => {
+  const ignored = new Set(["node_modules", "build", ".gradle", ".expo"]);
+  function testFiles(directory) {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      if (ignored.has(entry.name)) return [];
+      const file = path.join(directory, entry.name);
+      return entry.isDirectory()
+        ? testFiles(file)
+        : /\.test\.(?:mjs|cjs|js|jsx|ts|tsx)$/.test(file)
+          ? [file]
+          : [];
+    });
+  }
+  const relative = (file) => path.relative(root, file).split(path.sep).join("/");
+  const discovered = new Set(
+    ["scripts", "src", "modules"]
+      .map((directory) => path.join(root, directory))
+      .flatMap(testFiles)
+      .map(relative),
+  );
+  const { test: testScript } = JSON.parse(
+    readFileSync(path.join(root, "package.json"), "utf8"),
+  ).scripts;
+  const registered = new Set(
+    testScript.split(/\s+/).filter((entry) => entry.includes(".test.")),
+  );
+  for (const file of discovered) {
+    assert.ok(
+      registered.has(file),
+      `${file} is not in the npm test script, so it never runs`,
+    );
+  }
+  for (const entry of registered) {
+    assert.ok(discovered.has(entry), `npm test lists ${entry}, which does not exist`);
+  }
+});
+test("application sources contain no type escapes", () => {
+  for (const file of files) {
+    assert.doesNotMatch(
+      readFileSync(file, "utf8"),
+      /:\s*any\b|\bas\s+any\b|<any>|@ts-(?:ignore|nocheck)\b/,
+      `${path.relative(root, file)} uses any or a TypeScript escape hatch; write the real type`,
+    );
+  }
+});
+test("application sources ship no debug logging", () => {
+  for (const file of files) {
+    assert.doesNotMatch(
+      readFileSync(file, "utf8"),
+      /\bconsole\.log\b/,
+      `${path.relative(root, file)} contains console.log; remove it before shipping`,
+    );
+  }
+});

@@ -77,6 +77,10 @@ following:
   navigation only; features never depend on it.
 - `src/domain` stays pure: no React, React Native, Expo, storage, state hook or
   screen imports.
+- Every `*.test.*` file under `scripts/`, `src/` or `modules/` is listed in the
+  `test` script in `package.json`; an unregistered test never runs.
+- Application sources (`App.tsx` and `src/`) contain no `any`, no
+  `@ts-ignore`/`@ts-nocheck` and no `console.log`.
 
 In practice, features depend on `src/domain` and the shared modules under
 `src/ui`, and `src/domain` depends on nothing but itself. Keep React Native and
@@ -85,8 +89,9 @@ Expo package versions aligned when you upgrade.
 ## Adding a test
 
 `npm test` runs `node --test` over an explicit list of files in the `test`
-script in `package.json`. If you add a test file and do not register it there, it
-never runs, and CI never sees it. Name it after the code it covers
+script in `package.json`. If you add a test file and forget to register it, the
+architecture test fails: a test that never runs cannot be merged. Name it after
+the code it covers
 (`src/data/cache.test.mjs`) or put it in `scripts/` if it exercises the whole
 model. Use `node:test` and `node:assert/strict`, as the existing tests do.
 
@@ -99,6 +104,22 @@ gradlew.bat :keyboard-media:testDebugUnitTest --console=plain --max-workers=2
 Write tests at the level of the logic you changed. The suite covers the
 conversation model, message actions, media albums, stories, notification
 payloads and the persistence cache. It does not drive a device.
+
+## Releasing
+
+Every release runs through the same gate as CI. [AGENTS.md](AGENTS.md) is the
+full checklist; the short version:
+
+```sh
+npm run android:build   # writes artifacts/messenger-local.apk
+npm run release:check   # typecheck, tests and the slim-build gate
+```
+
+Then bump `expo.version` in `app.json` and `version` in `package.json`, update
+`CHANGELOG.md` and `docs/PERFORMANCE.md` with the real numbers, commit, and tag
+`vX.Y.Z`. The release workflow re-runs everything on a fresh CI build, compares
+the APK against the previous release, and refuses to publish if the tag, the
+version or the size budget is off.
 
 ## Commit messages
 

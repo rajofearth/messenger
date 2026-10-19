@@ -19,7 +19,8 @@
     "android:install": "node scripts/android.mjs install",
     "typecheck": "tsc --noEmit",
     "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/mediaAlbums.test.mjs scripts/conversation.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs src/features/calls/CallScreenCamera.test.mjs src/data/cache.test.mjs src/data/appearance.test.mjs src/ui/theme.test.mjs src/notifications/payloads.test.mjs modules/keyboard-media/KeyboardMediaInput.test.cjs",
-    "check": "npm run typecheck && expo install --check"
+    "check": "npm run typecheck && expo install --check",
+    "release:check": "npm run typecheck && npm test && node scripts/release-check.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",

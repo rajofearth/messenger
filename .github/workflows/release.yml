@@ -152,6 +152,26 @@ jobs:
           unzip -l "$apk" | grep -c '^.*lib/arm64-v8a/.*\.so$' | xargs -I {} echo "Packaged arm64-v8a libraries: {}"
           unzip -l "$apk" | grep -q 'assets/index.android.bundle' && echo "JavaScript bundle: present"
 
+      # The slim-build gate from AGENTS.md, run on the real CI APK before
+      # anything is published. It fails the release when the APK is over the
+      # size budget or drifted away from the slim configuration.
+      - name: Run the slim-build gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          args=(android/app/build/outputs/apk/release/app-release.apk)
+          previous=$(gh release list --exclude-drafts --limit 20 --json tagName --jq "[.[] | select(.tagName != \"$TAG\")][0].tagName // empty" || true)
+          if [ -n "${previous:-}" ]; then
+            baseline=$(gh release view "$previous" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))][0].size // empty' || true)
+            if [ -n "${baseline:-}" ]; then
+              echo "Comparing against $previous ($baseline bytes)"
+              args+=(--baseline "$baseline" --baseline-label "$previous")
+            fi
+          fi
+          node scripts/release-check.mjs "${args[@]}"
+
       - name: Collect release artifacts
         env:
           VERSION: ${{ steps.version.outputs.version }}
