@@ -4,17 +4,18 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,967,135 bytes
-(14.27 MiB) in the current build** — 65.6% smaller, in six stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 15,511,619 bytes
+(14.79 MiB) in the current unreleased build** — 64.4% smaller, in seven stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.95 MiB). Keeping only English resources brought it to 14,926,315 bytes
 (14.23 MiB), the in-app updater added 32,964 bytes for 14,959,279 bytes
-(14.27 MiB), and the device-scheme module added 3,720 for 14,962,999 bytes
+(14.27 MiB), the device-scheme module added 3,720 for 14,962,999 bytes
 (14.27 MiB), and the audit fixes added 4,136 bytes for 14,967,135 bytes
-(14.27 MiB). The stage table and the per-entry breakdown are under "Measured
-APK size".
+(14.27 MiB). The Convex-backed chat work added 544,484 bytes for 15,511,619
+bytes (14.79 MiB). The stage table and the per-entry breakdown are under
+"Measured APK size".
 
 ### Build configuration in `app.json`
 
@@ -121,6 +122,7 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.0.4 (in-app updater; versionCode 4) | 14,959,279 bytes (14.27 MiB) | **+32,964 bytes, +0.2%** against v0.0.3, -65.6% overall |
 | v0.0.5 (device scheme; the system theme follows the device live; versionCode 5) | 14,962,999 bytes (14.27 MiB) | **+3,720 bytes, +0.02%** against v0.0.4, -65.6% overall |
 | Current v0.0.6 (storage, notification, updater and contrast fixes; versionCode 6) | 14,967,135 bytes (14.27 MiB) | **+4,136 bytes, +0.03%** against published v0.0.5, -65.6% overall |
+| Unreleased Convex branch (accounts, chat, stories, media cache; versionCode 6) | 15,511,619 bytes (14.79 MiB) | **+544,484 bytes, +3.6%** against published v0.0.6, -64.4% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -145,6 +147,15 @@ modes:
 | `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | 1,636,860 bytes (1.56 MiB), 4 files | 1,638,559 bytes (1.56 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 1,633,748 bytes, 24,940 more than v0.0.3 for the updater and 1,688 more than v0.0.4 for the device-scheme bridge, and is still stored uncompressed. |
 | `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. |
 | Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | 163,883 bytes (0.16 MiB) | 163,883 bytes (0.16 MiB) | Packages, Kotlin metadata and property files; effectively unchanged in substance. The device-scheme module adds no package of its own. |
+
+The unreleased Convex branch is 15,511,619 bytes, 544,484 bytes (+3.6%) above
+published v0.0.6. The JavaScript bundle grew by 400,707 bytes (1,638,559 to
+2,039,266) for the Convex client, Convex Auth and the SecureStore session. The
+dex grew by 127,436 bytes (5,402,478 to 5,529,914) for `expo-secure-store` and
+`expo-media-library`; `res/` grew by 10,108 bytes across 12 new entries and
+`resources.arsc` by 7,160, both from media-library resources. `lib/` is
+unchanged at 5,896,334 bytes and 19 libraries. The build is 1.21 MiB below the
+16 MiB gate.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging
@@ -188,17 +199,17 @@ The cost of this choice is that each row is measured on first render. The benefi
 - `recyclingKey={message.id}` (in `MessageBubble.tsx`, `MediaAlbum.tsx`, `AlbumViewer.tsx` and `ChatProfileShared.tsx`) tells `expo-image` that a recycled view now shows a different image, so the view and its decode can be reused instead of holding a second image while the old one is still mounted.
 - `cachePolicy="memory-disk"` is set on the two media grid callers (`MediaAlbum.tsx` and `ChatProfileShared.tsx`); other `expo-image` callers use the default policy. The memory tier makes scrolling back over already-seen media cheap, and the disk tier keeps the memory tier from having to hold everything.
 
-### Source URLs are size parameterised
+### Remote media is downloaded once
 
-`src/domain/data.ts` exposes `image(id, width, quality = 80)`, with `avatar(id) = image(id, 200)` and `media(id) = image(id, 1080)`. Requesting the size actually displayed keeps both the download and the decoded bitmap small. Avatars are 200 px wide, enough for a 56 dp circle on a 3x display; story and message media are 1080 px, the size the full-screen viewer needs. A full-resolution URL would make every avatar decode cost many times the memory for pixels that are never shown, and the comment on the helper ties the choice to exactly that.
+Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Images keep the sender's aspect ratio; no server-side resize is performed, and `expo-image` decodes at the displayed size.
 
 ### Avatars in the notification pipeline
 
-Android notification image decoding accepts `file://` and `content://` URIs only, and it samples an image down to a thumbnail (stated in `modules/system-notifications/README.md`). Contact avatars are remote Unsplash URLs, so `src/data/avatars.ts` downloads each one once into `Paths.cache/avatars` and caches the local URI in memory (maximum 256 entries, pruned folder beyond 240 files). `useMessageNotifications` and `useCallNotifications` await `localAvatarUri` and pass the local file into the native payload. That keeps the notification path off the network after the first use, keeps the decoded image small, and makes later updates to the same notification cost no download. `warmAvatars` pre-downloads the avatars of the first 8 conversations two at a time so a ringing call or a notification usually has a local image ready.
+Android notification image decoding accepts `file://` and `content://` URIs only, and it samples an image down to a thumbnail (stated in `modules/system-notifications/README.md`). Contact avatars are remote profile URLs, so `src/data/avatars.ts` downloads each one once into `Paths.cache/avatars` and caches the local URI in memory (maximum 256 entries, pruned folder beyond 240 files). `useMessageNotifications` and `useCallNotifications` await `localAvatarUri` and pass the local file into the native payload. That keeps the notification path off the network after the first use, keeps the decoded image small, and makes later updates to the same notification cost no download. `warmAvatars` pre-downloads the avatars of the first 8 conversations two at a time so a ringing call or a notification usually has a local image ready.
 
 ### Lazy per-conversation history
 
-Only conversations opened since launch have their messages in memory (the `messages` record in `useMessenger`). The full history is never loaded at startup, and `thread()` single-flights concurrent opens, so a double tap cannot load the same thread twice. Persisted messages are split per chat id, so a send writes one thread key plus the chat list, and the seeded threads from `seedMessages(chat)` are generated on demand and only stored once a conversation is touched.
+Only the selected conversation's thread is queried (`api.chat.listMessages`, newest 100 messages). `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while `useRemoteThreadMedia` stores an opened thread and its downloaded files. Persisted messages are split per chat id, so a send writes one thread key plus the chat list, not the whole app state.
 
 ## Startup and JavaScript
 
@@ -290,9 +301,9 @@ There is no automated performance harness here. No baseline for startup, frame t
 
 ## Why some things were not done
 
-- **FlashList was not added.** The lists hold nine seeded chats and threads of a handful of messages. A new dependency and a new list API would not pay for themselves at this volume, and there is no measured jank to justify the swap.
+- **FlashList was not added.** A new dependency and a new list API would not pay for themselves without measured jank, and the thread is capped at the newest 100 messages.
 - **No deep virtualisation experiments.** No fixed row heights, no `getItemLayout`, no cell-recycling tricks beyond what `FlatList` and `expo-image` already provide. The reasons are in the `getItemLayout` section: variable font scale and content-dependent rows.
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
-- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.27 MiB there is no reason to take that trade without on-device startup numbers.
+- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.79 MiB there is no reason to take that trade without on-device startup numbers.
 - **No JS-level profiling.** Hermes is on (`hermesEnabled=true` in the generated `android/gradle.properties`), but no sampling or tracing run has been recorded in this repository.
 - **JDK 21 was not adopted, and JDK 26/27 are not options.** The build runs on JDK 17, which is also Android Gradle Plugin 8.12's target. An app-wipe build on JDK 21 took 88.1s against 65.7s on JDK 17 over an identical task set on this Windows-on-ARM machine (one run each; x86 Linux numbers elsewhere differ), so 21 buys nothing here. JDK 26 needs Gradle 9.4 and JDK 27 needs Gradle 9.8; the wrapper ships 9.3.1, which supports JVM 17-25. The measured win was caching, which is JDK-independent.

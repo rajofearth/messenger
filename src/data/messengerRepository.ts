@@ -15,7 +15,6 @@ import type {
   CallHistoryRecord,
   ChatRecord,
   LegacyAppearanceRecord,
-  LegacySnapshot,
   MessageRecord,
   PendingCallRecord,
   SettingsRecord,
@@ -29,13 +28,12 @@ export const asyncStorageDriver: StorageDriver = {
   keys: async () => [...(await AsyncStorage.getAllKeys())],
 };
 
-const LEGACY_KEY = "messenger-prototype-v1";
-const LEGACY_SETTINGS_KEY = "@messenger/settings/v1";
+const STORE_NAMESPACE = `messenger/${STORE_VERSION}`;
 
 export type MessengerRepository = ReturnType<typeof createMessengerRepository>;
 
 export function createMessengerRepository(
-  store: Store = createStore(asyncStorageDriver, `messenger/${STORE_VERSION}`),
+  store: Store = createStore(asyncStorageDriver, STORE_NAMESPACE),
 ) {
   const repository = {
     store,
@@ -53,6 +51,9 @@ export function createMessengerRepository(
     saveHistory: (history: CallHistoryRecord[]) => store.save("history", history),
     loadSettings: () => store.load<SettingsRecord>("settings"),
     saveSettings: (settings: SettingsRecord) => store.save("settings", settings),
+    /** Message ids already copied to the device gallery, so retries do not duplicate. */
+    loadGallerySaved: () => store.load<string[]>("gallery-saved"),
+    saveGallerySaved: (ids: string[]) => store.save("gallery-saved", ids),
     /** Messages live per conversation, so sending one never rewrites the rest. */
     loadMessages: (chatId: string) =>
       store.load<MessageRecord[]>(`messages/${chatId}`),
@@ -65,45 +66,8 @@ export function createMessengerRepository(
     loadDismissedRelease: () => store.load<UpdateRecord>("update"),
     saveDismissedRelease: (record: UpdateRecord | null) =>
       store.save("update", record),
-    /**
-     * One-time upgrade from the single saved blob and the old settings key to
-     * versioned slices. Returns true when anything was migrated.
-     */
-    async migrateLegacy(): Promise<boolean> {
-      const [legacy, legacySettings] = await Promise.all([
-        AsyncStorage.getItem(LEGACY_KEY),
-        AsyncStorage.getItem(LEGACY_SETTINGS_KEY),
-      ]);
-      if (legacySettings) {
-        try {
-          await store.save("settings", JSON.parse(legacySettings) as SettingsRecord);
-        } catch {
-          // A malformed legacy settings blob is dropped instead of blocking.
-        }
-        await AsyncStorage.removeItem(LEGACY_SETTINGS_KEY);
-      }
-      if (!legacy) return !!legacySettings;
-      try {
-        const saved = JSON.parse(legacy) as LegacySnapshot;
-        if (Array.isArray(saved.chats)) await store.save("chats", saved.chats);
-        if (Array.isArray(saved.stories)) await store.save("stories", saved.stories);
-        if (Array.isArray(saved.history)) await store.save("history", saved.history);
-        if (typeof saved.dark === "boolean") {
-          await store.save("appearance", {
-            theme: saved.dark ? "dark" : "light",
-          });
-        }
-        if (saved.messages && typeof saved.messages === "object") {
-          for (const [chatId, thread] of Object.entries(saved.messages)) {
-            if (Array.isArray(thread)) await store.save(`messages/${chatId}`, thread);
-          }
-        }
-      } catch {
-        // Unreadable legacy state: start from the seeded demo data.
-      }
-      await AsyncStorage.removeItem(LEGACY_KEY);
-      return true;
-    },
+    /** Signing out must not leave one account's messages for the next one. */
+    clearAccountData: () => store.clear(),
   };
   return repository;
 }

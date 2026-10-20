@@ -45,6 +45,7 @@ export default function MessageActions({
   onReact,
   onReply,
   onForward,
+  onSave,
   onDelete,
 }: {
   target: ActionTarget | null;
@@ -53,6 +54,7 @@ export default function MessageActions({
   onReact: (id: string, emoji: string) => void;
   onReply: (message: Message) => void;
   onForward: (message: Message) => void;
+  onSave?: (message: Message) => void;
   onDelete: (id: string, everyone: boolean) => void;
 }) {
   const { width, height } = useWindowDimensions();
@@ -118,6 +120,14 @@ export default function MessageActions({
             {[
               { label: "Reply", action: () => onReply(message) },
               { label: "Forward", action: () => onForward(message) },
+              ...(onSave && message.uri && (message.kind === "image" || message.kind === "video")
+                ? [
+                    {
+                      label: "Save to gallery",
+                      action: () => onSave(message),
+                    },
+                  ]
+                : []),
               {
                 label: "Delete",
                 action: () => confirmDelete(message, onDelete),

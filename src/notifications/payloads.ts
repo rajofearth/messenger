@@ -140,8 +140,8 @@ export function messagePayload({
     messages: recent.map((message, index) => ({
       text: previews ? messageLabel(message) : "New message",
       timestamp: times[index],
-      // Direct conversations show the contact as the sender; group senders are
-      // not stored per message yet, so the group name is used instead.
+      // Direct conversations show the contact as the sender; the client payload
+      // does not project per-message sender names, so the group name is used.
       sender: contact,
     })),
   };

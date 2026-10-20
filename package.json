@@ -23,9 +23,12 @@
     "release:check": "npm run typecheck && npm test && node scripts/release-check.mjs"
   },
   "dependencies": {
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.96",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "convex-chat": "^0.1.0",
     "expo": "~57.0.30",
     "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
@@ -39,7 +42,9 @@
     "expo-image": "~57.0.5",
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
+    "expo-media-library": "~57.0.5",
     "expo-navigation-bar": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
     "expo-sharing": "~57.0.23",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",

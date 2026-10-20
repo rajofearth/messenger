@@ -2,14 +2,14 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
-import type { CallRecord } from "../../state/useMessenger";
+import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { formatDuration } from "../../domain/model";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
 
 export type CallHistoryDetailProps = {
   chat: Chat;
-  history: CallRecord[];
+  history: RemoteCallRecord[];
   dark: boolean;
   onBack: () => void;
   onProfile: () => void;

@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
-import type { CallRecord } from "../../state/useMessenger";
+import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { palette, coral } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
@@ -23,7 +23,7 @@ export default function CallsScreen({
   onVoiceCall,
   onVideoCall,
 }: {
-  history: CallRecord[];
+  history: RemoteCallRecord[];
   dark: boolean;
   onCall: (chat: Chat, video: boolean) => void;
   onHistory: (chat: Chat) => void;

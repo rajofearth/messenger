@@ -21,6 +21,7 @@ import { useNotificationSettings } from "../../notifications/useNotificationSett
 import type { ThemePreference } from "../../ui/theme";
 import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
+import AccountSection from "./AccountSection";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -270,6 +271,7 @@ export default function SettingsScreen({
           </>
         ) : (
           <>
+            <AccountSection colors={colors} />
             {section("APPEARANCE")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.row}>

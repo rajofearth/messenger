@@ -22,6 +22,8 @@ export type Store = {
   save: <T>(key: string, value: T | null) => Promise<void>;
   keys: () => Promise<string[]>;
   flush: () => Promise<void>;
+  /** Removes every slice in this namespace, including in-memory values. */
+  clear: () => Promise<void>;
 };
 
 export const STORE_VERSION = "v2";
@@ -142,5 +144,19 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
     },
     keys: () => driver.keys(),
     flush: () => schedule(),
+    clear: async () => {
+      await schedule().catch(() => undefined);
+      queue.clear();
+      const prefix = `${namespace}/`;
+      const keys = (await driver.keys()).filter((key) => key.startsWith(prefix));
+      for (const key of keys) {
+        memory.delete(key.slice(prefix.length));
+        generations.set(
+          key.slice(prefix.length),
+          (generations.get(key.slice(prefix.length)) ?? 0) + 1,
+        );
+        await driver.write(key, null);
+      }
+    },
   };
 }

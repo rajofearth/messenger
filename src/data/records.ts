@@ -1,7 +1,6 @@
 /**
- * Persisted record shapes for the local store, kept explicit and versioned so a
- * future HTTP backend can map them one to one instead of reshaping UI state.
- * Version bumps are handled in `src/state/migrations.ts`.
+ * Persisted cache shapes for the local store. They mirror the domain types the
+ * screens use, so the server projection and the device cache stay one mapping.
  */
 
 import type { Chat, Message, Story } from "../domain/data";
@@ -21,11 +20,6 @@ export type ChatRecord = Chat;
 export type MessageRecord = Message;
 export type StoryRecord = Story;
 
-export type ConversationRecord = {
-  chatId: string;
-  messages: MessageRecord[];
-};
-
 export type CallHistoryRecord = {
   id: string;
   /** Contact snapshot taken when the call happened. */
@@ -34,15 +28,6 @@ export type CallHistoryRecord = {
   seconds: number;
   time: string;
   missed: boolean;
-};
-
-/** Legacy single-blob state written by earlier versions of the app. */
-export type LegacySnapshot = {
-  chats?: ChatRecord[];
-  messages?: Record<string, MessageRecord[]>;
-  stories?: StoryRecord[];
-  history?: CallHistoryRecord[];
-  dark?: boolean;
 };
 
 /** Profile and preference record owned by the settings screen. */

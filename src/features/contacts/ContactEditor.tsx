@@ -34,12 +34,12 @@ export default function ContactEditor({
     setHandle("");
   }, [kind]);
   function save() {
-    if (!name.trim() || (kind === "contact" && !handle.trim())) {
+    if (!name.trim() || !handle.trim()) {
       Alert.alert(
         "Missing details",
         kind === "group"
-          ? "Enter a group name."
-          : "Enter a name and phone number or username.",
+          ? "Enter a group name and at least one member username."
+          : "Enter a name and username.",
       );
       return;
     }
@@ -94,10 +94,10 @@ export default function ContactEditor({
               { color: colors.fg, backgroundColor: colors.card },
             ]}
           />
-          {kind === "contact" && (
+          {kind === "contact" ? (
             <TextInput
-              accessibilityLabel="Phone number or username"
-              placeholder="Phone number or @username"
+              accessibilityLabel="Username"
+              placeholder="@username"
               placeholderTextColor={colors.muted}
               value={handle}
               onChangeText={setHandle}
@@ -105,6 +105,22 @@ export default function ContactEditor({
               maxLength={100}
               style={[
                 s.input,
+                { color: colors.fg, backgroundColor: colors.card },
+              ]}
+            />
+          ) : (
+            <TextInput
+              accessibilityLabel="Member usernames"
+              placeholder="Member @usernames, separated by commas"
+              placeholderTextColor={colors.muted}
+              value={handle}
+              onChangeText={setHandle}
+              autoCapitalize="none"
+              multiline
+              maxLength={400}
+              style={[
+                s.input,
+                s.members,
                 { color: colors.fg, backgroundColor: colors.card },
               ]}
             />
@@ -147,6 +163,7 @@ const s = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
+  members: { minHeight: 92, textAlignVertical: "top" },
   primary: {
     backgroundColor: coral,
     padding: 16,

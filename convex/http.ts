@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
+import { auth } from "./auth";
 import { manifestFor, parseVersionCode, releaseProblem } from "./lib/manifest";
 
 /**
@@ -16,6 +17,8 @@ import { manifestFor, parseVersionCode, releaseProblem } from "./lib/manifest";
  * `EXPO_PUBLIC_UPDATE_FEED_URL`; the APK itself stays on GitHub Releases.
  */
 const http = httpRouter();
+
+auth.addHttpRoutes(http);
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

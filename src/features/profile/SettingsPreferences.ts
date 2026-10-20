@@ -13,12 +13,11 @@ export type SettingsProfile = Pick<
   Partial<Pick<Preferences, "bio" | "username" | "haptics">>;
 type Sheet = "profile" | "privacy" | "info" | null;
 export const DEFAULT_PREFERENCES: Preferences = {
-  name: "Alex Morgan",
-  bio: "Here for the little moments.",
-  username: "alexmorgan",
+  name: "Messenger user",
+  bio: "",
+  username: "",
   haptics: true,
-  avatar:
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+  avatar: "",
   sound: true,
   previews: true,
   systemNotifications: true,
@@ -88,8 +87,7 @@ export function useSettingsPreferences(
   useEffect(() => {
     if (!ready) return;
     setHapticsEnabled(preferences.haptics);
-    onProfileChange?.(preferences);
-  }, [preferences, ready, onProfileChange]);
+  }, [preferences, ready]);
 
   // Serialize writes so a slower earlier save cannot overwrite a newer preference.
   function persist(patch: Partial<Preferences>): Promise<void> {
@@ -138,6 +136,7 @@ export function useSettingsPreferences(
       if (!result.canceled && result.assets[0]?.uri) {
         setAvatarFailed(false);
         await persist({ avatar: result.assets[0].uri });
+        onProfileChange?.({ ...current.current });
       }
     } catch {
       Alert.alert(
@@ -174,6 +173,7 @@ export function useSettingsPreferences(
     setSaving(true);
     try {
       await persist({ name: name.trim(), bio: bio.trim(), username: handle });
+      onProfileChange?.({ ...current.current });
       setSheet(null);
     } catch {
       Alert.alert(

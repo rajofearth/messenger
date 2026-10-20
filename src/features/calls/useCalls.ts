@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Chat } from "../../domain/data";
-import type { CallRecord } from "../../state/useMessenger";
-import { clock, uid } from "../../state/useMessenger";
+import {
+  remoteUid,
+  timeLabel,
+  type RemoteCallRecord,
+} from "../../state/remoteMessengerTypes";
 export type Call = {
   /** Session id shared with the system notification, never a contact id. */
   id: string;
@@ -14,7 +17,7 @@ export type Call = {
   muted: boolean;
   speaker: boolean;
 };
-export function useCalls(onEnded: (record: CallRecord) => void) {
+export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
   const [call, setCall] = useState<Call | null>(null);
   const [full, setFull] = useState(false);
   useEffect(() => {
@@ -53,7 +56,7 @@ export function useCalls(onEnded: (record: CallRecord) => void) {
       return;
     }
     setCall({
-      id: resume?.id ?? uid(),
+      id: resume?.id ?? remoteUid(),
       chat,
       video,
       status: incoming ? "incoming" : "calling",
@@ -76,11 +79,11 @@ export function useCalls(onEnded: (record: CallRecord) => void) {
   function end() {
     if (!call) return;
     onEnded({
-      id: uid(),
+      id: remoteUid(),
       chat: call.chat,
       video: call.video,
       seconds: call.seconds,
-      time: clock(),
+      time: timeLabel(),
       missed: call.status === "incoming",
     });
     setCall(null);

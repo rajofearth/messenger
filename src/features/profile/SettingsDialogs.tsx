@@ -230,13 +230,13 @@ export default function SettingsDialogs({
                 </View>
                 <Text style={[styles.modalBody, { color: colors.text }]}>
                   {sheet === "privacy"
-                    ? "This is a local mock prototype. There is no server, no account service, and no real messaging or calling. Conversations and incoming calls are simulated."
-                    : "A local messenger prototype with simulated conversations and incoming calls."}
+                    ? "Your account, profile, contacts, conversations, messages and stories live on this app's Convex deployment. The app also keeps a local cache on this device so chats open offline."
+                    : "A Convex-backed messenger built with Expo and React Native. Accounts, chats, presence and stories sync through a Convex deployment, with a local cache for offline use."}
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.muted }]}>
                   {sheet === "privacy"
-                    ? "Your profile and notification preferences are saved on this device using local app storage, not encrypted secure storage. A selected profile photo stays on this device. Default remote avatars are fetched from Unsplash, which receives a normal image request. Notification preferences do not register you for push notifications. Avoid entering sensitive information. Clearing app data removes these saved preferences."
-                    : "Built with Expo and React Native. Profile edits and notification preferences are stored locally. This prototype does not connect to a messaging service or place real calls."}
+                    ? "The local cache is not encrypted by the app. Profile photos and shared media are uploaded to Convex storage; received media stays in app storage unless the conversation's Save media to gallery switch is on, which also copies photos and videos into a Messenger album. There is no end-to-end encryption, so treat the deployment and this device as trusted. Signing out removes the local account cache, not the messages already stored on the deployment."
+                    : "Voice and video calls connect on a timer and use a placeholder for the remote video because there is no call transport. Notifications are posted by the running app, not by a push service."}
                 </Text>
                 {sheet === "privacy" && (
                   <Pressable

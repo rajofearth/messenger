@@ -53,6 +53,10 @@ jobs:
     name: Export the JavaScript bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # Match the release build so Metro sees the same public URLs.
+      EXPO_PUBLIC_CONVEX_URL: ${{ vars.EXPO_PUBLIC_CONVEX_URL }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.EXPO_PUBLIC_CONVEX_SITE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -87,6 +91,8 @@ jobs:
     env:
       # Keep in step with .github/workflows/release.yml.
       EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ vars.EXPO_PUBLIC_CONVEX_URL }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.EXPO_PUBLIC_CONVEX_SITE_URL }}
       NDK_VERSION: 27.1.12297006
       BUILD_TOOLS_VERSION: 36.0.0
       PLATFORM_VERSION: android-36

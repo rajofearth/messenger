@@ -29,12 +29,18 @@ deadline. Reports will be acknowledged as soon as possible.
 
 ## Scope
 
-Messenger is a local prototype. It has no backend for app data, no accounts, no push
-notifications and no network messaging, and it stores its state unencrypted on
-the device. The only server is the optional release feed, which stores no user
-data. Most findings that would matter for a hosted app do not apply here.
-The parts worth attention are:
+Messenger stores accounts, profiles, conversations, messages and stories in a
+Convex deployment, with an unencrypted local cache on the device. There is no
+end-to-end encryption, no push service and no call transport. The parts worth
+attention are:
 
+- **Authentication and authorization** (`convex/auth.ts`, `convex/security.ts`,
+  `convex/chat.ts`, `convex/preferences.ts`, `convex/devices.ts`): session and
+  device revocation, username renames, block and membership checks, and any path
+  that could read or write another account's conversation.
+- **Uploads and media** (`convex/files.ts`, `src/services/remoteFiles.ts`,
+  `src/services/mediaCache.ts`): storage ownership checks, MIME and size limits,
+  signed URL scope, and the gallery copy path.
 - **System notifications** (`modules/system-notifications/`): PendingIntent
   construction, notification actions (quick reply, read, mute, answer, decline,
   hang up, speaker), payload validation, and the app-private storage of pending
@@ -53,10 +59,11 @@ The parts worth attention are:
 - **Release workflow**: `.github/workflows/release.yml` and the signing secrets
   it consumes. Never paste real secrets or keystores into an issue.
 
-The unencrypted local storage, the simulated nature of the calls and messages,
-and the generated debug signing key used by local builds and by releases without
-signing secrets are documented limitations of the prototype, not
-vulnerabilities. See `README.md` for the full list.
+The unencrypted local cache, the simulated call transport, the deliberate
+absence of a signed-out password reset, and the generated debug signing key used
+by local builds and by releases without signing secrets are documented
+limitations of the prototype, not vulnerabilities. See `README.md` for the full
+list.
 
 ## Out of scope
 

@@ -48,6 +48,8 @@ export type ConversationScreenProps = {
   onProfile: () => void;
   onDelete: (id: string, everyone: boolean) => void;
   onForward: (message: Message) => void;
+  onSaveMedia?: (message: Message) => Promise<boolean>;
+  onTypingChange?: (typing: boolean) => void;
 };
 
 export default function ConversationScreen({
@@ -64,6 +66,8 @@ export default function ConversationScreen({
   onProfile,
   onDelete,
   onForward,
+  onSaveMedia,
+  onTypingChange,
 }: ConversationScreenProps) {
   const { bg, fg, muted, card, line } = palette(dark);
   const [draft, setDraft] = useState("");
@@ -126,6 +130,10 @@ export default function ConversationScreen({
     setAlbum(null);
     setReply(null);
   }, [chat.id]);
+  useEffect(() => {
+    onTypingChange?.(draft.trim().length > 0);
+    return () => onTypingChange?.(false);
+  }, [draft, onTypingChange]);
   useEffect(() => {
     if (!visible) {
       setTarget(null);
@@ -271,18 +279,22 @@ export default function ConversationScreen({
                     : "Last seen recently"}
           </Text>
         </Pressable>
-        <IconButton
-          name="call-outline"
-          label="Start voice call"
-          color={fg}
-          onPress={() => guardRecording(() => onCall(false))}
-        />
-        <IconButton
-          name="videocam-outline"
-          label="Start video call"
-          color={fg}
-          onPress={() => guardRecording(() => onCall(true))}
-        />
+        {!chat.group && (
+          <>
+            <IconButton
+              name="call-outline"
+              label="Start voice call"
+              color={fg}
+              onPress={() => guardRecording(() => onCall(false))}
+            />
+            <IconButton
+              name="videocam-outline"
+              label="Start video call"
+              color={fg}
+              onPress={() => guardRecording(() => onCall(true))}
+            />
+          </>
+        )}
       </View>
       <View style={s.root}>
         <FlatList
@@ -340,6 +352,24 @@ export default function ConversationScreen({
         onReact={onReact}
         onReply={selectReply}
         onForward={(message) => guardRecording(() => onForward(message))}
+        onSave={
+          onSaveMedia
+            ? (message) => {
+                void onSaveMedia(message)
+                  .then((saved) =>
+                    Alert.alert(
+                      saved ? "Saved to gallery" : "Not saved",
+                      saved
+                        ? "The media is in your Messenger album."
+                        : "The media could not be copied to your gallery.",
+                    ),
+                  )
+                  .catch(() =>
+                    Alert.alert("Not saved", "Please try again."),
+                  );
+              }
+            : undefined
+        }
         onDelete={onDelete}
       />
       {album && (
