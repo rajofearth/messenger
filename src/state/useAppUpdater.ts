@@ -238,9 +238,9 @@ export function useAppUpdater() {
 
   /** Dismissal is remembered per release, so the next one asks again. */
   const dismiss = useCallback(() => {
-    setHiddenNow(true);
     const current = latest.current.decision;
     if (current.status !== "available" || current.forced) return;
+    setHiddenNow(true);
     setDismissed(current.manifest.versionCode);
     void messengerRepository
       .saveDismissedRelease({ dismissedVersionCode: current.manifest.versionCode })

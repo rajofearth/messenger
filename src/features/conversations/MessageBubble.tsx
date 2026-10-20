@@ -26,7 +26,7 @@ function VoiceNote({
 }) {
   const player = useAudioPlayer(message.uri ?? null);
   const status = useAudioPlayerStatus(player);
-  const color = message.mine ? "#FFF" : palette(dark).fg;
+  const color = message.mine ? palette(dark).outgoingFg : palette(dark).fg;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function MessageBubble({
   onReact,
   onViewMedia,
 }: MessageBubbleProps) {
-  const { fg, muted, card } = palette(dark);
+  const { fg, muted, card, outgoingFg, outgoingMuted } = palette(dark);
   const bubble = useRef<View>(null);
   const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
@@ -184,6 +184,8 @@ export default function MessageBubble({
         }}
         onLongPress={react}
         delayLongPress={300}
+        disabled={m.deleted}
+        accessibilityState={{ disabled: m.deleted }}
         onPress={() => handleTap(viewAttachment)}
         style={[
           s.bubble,
@@ -196,7 +198,7 @@ export default function MessageBubble({
           <Text
             style={[
               s.tiny,
-              { color: m.mine ? "#FFF" : muted, marginBottom: 6 },
+              { color: m.mine ? outgoingMuted : muted, marginBottom: 6 },
             ]}
           >
             ↪ Forwarded
@@ -213,10 +215,10 @@ export default function MessageBubble({
               marginBottom: 8,
             }}
           >
-            <Text style={[s.tiny, { color: m.mine ? "#FFF" : muted }]}>
+            <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
               {m.replyTo.mine ? "You" : "Reply"}
             </Text>
-            <Text numberOfLines={2} style={{ color: m.mine ? "#FFF" : fg }}>
+            <Text numberOfLines={2} style={{ color: m.mine ? outgoingFg : fg }}>
               {m.replyTo.text}
             </Text>
           </View>
@@ -260,18 +262,18 @@ export default function MessageBubble({
             <Ionicons
               name="document-text-outline"
               size={28}
-              color={m.mine ? "#FFF" : coral}
+              color={m.mine ? outgoingFg : coral}
             />
             <Text
               numberOfLines={2}
-              style={[s.body, { color: m.mine ? "#FFF" : fg, flex: 1 }]}
+              style={[s.body, { color: m.mine ? outgoingFg : fg, flex: 1 }]}
             >
               {m.filename}
             </Text>
             <Ionicons name="open-outline" size={17} color={muted} />
           </View>
         ) : (
-          <Text style={[s.messageText, { color: m.mine ? "#FFF" : fg }]}>
+          <Text style={[s.messageText, { color: m.mine ? outgoingFg : fg }]}>
             {m.text}
           </Text>
         )}

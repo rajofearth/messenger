@@ -33,7 +33,7 @@ export default function UpdatePrompt({
 }) {
   const colors = palette(dark);
   const { manifest, progress, download } = updates;
-  if (!visible || !manifest) return null;
+  if (!visible || !updates.promptVisible || !manifest) return null;
 
   const percent =
     progress && progress.total > 0

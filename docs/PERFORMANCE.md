@@ -4,14 +4,15 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,962,999 bytes
-(14.27 MiB) in the current build** — 65.6% smaller, in five stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,967,135 bytes
+(14.27 MiB) in the current build** — 65.6% smaller, in six stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.95 MiB). Keeping only English resources brought it to 14,926,315 bytes
 (14.23 MiB), the in-app updater added 32,964 bytes for 14,959,279 bytes
 (14.27 MiB), and the device-scheme module added 3,720 for 14,962,999 bytes
+(14.27 MiB), and the audit fixes added 4,136 bytes for 14,967,135 bytes
 (14.27 MiB). The stage table and the per-entry breakdown are under "Measured
 APK size".
 
@@ -118,7 +119,8 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.0.2 (compressed libraries, barcode scanner removed, fonts trimmed) | 15,680,499 bytes (14.95 MiB) | **-19,947,847 bytes, -56.0%** against v0.0.1, -64.0% overall |
 | v0.0.3 (English-only resources; system theme support) | 14,926,315 bytes (14.23 MiB) | **-754,184 bytes, -4.8%** against v0.0.2, -65.7% overall |
 | v0.0.4 (in-app updater; versionCode 4) | 14,959,279 bytes (14.27 MiB) | **+32,964 bytes, +0.2%** against v0.0.3, -65.6% overall |
-| Current v0.0.5 (device scheme; the system theme follows the device live; versionCode 5) | 14,962,999 bytes (14.27 MiB) | **+3,720 bytes, +0.02%** against v0.0.4, -65.6% overall |
+| v0.0.5 (device scheme; the system theme follows the device live; versionCode 5) | 14,962,999 bytes (14.27 MiB) | **+3,720 bytes, +0.02%** against v0.0.4, -65.6% overall |
+| Current v0.0.6 (storage, notification, updater and contrast fixes; versionCode 6) | 14,967,135 bytes (14.27 MiB) | **+4,136 bytes, +0.03%** against published v0.0.5, -65.6% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -135,7 +137,7 @@ Where the size went, read from the archives with
 The bytes below are stored sizes, so the `lib/` row compares the two packaging
 modes:
 
-| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | Current v0.0.5 | Notes |
+| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | v0.0.5 | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. Unchanged since v0.0.2; the updater and the device-scheme module add no native library. |
 | `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | 5,400,457 bytes (5.15 MiB) in 2 files, 12,928,160 unpacked | 5,402,478 bytes (5.15 MiB) in 2 files, 12,931,744 unpacked | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed, the updater module 7,571 and the device-scheme module 2,021. |

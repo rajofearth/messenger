@@ -29,32 +29,71 @@ export const STORE_VERSION = "v2";
 export function createStore(driver: StorageDriver, namespace: string): Store {
   const memory = new Map<string, unknown>();
   const reading = new Map<string, Promise<unknown>>();
-  const queue = new Map<string, string | null>();
-  const writes = new Map<string, Promise<void>>();
+  const generations = new Map<string, number>();
+  type QueuedWrite = {
+    value: string | null;
+    failed: boolean;
+    promise: Promise<void>;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  };
+  const queue = new Map<string, QueuedWrite>();
   const full = (key: string) => `${namespace}/${key}`;
 
   async function drain(): Promise<void> {
-    while (queue.size) {
-      const [key, value] = queue.entries().next().value as [
-        string,
-        string | null,
-      ];
+    const attempted = new Set<QueuedWrite>();
+    let failed = false;
+    let firstError: unknown;
+
+    while (true) {
+      const next = [...queue.entries()].find(
+        ([, write]) => !attempted.has(write),
+      );
+      if (!next) break;
+
+      const [key, queued] = next;
+      attempted.add(queued);
       queue.delete(key);
-      const write = driver.write(key, value);
-      writes.set(key, write);
       try {
-        await write;
-      } finally {
-        writes.delete(key);
+        await driver.write(key, queued.value);
+        queued.resolve();
+      } catch (error) {
+        failed = true;
+        firstError ??= error;
+        queued.failed = true;
+        queued.reject(error);
+        // Keep the failed value queued so a later flush/save can retry it, but
+        // do not replace a newer value saved while this write was in flight.
+        if (!queue.has(key)) queue.set(key, queued);
       }
+    }
+
+    if (failed) {
+      throw firstError;
     }
   }
 
-  let flushing: Promise<void> = Promise.resolve();
+  function queuedWrite(value: string | null): QueuedWrite {
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((done, fail) => {
+      resolve = done;
+      reject = fail;
+    });
+    return { value, failed: false, promise, resolve, reject };
+  }
+
+  let flushing: Promise<void> | null = null;
 
   function schedule(): Promise<void> {
-    flushing = flushing.then(drain).catch(drain);
-    return flushing;
+    if (flushing) return flushing;
+
+    const run = Promise.resolve().then(drain);
+    const scheduled = run.finally(() => {
+      if (flushing === scheduled) flushing = null;
+    });
+    flushing = scheduled;
+    return scheduled;
   }
 
   return {
@@ -63,6 +102,7 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
       if (memory.has(key)) return memory.get(key) as T;
       const pending = reading.get(key) as Promise<T | undefined> | undefined;
       if (pending) return pending;
+      const generation = generations.get(key) ?? 0;
       const request = driver
         .read(full(key))
         .then((raw) => {
@@ -76,7 +116,7 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
           }
         })
         .then((value) => {
-          memory.set(key, value);
+          if ((generations.get(key) ?? 0) === generation) memory.set(key, value);
           return value as T | undefined;
         })
         .finally(() => {
@@ -86,9 +126,19 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
       return request;
     },
     save: async <T>(key: string, value: T | null) => {
+      generations.set(key, (generations.get(key) ?? 0) + 1);
       memory.set(key, value ?? undefined);
-      queue.set(full(key), value === null ? null : JSON.stringify(value));
-      await schedule();
+      const storageKey = full(key);
+      const serialized = value === null ? null : JSON.stringify(value);
+      let queued = queue.get(storageKey);
+      if (!queued || queued.failed) {
+        queued = queuedWrite(serialized);
+        queue.set(storageKey, queued);
+      } else {
+        queued.value = serialized;
+      }
+      void schedule().catch(() => undefined);
+      await queued.promise;
     },
     keys: () => driver.keys(),
     flush: () => schedule(),

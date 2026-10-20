@@ -27,7 +27,6 @@ export type Profile = {
   bio?: string;
   username?: string;
   haptics?: boolean;
-  /** Master switch for Android system notifications. */
   systemNotifications?: boolean;
 };
 export type CallRecord = {
@@ -49,7 +48,7 @@ const DEFAULT_PROFILE: Profile = {
   sound: true,
   previews: true,
 };
-
+const settledValue = <T>(result: PromiseSettledResult<T>) => result.status === "fulfilled" ? result.value : undefined;
 export function useMessenger() {
   const [chats, setChats] = useState(initialChats.map(enrichChat));
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
@@ -67,15 +66,13 @@ export function useMessenger() {
   const chatsRef = useRef(chats);
   chatsRef.current = chats;
   const messagesRef = useRef(messages);
-  // Slices already written, so a state change never rewrites untouched data.
   const savedChats = useRef<Chat[] | null>(null);
   const savedStories = useRef<Story[] | null>(null);
   const savedHistory = useRef<CallRecord[] | null>(null);
   const savedThreads = useRef(new Map<string, Message[]>());
   const threads = useRef(new Map<string, Promise<Message[]>>());
-  function updateMessages(
-    update: (current: Record<string, Message[]>) => Record<string, Message[]>,
-  ) {
+  const hydrated = useRef({ chats: false, stories: false, history: false });
+  function updateMessages(update: (current: Record<string, Message[]>) => Record<string, Message[]>) {
     messagesRef.current = update(messagesRef.current);
     setMessages(messagesRef.current);
   }
@@ -84,32 +81,42 @@ export function useMessenger() {
     setChats(chatsRef.current);
   }
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
-        // One-time upgrade from the single saved blob to per-slice records.
-        await messengerRepository.migrateLegacy();
-        const [storedChats, storedStories, storedHistory, appearance, settings] =
-          await Promise.all([
-            messengerRepository.loadChats(),
-            messengerRepository.loadStories(),
-            messengerRepository.loadHistory(),
-            messengerRepository.loadAppearance(),
-            messengerRepository.loadSettings(),
-          ]);
+        try {
+          await messengerRepository.migrateLegacy();
+        } catch {}
+        const results = await Promise.allSettled([
+          messengerRepository.loadChats(),
+          messengerRepository.loadStories(),
+          messengerRepository.loadHistory(),
+          messengerRepository.loadAppearance(),
+          messengerRepository.loadSettings(),
+        ]);
         if (!active) return;
-        if (storedChats?.length) {
+        const [chatsResult, storiesResult, historyResult, appearanceResult, settingsResult] = results;
+        const storedChats = settledValue(chatsResult);
+        const storedStories = settledValue(storiesResult);
+        const storedHistory = settledValue(historyResult);
+        const appearance = settledValue(appearanceResult);
+        const settings = settledValue(settingsResult);
+        hydrated.current = {
+          chats: chatsResult.status === "fulfilled",
+          stories: storiesResult.status === "fulfilled",
+          history: historyResult.status === "fulfilled",
+        };
+        if (Array.isArray(storedChats)) {
           const next = storedChats.map(enrichChat);
           savedChats.current = next;
           updateChats(() => next);
         }
-        if (storedStories?.length) {
+        if (Array.isArray(storedStories)) {
           savedStories.current = storedStories;
           setStories(storedStories);
         }
-        if (storedHistory?.length) {
+        if (Array.isArray(storedHistory)) {
           savedHistory.current = storedHistory;
           setHistory(storedHistory);
         }
@@ -125,7 +132,6 @@ export function useMessenger() {
           });
         }
       } catch {
-        // Damaged storage keeps the seeded demo data rather than blocking startup.
       } finally {
         if (active) setLoaded(true);
       }
@@ -135,32 +141,33 @@ export function useMessenger() {
       timers.current.forEach(clearTimeout);
     };
   }, []);
-
   useEffect(() => {
-    if (!loaded || savedChats.current === chats) return;
-    savedChats.current = chats;
-    void messengerRepository.saveChats(chats).catch(() => {});
+    if (!loaded || !hydrated.current.chats || savedChats.current === chats) return;
+    void messengerRepository.saveChats(chats).then(() => {
+      if (chatsRef.current === chats) savedChats.current = chats;
+    }).catch(() => {});
   }, [chats, loaded]);
   useEffect(() => {
-    if (!loaded || savedStories.current === stories) return;
-    savedStories.current = stories;
-    void messengerRepository.saveStories(stories).catch(() => {});
+    if (!loaded || !hydrated.current.stories || savedStories.current === stories) return;
+    void messengerRepository.saveStories(stories).then(() => {
+      savedStories.current = stories;
+    }).catch(() => {});
   }, [stories, loaded]);
   useEffect(() => {
-    if (!loaded || savedHistory.current === history) return;
-    savedHistory.current = history;
-    void messengerRepository.saveHistory(history).catch(() => {});
+    if (!loaded || !hydrated.current.history || savedHistory.current === history) return;
+    void messengerRepository.saveHistory(history).then(() => {
+      savedHistory.current = history;
+    }).catch(() => {});
   }, [history, loaded]);
   useEffect(() => {
     if (!loaded) return;
     for (const [id, thread] of Object.entries(messages)) {
       if (savedThreads.current.get(id) === thread) continue;
-      savedThreads.current.set(id, thread);
-      void messengerRepository.saveMessages(id, thread).catch(() => {});
+      void messengerRepository.saveMessages(id, thread).then(() => {
+        if (messagesRef.current[id] === thread) savedThreads.current.set(id, thread);
+      }).catch(() => {});
     }
   }, [messages, loaded]);
-
-  /** Reads one conversation the first time it is opened, then keeps it in memory. */
   function thread(chat: Chat): Promise<Message[]> {
     const cached = messagesRef.current[chat.id];
     if (cached) return Promise.resolve(cached);
@@ -176,7 +183,6 @@ export function useMessenger() {
         savedThreads.current.set(chat.id, thread);
         return thread;
       })
-      .catch(() => seedMessages(chat))
       .finally(() => {
         threads.current.delete(chat.id);
       });
@@ -187,7 +193,7 @@ export function useMessenger() {
     selectedRef.current = chat.id;
     setSelected(chat.id);
     updateChats((current) => markChatRead(current, chat.id));
-    void thread(chat);
+    void thread(chat).catch(() => {});
   }
   function setConversationVisible(visible: boolean) {
     conversationVisible.current = visible;
@@ -201,9 +207,10 @@ export function useMessenger() {
   function append(chat: Chat, message: Message, preview: string) {
     if (!chatsRef.current.some((item) => item.id === chat.id && !item.blocked))
       return;
+    if (!messagesRef.current[chat.id]) return;
     updateMessages((current) => ({
       ...current,
-      [chat.id]: [...(current[chat.id] || seedMessages(chat)), message],
+      [chat.id]: [...current[chat.id], message],
     }));
     updateChats((current) =>
       updateChatPreview(current, {
@@ -236,47 +243,49 @@ export function useMessenger() {
         ? { id: original.id, mine: original.mine, text: "Message deleted" }
         : { ...message.replyTo };
     }
-    append(chat, message, messagePreview(message));
-    setTypingIds((ids) => (ids.includes(chat.id) ? ids : [...ids, chat.id]));
-    const previous = timers.current.get(chat.id);
-    if (previous) clearTimeout(previous);
-    timers.current.set(
-      chat.id,
-      setTimeout(() => {
-        const reply = partial.kind
-          ? "Thanks for sharing 🤍"
-          : "Sounds good! Let’s make it happen ✨";
-        append(
-          chat,
-          {
-            id: uid(),
-            mine: false,
-            text: reply,
-            time: clock(),
-            createdAt: new Date().toISOString(),
-          },
-          reply,
-        );
-        setTypingIds((ids) => ids.filter((id) => id !== chat.id));
-        timers.current.delete(chat.id);
-      }, 2600),
-    );
+    void thread(chat).then(() => {
+      if (
+        chat.blocked ||
+        !chatsRef.current.some((item) => item.id === chat.id && !item.blocked)
+      )
+        return;
+      append(chat, message, messagePreview(message));
+      setTypingIds((ids) => (ids.includes(chat.id) ? ids : [...ids, chat.id]));
+      const previous = timers.current.get(chat.id);
+      if (previous) clearTimeout(previous);
+      timers.current.set(
+        chat.id,
+        setTimeout(() => {
+          const reply = partial.kind
+            ? "Thanks for sharing 🤍"
+            : "Sounds good! Let’s make it happen ✨";
+          append(
+            chat,
+            {
+              id: uid(),
+              mine: false,
+              text: reply,
+              time: clock(),
+              createdAt: new Date().toISOString(),
+            },
+            reply,
+          );
+          setTypingIds((ids) => ids.filter((id) => id !== chat.id));
+          timers.current.delete(chat.id);
+        }, 2600),
+      );
+    }).catch(() => {});
   }
-  /**
-   * Sends a message into a named conversation, used by notification replies.
-   * The action id doubles as the message id, so a redelivered action can never
-   * post the same reply twice. The thread is loaded first, because appending to
-   * the seeded fallback would save that seed over the stored conversation. The
-   * promise resolves only once the thread is written, because the notification
-   * action is acknowledged after this returns.
-   */
   async function sendTo(chatId: string, text: string, actionId?: string) {
     const chat = chatsRef.current.find((item) => item.id === chatId);
     const body = text.trim();
     if (!chat || !body || chat.blocked) return;
     const id = actionId ? `notice-${actionId}` : uid();
-    const existing = messagesRef.current[chatId] ?? (await thread(chat));
-    if (existing.some((message) => message.id === id)) return;
+    const existing = await thread(chat);
+    if (existing.some((message) => message.id === id)) {
+      await messengerRepository.saveMessages(chatId, existing);
+      return;
+    }
     const message: Message = {
       id,
       text: body,
@@ -303,7 +312,7 @@ export function useMessenger() {
       }),
     );
     savedThreads.current.set(chatId, next);
-    await messengerRepository.saveMessages(chatId, next).catch(() => {});
+    await messengerRepository.saveMessages(chatId, next);
   }
   function markRead(chatId: string) {
     updateChats((current) => markChatRead(current, chatId));
@@ -373,22 +382,28 @@ export function useMessenger() {
       ),
     );
   }
-  function forwardMessage(message: Message, targetChatId: string) {
+  async function forwardMessage(message: Message, targetChatId: string) {
     const target = chatsRef.current.find((chat) => chat.id === targetChatId);
-    if (!target) return;
-    // A menu may still hold a snapshot from before a deletion.
+    if (!target || target.blocked) return;
+    try {
+      await thread(target);
+    } catch {
+      return;
+    }
+    const currentTarget = chatsRef.current.find((chat) => chat.id === targetChatId);
+    if (!currentTarget || currentTarget.blocked) return;
     const source =
       messagesRef.current[selectedRef.current || ""]?.find(
         (item) => item.id === message.id,
       ) || message;
     const forwarded = createForward(
       source,
-      target,
+      currentTarget,
       uid(),
       clock(),
       new Date().toISOString(),
     );
-    if (forwarded) append(target, forwarded, messagePreview(forwarded));
+    if (forwarded) append(currentTarget, forwarded, messagePreview(forwarded));
   }
   function updateFlag(id: string, flag: "muted" | "blocked" | "pinned", value: boolean) {
     const chat = chatsRef.current.find((item) => item.id === id);
@@ -427,11 +442,7 @@ export function useMessenger() {
   function clearChat(id: string) {
     cancelReplies(id);
     updateMessages((current) => ({ ...current, [id]: [] }));
-    updateChats((current) =>
-      current.map((chat) =>
-        chat.id === id ? refreshChatPreview({ ...chat, unread: 0 }, []) : chat,
-      ),
-    );
+    updateChats((current) => current.map((chat) => chat.id === id ? refreshChatPreview({ ...chat, unread: 0 }, []) : chat));
   }
   function deleteChat(id: string) {
     cancelReplies(id);

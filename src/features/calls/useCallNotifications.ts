@@ -29,7 +29,14 @@ export function useCallNotifications(call: Call | null, enabled: boolean) {
   const active = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !isSystemNotificationsAvailable) return;
+    if (!isSystemNotificationsAvailable) return;
+    if (!enabled) {
+      const finished = active.current;
+      active.current = null;
+      published.current = null;
+      if (finished) void dismissCall(finished).catch(() => {});
+      return;
+    }
     if (!call) {
       const finished = active.current;
       active.current = null;
@@ -41,36 +48,39 @@ export function useCallNotifications(call: Call | null, enabled: boolean) {
     const state = stateOf(call);
     let cancelled = false;
     void (async () => {
-      const avatarUri = await localAvatarUri(call.chat.avatar).catch(() => undefined);
-      if (cancelled) return;
-      // The signature includes the avatar so a cached avatar resolving later
-      // updates the same notification instead of stacking a second one.
-      const signature = [
-        call.id,
-        state,
-        call.video,
-        call.muted,
-        call.speaker,
-        call.connectedAt ?? 0,
-        avatarUri ?? "",
-      ].join(":");
-      if (published.current === signature) return;
-      const result = await showCall(
-        callPayload({
-          callId: call.id,
-          chat: call.chat,
+      const avatarPromise = localAvatarUri(call.chat.avatar).catch(() => undefined);
+      const post = async (avatarUri?: string) => {
+        if (cancelled) return;
+        const signature = [
+          call.id,
           state,
-          video: call.video,
-          connectedAt: call.connectedAt,
-          muted: call.muted,
-          speaker: call.speaker,
-          avatarUri,
-          timeoutMs: 60_000,
-        }),
-      ).catch(() => undefined);
+          call.video,
+          call.muted,
+          call.speaker,
+          call.connectedAt ?? 0,
+          avatarUri ?? "",
+        ].join(":");
+        if (published.current === signature) return;
+        const result = await showCall(
+          callPayload({
+            callId: call.id,
+            chat: call.chat,
+            state,
+            video: call.video,
+            connectedAt: call.connectedAt,
+            muted: call.muted,
+            speaker: call.speaker,
+            avatarUri,
+            timeoutMs: 60_000,
+          }),
+        ).catch(() => undefined);
       // Only a settled post may be remembered, or a failed one would never be
       // retried while the call state stays the same.
-      if (!result || result.posted) published.current = signature;
+        if (!cancelled && result?.posted === true) published.current = signature;
+      };
+      await post();
+      const avatarUri = await avatarPromise;
+      if (avatarUri) await post(avatarUri);
     })();
     return () => {
       cancelled = true;

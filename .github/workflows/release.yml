@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag to release. Defaults to v<version in app.json>.
-        required: false
+        description: Existing tag to release (for example v0.0.6).
+        required: true
         type: string
 
 permissions:
@@ -46,6 +46,8 @@ jobs:
           # The release notes print the recent commit list, which needs more
           # than the default single-commit shallow clone.
           fetch-depth: 0
+          # A manual release must name the tag it builds, just like a tag push.
+          ref: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -73,18 +75,26 @@ jobs:
       - name: Resolve version
         id: version
         env:
-          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
         run: |
           set -euo pipefail
           version=$(node -p "require('./app.json').expo.version")
-          tag="${INPUT_TAG:-v$version}"
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release ref $tag is not a semantic version tag (expected vMAJOR.MINOR.PATCH)."
+            exit 1
+          fi
           if [ "$tag" != "v$version" ]; then
             echo "::error::Tag $tag does not match app.json version $version. Bump the version or use tag v$version."
             exit 1
           fi
+          if ! git tag --points-at HEAD | grep -Fxq "$tag"; then
+            echo "::error::Checked-out source is not the commit pointed to by $tag."
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "Releasing $tag"
+          echo "Releasing $tag from $(git rev-parse HEAD)"
 
       # android/ is generated and gitignored, so every release starts from the
       # Expo config. This also means the build always matches app.json.
@@ -263,8 +273,9 @@ jobs:
             echo "Release $TAG already exists; replacing its assets."
             gh release upload "$TAG" "${assets[@]}" --clobber
           else
+            target=$(git rev-parse HEAD)
             gh release create "$TAG" "${assets[@]}" \
-              --target "$GITHUB_SHA" \
+              --target "$target" \
               --title "Messenger $VERSION" \
               --notes-file artifacts/release/notes.md
           fi

@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-10-19
+
+This release hardens the local prototype around failed storage, startup
+hydration, notification delivery, update prompts and conversation scrolling.
+It also improves outgoing-message contrast and makes release tags describe the
+source that was actually built.
+
+### Fixed
+
+- Failed storage writes now reject and remain retryable, and an older in-flight
+  read cannot replace a newer value saved during that read.
+- Empty saved chat and story collections survive restart instead of restoring
+  seeded demo data. Conversation sends and forwards wait for history hydration
+  rather than appending to a seed fallback.
+- Notification reply writes propagate durability failures instead of being
+  acknowledged as complete while only held in memory.
+- Optional update prompts respect Later and remembered per-release dismissal;
+  forced updates remain visible.
+- Message and call notifications require an explicit native posted result,
+  publish before waiting for avatar downloads, and clean up when notifications
+  are disabled.
+- New incoming messages no longer pull a reader out of older conversation
+  history, and outgoing message text meets the normal-copy contrast target in
+  both themes.
+- Tag-triggered releases validate the pushed tag and build the source pointed to
+  by that tag. Manual releases require an explicit tag.
+
+### Tests
+
+- Added storage regression coverage for failed writes and stale in-flight reads.
+- Added contrast regression coverage for outgoing message text.
+
+### Size
+
+The arm64-v8a APK is **14,967,135 bytes (14.27 MiB)**. That is +4,136 bytes
+(+0.03%) against the published v0.0.5 APK. The increase is the larger
+JavaScript bundle; the regression tests do not ship in the APK.
+
 ## [0.0.5] - 2026-10-19
 
 The app follows the device theme while it runs. Until this release, a switch

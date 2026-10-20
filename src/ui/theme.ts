@@ -25,10 +25,14 @@ export function palette(dark: boolean) {
   return {
     bg: dark ? "#292622" : "#FBFAF7",
     fg: dark ? "#FAF3E8" : "#28332E",
-    muted: dark ? "#BDB1A3" : "#92978F",
+    muted: dark ? "#BDB1A3" : "#66706A",
     card: dark ? "#36312B" : "#FFFFFF",
     line: dark ? "#4A4239" : "#EEEDE7",
     tint: dark ? "#543D32" : "#FBECE5",
+    // Dark text keeps normal-size outgoing copy above 4.5:1 on the coral
+    // bubbles in both themes; the muted variant is for secondary labels.
+    outgoingFg: dark ? "#120805" : "#3A1710",
+    outgoingMuted: dark ? "#24100C" : "#54251A",
   };
 }
 export type Colors = ReturnType<typeof palette>;
