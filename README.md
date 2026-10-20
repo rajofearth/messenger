@@ -12,7 +12,7 @@ The client architecture reads through one typed cache seam (`src/data/messengerR
 
 Working: username/password accounts with signed-in device management, editable profile photos, contact creation by username, direct and group chats, text and media messages, replies, reactions, forwarding, delete for me/everyone, online and typing presence, mute and block, per-chat gallery visibility, call history, 24-hour stories, and Android system notifications for calls and messages.
 
-Local-first: the inbox, threads, stories, settings and downloaded media are cached on the device. Convex is only queried when the cache has no answer or when the server has newer data. A per-conversation switch can copy received photos and videos into a `Messenger` album in the device gallery; otherwise media stays inside app storage.
+Local-first: the inbox, threads, stories, settings and downloaded media are cached on the device. The cache paints immediately while Convex queries reconcile or refresh it; a cache hit does not stop the query. A per-conversation switch can copy received photos and videos into a `Messenger` album in the device gallery; otherwise media stays inside app storage.
 
 Simulated or limited: calls connect on a timer and the remote video is a placeholder, because there is no call transport. Notifications are posted by the running app, not by push. There is no end-to-end encryption and local caches are not encrypted by the app; treat the deployment's database and the device as trusted for this prototype.
 
@@ -37,8 +37,11 @@ Run the backend locally with `npx convex dev`; it watches `convex/`, generates
 the typed API, and sets both values. The deployment also needs `JWT_PRIVATE_KEY`
 and `JWKS` for Convex Auth; `SITE_URL` is only used by OAuth or email flows,
 which this app does not use. [convex/README.md](convex/README.md) has the
-one-time commands. Without a deployment the app cannot sign in, though
-previously cached chats still render.
+one-time commands. `EXPO_PUBLIC_CONVEX_URL` is read when the JavaScript bundle
+is built: if it was absent, `convexClient` throws during startup and the app
+cannot open, cached data included. If the build contains a deployment URL but
+the device is offline, previously cached chats still render and sync resumes
+when the connection returns.
 
 To try the app without building it, download the APK from the [latest release](https://github.com/rajofearth/messenger/releases/latest) and sideload it (Android 7.0 or newer, arm64 device).
 

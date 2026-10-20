@@ -40,8 +40,11 @@ start while writes reconcile with the deployment.
   service.
 - Signing out unregisters the device and clears cached account data while
   keeping the appearance preference.
-- Uploads are finalized against storage's real size (25 MiB cap) and a
-  kind-matched MIME type; forwarding respects delete-for-me and cleared history.
+- Uploads are finalized against storage's real size (25 MiB cap) and MIME
+  metadata, and a rejected object is deleted; forwarding respects delete-for-me
+  and cleared history.
+- Story lists and seen marks are limited to the owner and people who share a
+  conversation with them.
 - A conversation that is on screen marks new messages read on the server, and a
   failed notification reply is retried instead of being treated as sent.
 - CI and release builds receive `EXPO_PUBLIC_CONVEX_URL` and
@@ -51,10 +54,11 @@ start while writes reconcile with the deployment.
 
 ### Size
 
-- Release APK: 15,511,619 bytes (14.79 MiB), 544,484 bytes (+3.6%) above
-  published v0.0.6 and 1.21 MiB below the 16 MiB gate. The JavaScript bundle,
+- Release APK: 15,516,415 bytes (14.80 MiB), 549,280 bytes (+3.7%) above
+  published v0.0.6 and 1.20 MiB below the 16 MiB gate. The JavaScript bundle,
   `expo-secure-store` and `expo-media-library` account for almost all of the
-  growth; see `docs/PERFORMANCE.md`.
+  growth; the review fixes added 4,796 bytes over the first feature build. See
+  `docs/PERFORMANCE.md`.
 
 ## [0.0.6] - 2026-10-19
 
@@ -350,7 +354,8 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/rajofearth/messenger/releases/tag/v0.0.6
 [0.0.5]: https://github.com/rajofearth/messenger/releases/tag/v0.0.5
 [0.0.4]: https://github.com/rajofearth/messenger/releases/tag/v0.0.4
 [0.0.3]: https://github.com/rajofearth/messenger/releases/tag/v0.0.3

@@ -11,6 +11,11 @@ export type SettingsProfile = Pick<
   "name" | "avatar" | "sound" | "previews" | "systemNotifications"
 > &
   Partial<Pick<Preferences, "bio" | "username" | "haptics">>;
+export type ProfileChangeOptions = { remote?: boolean };
+export type ProfileChangeHandler = (
+  profile: SettingsProfile,
+  options?: ProfileChangeOptions,
+) => void | Promise<void>;
 type Sheet = "profile" | "privacy" | "info" | null;
 export const DEFAULT_PREFERENCES: Preferences = {
   name: "Messenger user",
@@ -24,7 +29,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 };
 
 export function useSettingsPreferences(
-  onProfileChange?: (profile: SettingsProfile) => void,
+  onProfileChange?: ProfileChangeHandler,
 ) {
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
   const current = useRef(DEFAULT_PREFERENCES);
@@ -112,6 +117,12 @@ export function useSettingsPreferences(
         "This change is active for now, but could not be saved. Please try again.",
       );
     });
+    // Keep the shared profile in step with the switch immediately. These
+    // notification and haptic fields live only on this device, so no remote
+    // profile write is needed.
+    void Promise.resolve(
+      onProfileChange?.({ ...current.current }, { remote: false }),
+    ).catch(() => {});
   }
 
   async function pickAvatar() {
@@ -135,8 +146,16 @@ export function useSettingsPreferences(
       });
       if (!result.canceled && result.assets[0]?.uri) {
         setAvatarFailed(false);
+        const previousAvatar = current.current.avatar;
         await persist({ avatar: result.assets[0].uri });
-        onProfileChange?.({ ...current.current });
+        try {
+          await onProfileChange?.({ ...current.current });
+        } catch (error) {
+          // The local pick is only useful once the profile photo reaches the
+          // server; restore the previous avatar before showing the failure.
+          await persist({ avatar: previousAvatar }).catch(() => {});
+          throw error;
+        }
       }
     } catch {
       Alert.alert(
@@ -172,8 +191,16 @@ export function useSettingsPreferences(
     }
     setSaving(true);
     try {
-      await persist({ name: name.trim(), bio: bio.trim(), username: handle });
-      onProfileChange?.({ ...current.current });
+      const next: SettingsProfile = {
+        ...current.current,
+        name: name.trim(),
+        bio: bio.trim(),
+        username: handle,
+      };
+      // Wait for the server before committing the local copy and closing the
+      // sheet, so a failed username change cannot look saved.
+      await onProfileChange?.(next);
+      await persist({ name: next.name, bio: next.bio, username: next.username });
       setSheet(null);
     } catch {
       Alert.alert(

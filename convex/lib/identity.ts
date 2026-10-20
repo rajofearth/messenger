@@ -1,4 +1,7 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import {
+  getAuthSessionId,
+  getAuthUserId,
+} from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
@@ -6,7 +9,16 @@ export const CHAT_SCOPE = "messenger";
 
 export async function requireUser(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
-  if (!userId) throw new ConvexError("AUTH_REQUIRED");
+  const sessionId = await getAuthSessionId(ctx);
+  if (!userId || !sessionId) throw new ConvexError("AUTH_REQUIRED");
+  const session = await ctx.db.get(sessionId);
+  if (
+    !session ||
+    session.userId !== userId ||
+    session.expirationTime <= Date.now()
+  ) {
+    throw new ConvexError("AUTH_REQUIRED");
+  }
   const user = await ctx.db.get(userId);
   if (!user) throw new ConvexError("AUTH_REQUIRED");
   return { userId, user, subjectId: userId.toString(), scopeId: CHAT_SCOPE };

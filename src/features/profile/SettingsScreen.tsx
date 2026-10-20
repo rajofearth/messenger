@@ -13,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { CORAL, styles, settingsColors } from "./SettingsScreen.styles";
 import {
   useSettingsPreferences,
-  type SettingsProfile,
+  type ProfileChangeHandler,
 } from "./SettingsPreferences";
 import SettingsDialogs from "./SettingsDialogs";
 import { IconButton, tap } from "../../ui/primitives";
@@ -34,7 +34,7 @@ export type SettingsScreenProps = {
   theme: ThemePreference;
   onThemeChange: (value: ThemePreference) => void;
   onIncoming: () => void;
-  onProfileChange?: (profile: SettingsProfile) => void;
+  onProfileChange?: ProfileChangeHandler;
   /** The app-wide updater, so the card and the launch prompt share one state. */
   updates: AppUpdater;
 };

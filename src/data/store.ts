@@ -122,7 +122,8 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
           return value as T | undefined;
         })
         .finally(() => {
-          reading.delete(key);
+          // A clear() may have replaced this request with a newer read.
+          if (reading.get(key) === request) reading.delete(key);
         });
       reading.set(key, request);
       return request;
@@ -146,17 +147,29 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
     flush: () => schedule(),
     clear: async () => {
       await schedule().catch(() => undefined);
-      queue.clear();
       const prefix = `${namespace}/`;
-      const keys = (await driver.keys()).filter((key) => key.startsWith(prefix));
+      const queuedKeys = [...queue.keys()];
+      queue.clear();
+      // Memory and in-flight reads can hold data that never reached storage,
+      // so include them as well as the keys the driver reports.
+      const keys = new Set([
+        ...memory.keys(),
+        ...reading.keys(),
+        ...queuedKeys.map((key) => key.slice(prefix.length)),
+        ...(await driver.keys())
+          .filter((key) => key.startsWith(prefix))
+          .map((key) => key.slice(prefix.length)),
+      ]);
       for (const key of keys) {
-        memory.delete(key.slice(prefix.length));
-        generations.set(
-          key.slice(prefix.length),
-          (generations.get(key.slice(prefix.length)) ?? 0) + 1,
-        );
-        await driver.write(key, null);
+        await driver.write(full(key), null);
       }
+      // Invalidate reads only after the deletes land, so a read that started
+      // during the loop cannot put the old value back into memory.
+      for (const key of keys) {
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        memory.delete(key);
+      }
+      reading.clear();
     },
   };
 }

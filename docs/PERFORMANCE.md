@@ -4,8 +4,8 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 15,511,619 bytes
-(14.79 MiB) in the current unreleased build** — 64.4% smaller, in seven stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 15,516,415 bytes
+(14.80 MiB) in the current unreleased build** — 64.4% smaller, in seven stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
@@ -13,9 +13,9 @@ barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.23 MiB), the in-app updater added 32,964 bytes for 14,959,279 bytes
 (14.27 MiB), the device-scheme module added 3,720 for 14,962,999 bytes
 (14.27 MiB), and the audit fixes added 4,136 bytes for 14,967,135 bytes
-(14.27 MiB). The Convex-backed chat work added 544,484 bytes for 15,511,619
-bytes (14.79 MiB). The stage table and the per-entry breakdown are under
-"Measured APK size".
+(14.27 MiB). The Convex-backed chat work added 549,280 bytes for 15,516,415
+bytes (14.80 MiB), including 4,796 bytes in the review fixes. The stage table
+and the per-entry breakdown are under "Measured APK size".
 
 ### Build configuration in `app.json`
 
@@ -122,7 +122,7 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.0.4 (in-app updater; versionCode 4) | 14,959,279 bytes (14.27 MiB) | **+32,964 bytes, +0.2%** against v0.0.3, -65.6% overall |
 | v0.0.5 (device scheme; the system theme follows the device live; versionCode 5) | 14,962,999 bytes (14.27 MiB) | **+3,720 bytes, +0.02%** against v0.0.4, -65.6% overall |
 | Current v0.0.6 (storage, notification, updater and contrast fixes; versionCode 6) | 14,967,135 bytes (14.27 MiB) | **+4,136 bytes, +0.03%** against published v0.0.5, -65.6% overall |
-| Unreleased Convex branch (accounts, chat, stories, media cache; versionCode 6) | 15,511,619 bytes (14.79 MiB) | **+544,484 bytes, +3.6%** against published v0.0.6, -64.4% overall |
+| Unreleased Convex branch (accounts, chat, stories, media cache and review fixes; versionCode 6) | 15,516,415 bytes (14.80 MiB) | **+549,280 bytes, +3.7%** against published v0.0.6, -64.4% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -148,13 +148,13 @@ modes:
 | `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. |
 | Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | 163,883 bytes (0.16 MiB) | 163,883 bytes (0.16 MiB) | Packages, Kotlin metadata and property files; effectively unchanged in substance. The device-scheme module adds no package of its own. |
 
-The unreleased Convex branch is 15,511,619 bytes, 544,484 bytes (+3.6%) above
-published v0.0.6. The JavaScript bundle grew by 400,707 bytes (1,638,559 to
-2,039,266) for the Convex client, Convex Auth and the SecureStore session. The
+The unreleased Convex branch is 15,516,415 bytes, 549,280 bytes (+3.7%) above
+published v0.0.6. The JavaScript bundle grew by 402,269 bytes (1,638,559 to
+2,040,828) for the Convex client, Convex Auth and the SecureStore session. The
 dex grew by 127,436 bytes (5,402,478 to 5,529,914) for `expo-secure-store` and
 `expo-media-library`; `res/` grew by 10,108 bytes across 12 new entries and
 `resources.arsc` by 7,160, both from media-library resources. `lib/` is
-unchanged at 5,896,334 bytes and 19 libraries. The build is 1.21 MiB below the
+unchanged at 5,896,334 bytes and 19 libraries. The build is 1.20 MiB below the
 16 MiB gate.
 
 The same figures are worth quoting with their caveats: this is APK file size,
@@ -304,6 +304,6 @@ There is no automated performance harness here. No baseline for startup, frame t
 - **FlashList was not added.** A new dependency and a new list API would not pay for themselves without measured jank, and the thread is capped at the newest 100 messages.
 - **No deep virtualisation experiments.** No fixed row heights, no `getItemLayout`, no cell-recycling tricks beyond what `FlatList` and `expo-image` already provide. The reasons are in the `getItemLayout` section: variable font scale and content-dependent rows.
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
-- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.79 MiB there is no reason to take that trade without on-device startup numbers.
+- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.80 MiB there is no reason to take that trade without on-device startup numbers.
 - **No JS-level profiling.** Hermes is on (`hermesEnabled=true` in the generated `android/gradle.properties`), but no sampling or tracing run has been recorded in this repository.
 - **JDK 21 was not adopted, and JDK 26/27 are not options.** The build runs on JDK 17, which is also Android Gradle Plugin 8.12's target. An app-wipe build on JDK 21 took 88.1s against 65.7s on JDK 17 over an identical task set on this Windows-on-ARM machine (one run each; x86 Linux numbers elsewhere differ), so 21 buys nothing here. JDK 26 needs Gradle 9.4 and JDK 27 needs Gradle 9.8; the wrapper ships 9.3.1, which supports JVM 17-25. The measured win was caching, which is JDK-independent.

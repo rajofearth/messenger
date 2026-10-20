@@ -75,6 +75,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
             kind: asset.type === "video" ? "video" : "image",
             uri: asset.uri,
             mimeType: asset.mimeType ?? undefined,
+            filename: asset.fileName ?? undefined,
             albumId,
             width: asset.width,
             height: asset.height,
@@ -148,7 +149,13 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
         if (mounted.current) {
           setRecording(false);
           if (!recorder.uri) throw new Error("Missing recording URI");
-          onSend({ kind: "audio", uri: recorder.uri, duration: seconds });
+          onSend({
+            kind: "audio",
+            uri: recorder.uri,
+            duration: seconds,
+            mimeType: "audio/mp4",
+            filename: "voice-note.m4a",
+          });
         }
       } else {
         const permission = await requestRecordingPermissionsAsync();

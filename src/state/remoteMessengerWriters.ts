@@ -72,7 +72,14 @@ export function deleteLocalMessage(args: {
     const next = (current[args.chatId] || []).filter(
       (item) => item.id !== args.messageId,
     );
-    void messengerRepository.saveMessages(args.chatId, next).catch(() => {});
+    // Unconfirmed sends stay in memory only; a restart cannot revive a bubble
+    // whose mutation never completed.
+    void messengerRepository
+      .saveMessages(
+        args.chatId,
+        next.filter((item) => item.sequence !== undefined),
+      )
+      .catch(() => {});
     return { ...current, [args.chatId]: next };
   });
 }

@@ -37,10 +37,11 @@ dev` runs the backend against your development deployment, regenerates
 Convex Auth setup also needs `JWT_PRIVATE_KEY` and `JWKS` on the deployment, as
 described in [convex/README.md](convex/README.md).
 
-The app talks to Convex at `EXPO_PUBLIC_CONVEX_URL`. Without a configured
-deployment it cannot sign in or send, but a previously cached inbox still
-renders. `EXPO_PUBLIC_CONVEX_SITE_URL` is the deployment's `.convex.site` origin
-and is used by the auth HTTP routes.
+The app reads `EXPO_PUBLIC_CONVEX_URL` at build time. A build without it fails
+during startup, before cached chats can render; a build with the URL still
+shows the cached inbox and threads when the device is offline and syncs when a
+connection returns. `EXPO_PUBLIC_CONVEX_SITE_URL` is the deployment's
+`.convex.site` origin and is used by the auth HTTP routes.
 
 ## Build and install the Android APK
 

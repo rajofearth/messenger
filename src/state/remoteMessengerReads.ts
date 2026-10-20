@@ -35,9 +35,15 @@ export function createRemoteReplySender({
   sendText: SendText;
 }) {
   return async function sendTo(chatId: string, text: string, actionId?: string) {
-    const chat = chatsRef.current.find((item) => item.id === chatId);
     const body = text.trim();
-    if (!chat || !body || chat.blocked) return;
+    if (!body) return;
+    const chat = chatsRef.current.find((item) => item.id === chatId);
+    if (!chat) {
+      // The native action queue retries rejected replies. A missing cache entry
+      // is usually a race with a cold start, not a permanent failure.
+      throw new Error("CHAT_NOT_FOUND");
+    }
+    if (chat.blocked) return;
     const clientMessageId = actionId ? `notice-${actionId}` : remoteUid();
     const known = (messagesRef.current[chatId] || []).some(
       (item) => item.id === clientMessageId,

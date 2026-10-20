@@ -67,6 +67,17 @@ jobs:
           node-version: 24
           cache: npm
 
+      # The bundle is not useful if the app throws at startup. Keep this in
+      # step with the release workflow's pre-build check.
+      - name: Require Convex deployment URL
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          set -euo pipefail
+          if [[ -z "${EXPO_PUBLIC_CONVEX_URL:-}" ]]; then
+            echo "::error::EXPO_PUBLIC_CONVEX_URL is empty. Set the repository variable to the deployment's .convex.cloud URL."
+            exit 1
+          fi
+
       - name: Install dependencies
         run: npm ci
 

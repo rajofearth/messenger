@@ -64,12 +64,34 @@ export const finalizeUpload = mutation({
       if (existing.ownerId !== actor.userId) throw new ConvexError("FILE_FORBIDDEN");
       return existing.storageId;
     }
-    const metadata = await ctx.storage.getMetadata(args.storageId);
+    const metadata = await ctx.db.system.get("_storage", args.storageId);
     if (!metadata) throw new ConvexError("FILE_NOT_FOUND");
     // Storage knows the real size; the client-supplied number is never trusted.
-    if (metadata.size <= 0) throw new ConvexError("FILE_EMPTY");
-    if (metadata.size > MAX_UPLOAD_BYTES) throw new ConvexError("FILE_TOO_LARGE");
-    const mimeType = normalizeMime(args.kind, args.mimeType);
+    if (metadata.size <= 0) {
+      // A throwing mutation rolls back storage deletion, so reject by returning
+      // after the delete commits and let the client surface the error code.
+      await ctx.storage.delete(args.storageId);
+      return { error: "FILE_EMPTY" };
+    }
+    if (metadata.size > MAX_UPLOAD_BYTES) {
+      await ctx.storage.delete(args.storageId);
+      return { error: "FILE_TOO_LARGE" };
+    }
+    // The upload's Content-Type is set by the object that was actually stored.
+    // Fall back to the client value only when storage did not record one.
+    const storedMime = metadata.contentType?.split(";")[0].trim().toLowerCase();
+    const claimedMime = args.mimeType.split(";")[0].trim().toLowerCase();
+    const candidate =
+      storedMime && storedMime !== "application/octet-stream"
+        ? storedMime
+        : claimedMime;
+    let mimeType: string;
+    try {
+      mimeType = normalizeMime(args.kind, candidate);
+    } catch {
+      await ctx.storage.delete(args.storageId);
+      return { error: "INVALID_MIME" };
+    }
     await ctx.db.insert("files", {
       ownerId: actor.userId,
       storageId: args.storageId,

@@ -71,8 +71,9 @@ export function useRemoteCache() {
   }, []);
 
   useEffect(() => {
+    if (!localReady) return;
     void messengerRepository.saveHistory(history).catch(() => {});
-  }, [history]);
+  }, [history, localReady]);
 
   useEffect(() => {
     if (!localReady) return;

@@ -1,4 +1,4 @@
-import type { Chat, Story } from "../domain/data";
+import type { Chat, Message, Story } from "../domain/data";
 import type { SettingsRecord } from "../data/records";
 
 export type RemoteProfile = {
@@ -35,11 +35,22 @@ export const DEFAULT_SETTINGS: SettingsRecord = {
   systemNotifications: true,
 };
 
-export function timeLabel() {
-  return new Date().toLocaleTimeString([], {
+export function timeLabel(at: number | Date = Date.now()) {
+  return new Date(at).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export type RemoteMessage = Omit<Message, "time"> & { createdAt: string };
+
+/** Server timestamps are UTC; the device formats them in its own locale. */
+export function mapMessage(item: RemoteMessage): Message {
+  const at = Date.parse(item.createdAt);
+  return {
+    ...item,
+    time: Number.isFinite(at) ? timeLabel(at) : "",
+  };
 }
 
 export function mapChat(item: {
@@ -49,7 +60,7 @@ export function mapChat(item: {
   username?: string;
   bio?: string;
   preview: string;
-  time: string;
+  lastMessageAt?: number;
   unread: number;
   group: boolean;
   color: string;
@@ -68,7 +79,7 @@ export function mapChat(item: {
     username: item.username,
     bio: item.bio,
     preview: item.preview,
-    time: item.time,
+    time: item.lastMessageAt ? timeLabel(item.lastMessageAt) : "",
     unread: item.unread,
     group: item.group,
     color: item.color,

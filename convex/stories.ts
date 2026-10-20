@@ -4,6 +4,24 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { requireUser } from "./lib/identity";
 
+/**
+ * A story is visible to its owner and to anyone who shares a conversation with
+ * the owner. Conversations are mirrored in `conversationMeta`, which is small
+ * enough to scan and keeps the rule in one place.
+ */
+async function storyAudience(
+  ctx: QueryCtx | MutationCtx,
+  actor: { subjectId: string },
+) {
+  const conversations = await ctx.db.query("conversationMeta").collect();
+  const allowed = new Set<string>([actor.subjectId]);
+  for (const conversation of conversations) {
+    if (!conversation.memberSubjectIds.includes(actor.subjectId)) continue;
+    for (const memberId of conversation.memberSubjectIds) allowed.add(memberId);
+  }
+  return allowed;
+}
+
 const story = (ctx: QueryCtx | MutationCtx, row: {
   _id: Id<"stories">;
   ownerId: Id<"users">;
@@ -32,14 +50,19 @@ export const list = query({
     const actor = await requireUser(ctx);
     const now = Date.now();
     const limit = Math.max(1, Math.min(args.limit ?? 50, 100));
+    const audience = await storyAudience(ctx, actor);
     const rows = await ctx.db
       .query("stories")
       .withIndex("by_expiresAt", (q) => q.gt("expiresAt", now))
-      // Newest stories expire last, so descending order keeps the newest when
-      // the limit is smaller than the number of active rows.
-      .order("desc")
-      .take(limit);
-    const result = await Promise.all(rows.map(async (row) => {
+      .collect();
+    // Filter before applying the display limit so a hidden owner's story cannot
+    // crowd an allowed story out of the newest page.
+    const visible = rows
+      .filter((row) => audience.has(row.ownerId.toString()))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, limit);
+    const result = await Promise.all(
+      visible.map(async (row) => {
         const user = await ctx.db.get(row.ownerId);
         const profile = await ctx.db
           .query("profiles")
@@ -60,7 +83,8 @@ export const list = query({
             ? await ctx.storage.getUrl(profile.avatarStorageId)
             : user?.image) ?? undefined,
         );
-      }));
+      }),
+    );
     return result.sort((a, b) => a.createdAt - b.createdAt);
   },
 });
@@ -97,6 +121,10 @@ export const markSeen = mutation({
     const actor = await requireUser(ctx);
     const row = await ctx.db.get(args.storyId);
     if (!row || row.expiresAt <= Date.now()) throw new ConvexError("STORY_EXPIRED");
+    const audience = await storyAudience(ctx, actor);
+    if (!audience.has(row.ownerId.toString())) {
+      throw new ConvexError("STORY_NOT_FOUND");
+    }
     const existing = await ctx.db
       .query("storyViews")
       .withIndex("by_story_user", (q) =>

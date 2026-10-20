@@ -6,6 +6,15 @@ import { normalizeUsername, requireUser, validateUsername } from "./lib/identity
 
 type ProfileCtx = QueryCtx | MutationCtx;
 
+async function passwordAccount(ctx: ProfileCtx, userId: Id<"users">) {
+  return await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) =>
+      q.eq("userId", userId).eq("provider", "password"),
+    )
+    .unique();
+}
+
 async function publicProfile(ctx: ProfileCtx, userId: Id<"users">) {
   const profile = await ctx.db
     .query("profiles")
@@ -43,20 +52,22 @@ export const ensure = mutation({
       .unique();
     if (existing) return existing._id;
 
-    const base = validateUsername(
-      actor.user.username || actor.user.email || `user_${actor.userId}`,
+    const account = await passwordAccount(ctx, actor.userId);
+    if (!account) throw new ConvexError("AUTH_ACCOUNT_NOT_FOUND");
+    // The password provider id is the canonical handle. Deriving the profile
+    // from the account keeps both records identical, even for repaired data.
+    const username = validateUsername(
+      account.providerAccountId ||
+        actor.user.username ||
+        actor.user.email ||
+        `user_${actor.userId}`,
     );
-    let username = base;
-    let suffix = 1;
-    while (
-      await ctx.db
-        .query("profiles")
-        .withIndex("by_username", (q) => q.eq("username", username))
-        .unique()
-    ) {
-      const next = `${base.slice(0, 25)}_${suffix}`;
-      username = next.slice(0, 30);
-      suffix += 1;
+    const conflict = await ctx.db
+      .query("profiles")
+      .withIndex("by_username", (q) => q.eq("username", username))
+      .unique();
+    if (conflict && conflict.userId !== actor.userId) {
+      throw new ConvexError("USERNAME_TAKEN");
     }
     const now = Date.now();
     const profileId = await ctx.db.insert("profiles", {
@@ -96,6 +107,20 @@ export const update = mutation({
     if (conflict && conflict.userId !== actor.userId) {
       throw new ConvexError("USERNAME_TAKEN");
     }
+    // The password provider owns the login id, so check it as well as the
+    // public profile. Both records must move together or one would become a
+    // stale handle that can be claimed or cannot sign in.
+    const usernameAccount = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", "password").eq("providerAccountId", username),
+      )
+      .unique();
+    if (usernameAccount && usernameAccount.userId !== actor.userId) {
+      throw new ConvexError("USERNAME_TAKEN");
+    }
+    const account = await passwordAccount(ctx, actor.userId);
+    if (!account) throw new ConvexError("AUTH_ACCOUNT_NOT_FOUND");
 
     const avatarStorageId = args.avatarStorageId;
     if (avatarStorageId) {
@@ -112,14 +137,7 @@ export const update = mutation({
       }
     }
 
-    if (username !== current.username) {
-      const account = await ctx.db
-        .query("authAccounts")
-        .withIndex("providerAndAccountId", (q) =>
-          q.eq("provider", "password").eq("providerAccountId", current.username),
-        )
-        .unique();
-      if (!account) throw new ConvexError("AUTH_ACCOUNT_NOT_FOUND");
+    if (account.providerAccountId !== username) {
       await ctx.db.patch(account._id, { providerAccountId: username });
     }
     await ctx.db.patch(actor.userId, { name, username, email: username });

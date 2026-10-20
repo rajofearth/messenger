@@ -31,6 +31,7 @@ export async function uploadAndSendAttachment(
   message: Partial<Message>,
   appendLocal: AppendLocal,
   sendAttachment: SendAttachment,
+  onFailure?: (chatId: string, messageId: string) => void,
 ) {
   if (!message.uri || !message.kind) return;
   const clientMessageId = remoteUid();
@@ -64,6 +65,7 @@ export async function uploadAndSendAttachment(
       replyToMessageId: message.replyTo?.id,
     });
   } catch (error) {
+    onFailure?.(chat.id, clientMessageId);
     Alert.alert("Attachment not sent", uploadErrorMessage(error));
   }
 }

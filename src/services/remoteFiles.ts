@@ -22,7 +22,7 @@ type FinalizeMutation = FunctionReference<
     height?: number;
     durationMs?: number;
   },
-  Id<"_storage">
+  Id<"_storage"> | { error: string }
 >;
 
 /** Server-side cap; checked here too so an oversized pick fails fast. */
@@ -56,7 +56,7 @@ export async function uploadLocalFile(
   }
   const body = JSON.parse(response.body) as { storageId?: string };
   if (!body.storageId) throw new Error("Upload did not return a storage id");
-  return await client.mutation(finalizeMutation, {
+  const finalized = await client.mutation(finalizeMutation, {
     storageId: body.storageId as Id<"_storage">,
     kind: input.kind,
     mimeType: input.mimeType || "application/octet-stream",
@@ -66,4 +66,6 @@ export async function uploadLocalFile(
     height: input.height,
     durationMs: input.durationMs,
   });
+  if (typeof finalized !== "string") throw new Error(finalized.error);
+  return finalized as Id<"_storage">;
 }

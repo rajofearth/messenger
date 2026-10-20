@@ -92,13 +92,6 @@ async function profile(ctx: Parameters<typeof requireUser>[0], userId: string) {
   };
 }
 
-function timeLabel(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function attachmentKind(mediaType: string): "image" | "video" | "audio" | "file" {
   if (mediaType.startsWith("image/")) return "image";
   if (mediaType.startsWith("video/")) return "video";
@@ -123,7 +116,6 @@ async function messageView(
     id: message.id,
     text: textPart?.type === "text" ? textPart.text : undefined,
     mine: message.authorSubjectId === subjectId,
-    time: timeLabel(message.createdAt),
     createdAt: new Date(message.createdAt).toISOString(),
     kind: attachmentData ? attachmentKind(attachmentData.mediaType) : undefined,
     uri: uri ?? undefined,
@@ -160,6 +152,34 @@ async function readMessages(
     beforeSequence: args.beforeSequence,
     limit: args.limit,
   });
+}
+
+/**
+ * The chat component has no get-by-id query. Page backwards from the newest
+ * message until the requested row is found, so forwarding still works when the
+ * source is older than the 100-message window the thread screen loads.
+ */
+async function findSourceMessage(
+  ctx: Parameters<typeof requireUser>[0],
+  actor: Awaited<ReturnType<typeof requireUser>>,
+  conversationId: string,
+  messageId: string,
+) {
+  let beforeSequence: number | undefined;
+  for (;;) {
+    const page = await ctx.runQuery(components.chat.messages.list, {
+      scopeId: actor.scopeId,
+      subjectId: actor.subjectId,
+      conversationId,
+      beforeSequence,
+      limit: 100,
+    });
+    const found = page.find((item) => item.id === messageId);
+    if (found) return found;
+    const oldest = page[0]?.sequence;
+    if (!oldest || oldest <= 1 || oldest === beforeSequence) return null;
+    beforeSequence = oldest;
+  }
 }
 
 export const listInbox = query({
@@ -212,9 +232,8 @@ export const listInbox = query({
           preview: cleared
             ? "No messages yet"
             : summary.lastMessagePreview || "Start a conversation",
-          time: cleared || !summary.lastMessageAt
-            ? ""
-            : timeLabel(summary.lastMessageAt),
+          // The device formats this timestamp in its own locale and timezone.
+          lastMessageAt: cleared ? undefined : summary.lastMessageAt,
           unread: cleared ? 0 : summary.unreadCount,
           group: summary.kind === "group",
           color: summary.kind === "group" ? "#F4E4D9" : "#EBEEE4",
@@ -412,14 +431,8 @@ export const forwardMessage = mutation({
     if (args.sourceConversationId === args.targetConversationId) {
       throw new ConvexError("SAME_CONVERSATION");
     }
-    await member(ctx, args.sourceConversationId);
+    const sourceActor = await member(ctx, args.sourceConversationId);
     const actor = await canWrite(ctx, args.targetConversationId);
-    const source = await ctx.runQuery(components.chat.messages.list, {
-      scopeId: actor.scopeId,
-      subjectId: actor.subjectId,
-      conversationId: args.sourceConversationId,
-      limit: 100,
-    });
     // Forwarding must honour the same per-user hidden and cleared history as
     // the thread query, otherwise an id from a deleted message could be reused.
     const hidden = await ctx.db
@@ -439,7 +452,12 @@ export const forwardMessage = mutation({
           .eq("conversationId", args.sourceConversationId),
       )
       .unique();
-    const message = source.find((item) => item.id === args.messageId);
+    const message = await findSourceMessage(
+      ctx,
+      sourceActor,
+      args.sourceConversationId,
+      args.messageId,
+    );
     if (
       hidden ||
       !message ||

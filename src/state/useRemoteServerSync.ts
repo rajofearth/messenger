@@ -81,6 +81,7 @@ export function useRemoteServerSync({
 
   useEffect(() => {
     if (!remoteStories) return;
+    let active = true;
     const now = Date.now();
     const next = remoteStories
       .map(mapStory)
@@ -90,11 +91,15 @@ export function useRemoteServerSync({
     void messengerRepository.saveStories(next).catch(() => {});
     void prefetchStories(next, 8)
       .then((cached) => {
+        if (!active) return;
         storiesRef.current = cached;
         setStories(cached);
         return messengerRepository.saveStories(cached);
       })
       .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [remoteStories, setStories, storiesRef]);
 
   useEffect(() => {

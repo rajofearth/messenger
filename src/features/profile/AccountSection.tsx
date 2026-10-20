@@ -117,9 +117,17 @@ export default function AccountSection({
           style: "destructive",
           onPress: () => {
             void (async () => {
-              await unregister({}).catch(() => {});
-              await signOut();
-              await messengerRepository.clearAccountData().catch(() => {});
+              try {
+                await unregister({}).catch(() => {});
+                await signOut();
+              } catch {
+                Alert.alert(
+                  "Sign out failed",
+                  "This device may still be signed in. Local messages were removed anyway; check your connection and try again.",
+                );
+              } finally {
+                await messengerRepository.clearAccountData().catch(() => {});
+              }
             })();
           },
         },

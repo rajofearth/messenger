@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,9 +10,7 @@ import type { ThemePreference } from "../ui/theme";
 import { useThemePreference } from "./useThemePreference";
 import type { SettingsProfile } from "../features/profile/SettingsPreferences";
 import {
-  DEFAULT_SETTINGS,
-  mapChat,
-  mapStory,
+  mapMessage,
   remoteUid,
   timeLabel,
   type RemoteCallRecord,
@@ -30,7 +28,7 @@ import {
   uploadAndCreateStory,
   uploadAndSendAttachment,
 } from "./remoteMessengerUploads";
-import { createRemoteWriters } from "./remoteMessengerWriters";
+import { createRemoteWriters, deleteLocalMessage } from "./remoteMessengerWriters";
 import {
   createRemoteReadMarker,
   createRemoteReplySender,
@@ -98,9 +96,13 @@ export function useRemoteMessenger() {
   storiesRef.current = stories;
   gallerySavedRef.current = new Set(gallerySaved);
 
-  const remoteThread = useQuery(
+  const remoteThreadRows = useQuery(
     api.chat.listMessages,
     selected ? { conversationId: selected, limit: 100 } : "skip",
+  );
+  const remoteThread = useMemo(
+    () => remoteThreadRows?.map(mapMessage),
+    [remoteThreadRows],
   );
   const presence = useQuery(
     api.chat.listPresence,
@@ -143,28 +145,10 @@ export function useRemoteMessenger() {
     markReadThrough: markReadMutation,
   });
 
-  useRemoteThreadMedia({
-    selected,
-    remoteThread,
-    mediaVisibility: chatsRef.current.find((item) => item.id === selected)
-      ?.mediaVisibility,
-    setMessages,
-    setGallerySaved,
-    gallerySavedRef,
-  });
-
-  useRemotePresence({
-    selected,
-    onlineSession,
-    presenceSession,
-    onRoomToken: setRoomToken,
-    heartbeatOnline: heartbeatOnlineMutation,
-    heartbeatPresence: heartbeatPresenceMutation,
-    setTyping: setTypingMutation,
-  });
-
   const chats = useMemo(() => {
-    const base = remoteChats ? remoteChats.map(mapChat) : cachedChats;
+    // The cache is the single source of truth on screen. The server sync writes
+    // remoteChats into it, so optimistic edits survive until the next sync.
+    const base = cachedChats;
     const active =
       selected && conversationVisible
         ? base.map((item) =>
@@ -185,10 +169,32 @@ export function useRemoteMessenger() {
     cachedChats,
     conversationVisible,
     presence,
-    remoteChats,
     remoteProfile?.userId,
     selected,
   ]);
+  const selectedMediaVisibility = chats.find(
+    (item) => item.id === selected,
+  )?.mediaVisibility;
+
+  useRemoteThreadMedia({
+    selected,
+    remoteThread,
+    mediaVisibility: selectedMediaVisibility,
+    messagesRef,
+    setMessages,
+    setGallerySaved,
+    gallerySavedRef,
+  });
+
+  useRemotePresence({
+    selected,
+    onlineSession,
+    presenceSession,
+    onRoomToken: setRoomToken,
+    heartbeatOnline: heartbeatOnlineMutation,
+    heartbeatPresence: heartbeatPresenceMutation,
+    setTyping: setTypingMutation,
+  });
   const profile: RemoteProfile = useMemo(
     () => ({
       name: settings.name,
@@ -309,6 +315,9 @@ export function useRemoteMessenger() {
     }
   }
 
+  const removeOptimistic = (chatId: string, messageId: string) =>
+    deleteLocalMessage({ chatId, messageId, updateMessages });
+
   function send(partial: Partial<Message>) {
     const chat = chatsRef.current.find(
       (item) => item.id === selectedRef.current,
@@ -320,6 +329,7 @@ export function useRemoteMessenger() {
         partial,
         appendLocal,
         sendAttachmentMutation,
+        removeOptimistic,
       );
       return;
     }
@@ -341,6 +351,8 @@ export function useRemoteMessenger() {
       text,
       replyToMessageId: partial.replyTo?.id,
     }).catch(() => {
+      // A failed bubble must not be merged back on every refresh.
+      removeOptimistic(chat.id, clientMessageId);
       Alert.alert("Message not sent", "Check your connection and try again.");
     });
   }
@@ -416,29 +428,31 @@ export function useRemoteMessenger() {
     return saveTrackedMedia(message, gallerySavedRef.current, setGallerySaved);
   }
 
-  function setProfile(next: SettingsProfile) {
+  async function setProfile(
+    next: SettingsProfile,
+    options?: { remote?: boolean },
+  ) {
+    if (options?.remote !== false && remoteProfile) {
+      await saveRemoteProfile({
+        next,
+        remote: remoteProfile,
+        updateProfile,
+        uploaded: uploadedAvatars.current,
+      });
+    }
     setSettings((current) => ({ ...current, ...next }));
-    if (!remoteProfile) return;
-    void saveRemoteProfile({
-      next,
-      remote: remoteProfile,
-      updateProfile,
-      uploaded: uploadedAvatars.current,
-    }).catch((error) => {
-      Alert.alert(
-        "Profile not saved",
-        error instanceof Error ? error.message : "Please try again.",
-      );
-    });
   }
 
-  function setTyping(typing: boolean) {
-    if (!selectedRef.current) return;
-    void setTypingMutation({
-      conversationId: selectedRef.current,
-      typing,
-    }).catch(() => {});
-  }
+  const setTyping = useCallback(
+    (typing: boolean) => {
+      if (!selectedRef.current) return;
+      void setTypingMutation({
+        conversationId: selectedRef.current,
+        typing,
+      }).catch(() => {});
+    },
+    [setTypingMutation],
+  );
 
   return {
     chats,
