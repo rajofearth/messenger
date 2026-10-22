@@ -4,8 +4,8 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,375,470 bytes
-(13.71 MiB) in v0.1.0** — 67.0% smaller, in nine measured stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,376,582 bytes
+(13.71 MiB) in v0.1.1** — 67.0% smaller, in nine measured stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
@@ -16,7 +16,9 @@ barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.27 MiB). The first Convex-backed chat build reached 15,516,415 bytes
 (14.80 MiB). The mobile polish and size pass then removed 1,140,945 bytes,
 ending at 14,375,470 bytes (13.71 MiB), 2.29 MiB below the 16 MiB gate. The
-stage table and the per-entry breakdown are under "Measured APK size".
+v0.1.1 sign-in copy added 1,112 bytes to the local build, for 14,376,582 bytes
+(13.71 MiB), still 2.29 MiB below the gate. The stage table and the per-entry
+breakdown are under "Measured APK size".
 
 ### Build configuration in `app.json`
 
@@ -146,6 +148,7 @@ Each figure is the same working tree, the same Expo config and the same
 | Current v0.0.6 (storage, notification, updater and contrast fixes; versionCode 6) | 14,967,135 bytes (14.27 MiB) | **+4,136 bytes, +0.03%** against published v0.0.5, -65.6% overall |
 | First Convex build (accounts, chat, stories, media cache and review fixes; versionCode 6) | 15,516,415 bytes (14.80 MiB) | **+549,280 bytes, +3.7%** against published v0.0.6, -64.4% overall |
 | v0.1.0 release (send/retry UX, dates and accessibility, `expo-image`, Fresco decoder trim, LogBox excluded; versionCode 7) | 14,375,470 bytes (13.71 MiB) | **-1,140,945 bytes, -7.4%** against the first Convex build, -4.0% against v0.0.6, -67.0% overall |
+| v0.1.1 release (missing-account sign-in copy and create-account shortcut; versionCode 8) | 14,376,582 bytes (13.71 MiB) | **+1,112 bytes, +0.01%** against the local v0.1.0 build, +1,148 bytes against published v0.1.0, -67.0% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -190,6 +193,17 @@ libraries, `res/` fell 81,697, and `resources.arsc` fell 351,020. The build is
 libraries, 2 dex files (11.90 MiB unpacked), a 1.96 MiB JavaScript bundle stored
 uncompressed, a 0.16 MiB `resources.arsc`, English-only resources, and 10
 passing checks with no warnings.
+
+The v0.1.1 build is 14,376,582 bytes, 1,112 bytes (+0.01%) above the local
+v0.1.0 build and 1,148 bytes above the published v0.1.0 APK. The JavaScript
+bundle grew 1,116 bytes to 2,059,404 for the pure auth-error mapping and the
+sign-in alert's create-account action. `assets/` moved 1,119 stored bytes with
+that bundle; `lib/`, the dex, `res/` and `resources.arsc` are unchanged, and
+`Other` is one byte smaller. The rest is ZIP metadata. The APK remains 2.29 MiB
+below the 16 MiB gate. `npm run release:check` reports 17 native libraries, 2 dex files
+(11.90 MiB unpacked), a 1.96 MiB JavaScript bundle stored uncompressed, a
+0.16 MiB `resources.arsc`, English-only resources, and 11 passing checks with
+one size warning for the 1,148-byte increase above published v0.1.0.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging

@@ -8,6 +8,20 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-22
+
+### Fixed
+
+- Sign-in now reports an unknown username as "Account not found" and offers a
+  direct switch to account creation, instead of surfacing Convex Auth's
+  `InvalidAccountId`. Incorrect passwords and rate-limited attempts also get
+  their own copy.
+
+The local v0.1.1 gate build is 14,376,582 bytes, 1,148 bytes (+0.01%) above the
+published v0.1.0 APK. The JavaScript bundle grew 1,116 bytes for the error
+mapping and the alert's create-account action; the native libraries, dex,
+resources and locales are unchanged. See `docs/PERFORMANCE.md`.
+
 ## [0.1.0] - 2026-10-22
 
 Convex now backs accounts and chat. The client keeps its local cache in front of

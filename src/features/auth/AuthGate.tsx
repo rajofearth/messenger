@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { describeAuthFailure } from "./authErrors";
 import { messengerRepository } from "../../data/messengerRepository";
 import { useDeviceScheme } from "../../state/useDeviceScheme";
 import { coral, palette, resolveDark } from "../../ui/theme";
@@ -60,10 +61,21 @@ function AuthForm({ dark }: { dark: boolean }) {
         flow: mode,
       });
     } catch (error) {
-      Alert.alert(
-        mode === "signIn" ? "Could not sign in" : "Could not create account",
-        error instanceof Error ? error.message : "Please try again.",
-      );
+      const failure = describeAuthFailure(error, mode, username);
+      if (failure.missingAccount) {
+        Alert.alert(failure.title, failure.message, [
+          { text: "Try again", style: "cancel" },
+          {
+            text: "Create account",
+            onPress: () => {
+              setUsernameEdited(true);
+              setMode("signUp");
+            },
+          },
+        ]);
+      } else {
+        Alert.alert(failure.title, failure.message);
+      }
     } finally {
       setBusy(false);
     }
