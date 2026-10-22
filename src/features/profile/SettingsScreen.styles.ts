@@ -1,29 +1,25 @@
 import { StyleSheet } from "react-native";
-import { palette } from "../../ui/theme";
+import { coral, onCoral, palette } from "../../ui/theme";
 
-export const CORAL = "#F28B70";
-
+/**
+ * The settings branch used to carry its own warm palette, which drifted from
+ * the rest of the app. It now reads every shared token, and keeps only the
+ * segmented-control well that has no palette equivalent.
+ */
 export function settingsColors(dark: boolean) {
   const colors = palette(dark);
-  return dark
-    ? {
-        bg: colors.bg,
-        card: colors.card,
-        text: colors.fg,
-        muted: colors.muted,
-        line: colors.line,
-        tint: colors.tint,
-        input: "#302B25",
-      }
-    : {
-        bg: "#FAF7EF",
-        card: "#FFFFFF",
-        text: "#29372F",
-        muted: "#858B80",
-        line: "#EFEFE7",
-        tint: "#FCE9DF",
-        input: "#F6F5EF",
-      };
+  return {
+    bg: colors.bg,
+    card: colors.card,
+    text: colors.fg,
+    muted: colors.muted,
+    line: colors.line,
+    tint: colors.tint,
+    onCoral: colors.onCoral,
+    coralInk: colors.coralInk,
+    // Light enough that the shared muted ink stays above 4.5:1 on it.
+    input: dark ? "#302B25" : "#F2F1EC",
+  };
 }
 
 export type SettingsColors = ReturnType<typeof settingsColors>;
@@ -59,7 +55,7 @@ export const styles = StyleSheet.create({
     width: 31,
     height: 31,
     borderRadius: 16,
-    backgroundColor: CORAL,
+    backgroundColor: coral,
     borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
@@ -83,8 +79,8 @@ export const styles = StyleSheet.create({
     gap: 7,
     alignItems: "center",
     paddingHorizontal: 17,
-    minHeight: 38,
-    borderRadius: 19,
+    minHeight: 44,
+    borderRadius: 22,
   },
   editText: { fontFamily: "DMSans_700Bold", fontSize: 12 },
   loader: { marginTop: 12 },
@@ -135,12 +131,12 @@ export const styles = StyleSheet.create({
   },
   segmentOption: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  segmentActive: { backgroundColor: CORAL },
+  segmentActive: { backgroundColor: coral },
   segmentText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
   note: {
     fontFamily: "DMSans_400Regular",
@@ -158,7 +154,7 @@ export const styles = StyleSheet.create({
     marginTop: 24,
   },
   callIcon: {
-    backgroundColor: CORAL,
+    backgroundColor: coral,
     width: 46,
     height: 46,
     borderRadius: 17,
@@ -229,21 +225,21 @@ export const styles = StyleSheet.create({
     marginBottom: 20,
   },
   primary: {
-    backgroundColor: CORAL,
+    backgroundColor: coral,
     borderRadius: 16,
     minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 3,
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: "#29372F", fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
   secondary: {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: CORAL,
+    borderColor: coral,
     minHeight: 46,
   },
-  secondaryText: { fontFamily: "DMSans_500Medium", color: CORAL, fontSize: 13 },
+  secondaryText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
 });

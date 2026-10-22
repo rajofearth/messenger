@@ -33,6 +33,10 @@ env:
   # variable to the Convex site URL once the update backend exists; an empty
   # value ships the app with the updater visibly unconfigured.
   EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
+  # The client refuses to start without a Convex deployment URL. Set both as
+  # repository variables so the release APK can sign in and sync.
+  EXPO_PUBLIC_CONVEX_URL: ${{ vars.EXPO_PUBLIC_CONVEX_URL }}
+  EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.EXPO_PUBLIC_CONVEX_SITE_URL }}
 
 jobs:
   release:
@@ -48,6 +52,17 @@ jobs:
           fetch-depth: 0
           # A manual release must name the tag it builds, just like a tag push.
           ref: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+
+      # The JavaScript bundle throws during startup when this is empty, so a
+      # missing repository variable must fail here instead of publishing a
+      # broken APK.
+      - name: Require Convex deployment URL
+        run: |
+          set -euo pipefail
+          if [[ -z "${EXPO_PUBLIC_CONVEX_URL:-}" ]]; then
+            echo "::error::EXPO_PUBLIC_CONVEX_URL is empty. Set the repository variable to the deployment's .convex.cloud URL before releasing."
+            exit 1
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -249,7 +264,7 @@ jobs:
               echo "- Signing: Expo's generated debug keystore. Not a store upload; see SECURITY.md."
             fi
             echo
-            echo "This is a local prototype with no backend and no push notifications. Everything it shows is driven by the app itself."
+            echo "This build stores accounts and messages in a hosted Convex deployment. Notifications are posted by the running app: there is no push service, so they only arrive while the process is alive. Calls are simulated and there is no end-to-end encryption."
             echo
             echo "### Commits"
             echo

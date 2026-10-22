@@ -2,16 +2,18 @@ import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Avatar, tap } from "./primitives";
-import { coral, palette } from "./theme";
+import { palette } from "./theme";
 export type Tab = "chats" | "calls" | "settings";
 export default function Navigation({
   active,
   avatar,
+  name,
   dark,
   onChange,
 }: {
   active: Tab;
   avatar: string;
+  name?: string;
   dark: boolean;
   onChange: (tab: Tab) => void;
 }) {
@@ -53,12 +55,12 @@ export default function Navigation({
         >
           <View style={s.icon}>
             {item.id === "settings" ? (
-              <Avatar uri={avatar} size={27} />
+              <Avatar uri={avatar} name={name} size={27} />
             ) : (
               <Ionicons
                 name={active === item.id ? item.filled : item.icon}
                 size={23}
-                color={active === item.id ? coral : colors.muted}
+                color={active === item.id ? colors.coralInk : colors.muted}
               />
             )}
           </View>

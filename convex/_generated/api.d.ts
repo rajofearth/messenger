@@ -8,9 +8,19 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as chat from "../chat.js";
+import type * as crons from "../crons.js";
+import type * as devices from "../devices.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as lib_identity from "../lib/identity.js";
 import type * as lib_manifest from "../lib/manifest.js";
+import type * as preferences from "../preferences.js";
+import type * as profiles from "../profiles.js";
 import type * as releases from "../releases.js";
+import type * as security from "../security.js";
+import type * as stories from "../stories.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +29,19 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  chat: typeof chat;
+  crons: typeof crons;
+  devices: typeof devices;
+  files: typeof files;
   http: typeof http;
+  "lib/identity": typeof lib_identity;
   "lib/manifest": typeof lib_manifest;
+  preferences: typeof preferences;
+  profiles: typeof profiles;
   releases: typeof releases;
+  security: typeof security;
+  stories: typeof stories;
 }>;
 
 /**
@@ -50,4 +70,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  chat: import("convex-chat/_generated/component.js").ComponentApi<"chat">;
+};

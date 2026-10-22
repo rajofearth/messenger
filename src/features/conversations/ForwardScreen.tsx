@@ -12,7 +12,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { coral, onCoral, palette } from "../../ui/theme";
 export default function ForwardScreen({
   chats,
   message,
@@ -60,10 +60,10 @@ export default function ForwardScreen({
       <View
         style={[
           s.preview,
-          { backgroundColor: colors.card, borderLeftColor: coral },
+          { backgroundColor: colors.card, borderLeftColor: colors.coralInk },
         ]}
       >
-        <Text style={[s.label, { color: coral }]}>Forwarding</Text>
+        <Text style={[s.label, { color: colors.coralInk }]}>Forwarding</Text>
         <Text numberOfLines={2} style={[s.text, { color: colors.fg }]}>
           {summary}
         </Text>
@@ -96,7 +96,7 @@ export default function ForwardScreen({
             }
             style={s.row}
           >
-            <Avatar uri={chat.avatar} size={47} />
+            <Avatar uri={chat.avatar} name={chat.name} size={47} />
             <View style={s.body}>
               <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
               <Text style={[s.text, { color: colors.muted }]}>
@@ -109,7 +109,7 @@ export default function ForwardScreen({
                   ? "checkmark-circle"
                   : "ellipse-outline"
               }
-              color={selected.includes(chat.id) ? coral : colors.muted}
+              color={selected.includes(chat.id) ? colors.coralInk : colors.muted}
               size={25}
             />
           </Pressable>
@@ -127,7 +127,7 @@ export default function ForwardScreen({
         onPress={() => onForward(selected)}
         style={[s.send, { opacity: selected.length ? 1 : 0.4 }]}
       >
-        <Ionicons name="arrow-redo" size={20} color="white" />
+        <Ionicons name="arrow-redo" size={20} color={onCoral} />
         <Text style={s.sendText}>
           Forward{selected.length ? ` · ${selected.length}` : ""}
         </Text>
@@ -176,5 +176,5 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  sendText: { color: "#FFF", fontFamily: "DMSans_700Bold", fontSize: 15 },
+  sendText: { color: onCoral, fontFamily: "DMSans_700Bold", fontSize: 15 },
 });

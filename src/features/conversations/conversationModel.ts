@@ -13,6 +13,20 @@ export function messageSummary(
   );
 }
 
+/** A composed TalkBack label: sender, content, context, time and send state. */
+export function messageAccessibilityLabel(message: Message) {
+  if (message.deleted) return "Deleted message";
+  const parts: string[] = [];
+  if (message.forwarded) parts.push("Forwarded");
+  parts.push(`${message.mine ? "You" : "Message"}: ${messageSummary(message)}`);
+  if (message.replyTo) parts.push(`Replying to ${message.replyTo.text}`);
+  if (message.reaction) parts.push(`Reaction ${message.reaction}`);
+  if (message.time) parts.push(message.time);
+  if (message.status === "sending") parts.push("Sending");
+  if (message.status === "failed") parts.push("Not sent. Tap to retry.");
+  return parts.join(", ");
+}
+
 export function replySnapshot(
   message: Message,
 ): NonNullable<Message["replyTo"]> {
@@ -41,7 +55,9 @@ export function deleteOptions(
       style: "destructive" as const,
       onPress: () => onDelete(message.id, false),
     },
-    ...(message.mine
+    // A local-only bubble has no server revision yet, so "everyone" cannot
+    // work and would only surface an avoidable error.
+    ...(message.mine && !message.status
       ? [
           {
             text: "Delete for everyone",

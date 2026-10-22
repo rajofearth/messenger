@@ -4,15 +4,17 @@
 [![Release](https://img.shields.io/github/v/release/rajofearth/messenger?include_prereleases&sort=semver)](https://github.com/rajofearth/messenger/releases)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-A messenger interface for Android, built with Expo SDK 57 and React Native 0.86. Chats, media albums, stories, calls and profiles are all interactive, and calls and messages arrive as real Android system notifications with working action buttons. State lives on the device: there is no account, no message server and no push service. The only server is an optional release feed that tells the app when a newer build exists.
+A messenger for Android, built with Expo SDK 57 and React Native 0.86. Accounts, profiles, contacts, groups, messages, presence, typing, stories and per-conversation preferences live in a Convex deployment; the app keeps a local copy so chats open instantly and survive an offline start. Calls and messages still arrive as real Android system notifications with working action buttons while the app process is alive. There is no push service and no call signalling server.
 
-The point of the project is the client architecture. Everything the app knows is read through one typed repository (`src/data/messengerRepository.ts`) and one cache (`src/data/cache.ts`), so a real backend can replace the local store without touching a single screen. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The client architecture reads through one typed cache seam (`src/data/messengerRepository.ts`); `useRemoteCache` and `useRemoteServerSync` keep that cache current, and `useRemoteMessenger` hydrates screens from it first, then reconciles with Convex. A backend outage therefore degrades to the last known state instead of an empty app. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## What it is, and what it is not
 
-Working: chat list with unread badges and typing states, conversation threads with text, photos, videos, files and voice notes, automatic media albums, stories with per-item captions, call history, incoming/outgoing/ongoing voice and video calls with real camera preview, contact and group profiles, mute and block, and Android system notifications for calls and messages.
+Working: username/password accounts with signed-in device management, editable profile photos, contact creation by username, direct and group chats, text and media messages, replies, reactions, forwarding, delete for me/everyone, online and typing presence, mute and block, per-chat gallery visibility, call history, 24-hour stories, and Android system notifications for calls and messages.
 
-Simulated: other people. Replies are generated locally after a short typing delay, calls connect on a timer, and profile photos and story images are loaded from Unsplash. There is no authentication, no message transport, no signalling server and no push notification service, so a notification can only appear while the app process is running. Nothing here is end-to-end encrypted, and app state is stored unencrypted on the device. Do not put anything private in it.
+Local-first: the inbox, threads, stories, settings and downloaded media are cached on the device. The cache paints immediately while Convex queries reconcile or refresh it; a cache hit does not stop the query. A per-conversation switch can copy received photos and videos into a `Messenger` album in the device gallery; otherwise media stays inside app storage.
+
+Simulated or limited: calls connect on a timer and the remote video is a placeholder, because there is no call transport. Notifications are posted by the running app, not by push. There is no end-to-end encryption and local caches are not encrypted by the app; treat the deployment's database and the device as trusted for this prototype.
 
 ## Requirements
 
@@ -27,6 +29,19 @@ npm ci
 npm run check   # typecheck + Expo dependency compatibility
 npm test        # pure model and data tests, no device needed
 ```
+
+The app needs a Convex deployment. `.env.local` supplies
+`EXPO_PUBLIC_CONVEX_URL` (the `.convex.cloud` URL) and
+`EXPO_PUBLIC_CONVEX_SITE_URL` (the `.convex.site` URL used by the auth routes).
+Run the backend locally with `npx convex dev`; it watches `convex/`, generates
+the typed API, and sets both values. The deployment also needs `JWT_PRIVATE_KEY`
+and `JWKS` for Convex Auth; `SITE_URL` is only used by OAuth or email flows,
+which this app does not use. [convex/README.md](convex/README.md) has the
+one-time commands. `EXPO_PUBLIC_CONVEX_URL` is read when the JavaScript bundle
+is built: if it was absent, `convexClient` throws during startup and the app
+cannot open, cached data included. If the build contains a deployment URL but
+the device is offline, previously cached chats still render and sync resumes
+when the connection returns.
 
 To try the app without building it, download the APK from the [latest release](https://github.com/rajofearth/messenger/releases/latest) and sideload it (Android 7.0 or newer, arm64 device).
 
@@ -63,13 +78,15 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 
 ## Features
 
-- **Chats.** Compact heading with private/group tabs, search that hides the stories strip while a query is active, unread badges, online and typing indicators. Opening a chat clears its unread count.
-- **Messages.** Text, photos, videos, files and voice notes, with a metered recording waveform. Long-press a bubble for anchored reactions, reply (including replies to replies), forward and delete. Double-tap to react. Forwarding opens a searchable multi-recipient screen. Media opens in a viewer; documents use the system share sheet.
+- **Accounts.** Create an account with a name, username and password. Usernames are how people find you; changing one renames the password account at the same time. There is deliberately no signed-out password reset, and the app warns that forgetting the password loses the account. Password changes and device removal live in Settings, where a device must be signed in for 24 hours before it can remove other devices.
+- **Chats.** Compact heading with private/group tabs, search that hides the stories strip while a query is active, unread badges, and live online and typing indicators. Opening a chat clears its unread count and syncs the read position.
+- **Messages.** Text, photos, videos, files and voice notes, with a metered recording waveform. Long-press a bubble for anchored reactions, reply (including replies to replies), forward, save photo/video to the gallery, and delete for me or everyone. Double-tap to react. Forwarding opens a searchable multi-recipient screen. Media opens in a viewer; documents use the system share sheet.
 - **Media albums.** Consecutive media from one sender within two minutes forms a grid with up to four previews and a `+n` overflow tile. Albums break on text, a different sender, different reply targets, forwarded or deleted messages. Individual items stay addressable for deletion, replies and shared-media history.
-- **Stories.** One ring per person, plus a self ring for your own uploads, with per-item captions and no forced cropping. Tap to advance, hold to pause, swipe to change people. Your own story items can be deleted.
-- **Calls.** Voice and video calls from any conversation, with history, a connecting state, mute, speaker, camera flip and a return-to-chat pill that keeps the call running. The video call screen shows your real front or rear camera in the picture-in-picture view; the remote video is a placeholder image because there is no second participant.
-- **Profiles.** Contact and group profiles with shared media, documents, links, call history, dates, members and admins, plus mute and block switches that persist. Edit your own name, username, bio and photo, with the current photo shown before you replace it.
-- **Settings.** A theme control that follows the device by default — including a switch made while the app is running — or pins Light or Dark; the choice is stored on the device, and the status bar, navigation bar, native dialogs and root background follow it. Haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
+- **Stories.** One ring per person, plus a self ring for your own uploads, with per-item captions and no forced cropping. Stories expire after 24 hours locally and in the database, and the next few are prefetched into app storage.
+- **Calls.** Voice and video calls from any direct conversation, with history, a connecting state, mute, speaker, camera flip and a return-to-chat pill that keeps the call running. Group calls are disabled. The video call screen shows your real front or rear camera in the picture-in-picture view; the remote video is a placeholder because there is no call transport.
+- **Profiles.** Contact and group profiles with shared media, documents, links, call history, dates, members and admins, plus mute, block and gallery-visibility switches that persist on the server. Edit your own name, username, bio and photo, with the current photo shown before you replace it.
+- **Groups.** Create a group by entering one or more member usernames. A group must contain at least one other account; voice and video calls stay unavailable for groups.
+- **Settings.** Account controls (password, signed-in devices, sign out), a theme control that follows the device by default — including a switch made while the app is running — or pins Light or Dark, haptics, and a notifications section that reports the real Android permission and channel state and links straight to the system settings for each channel.
 - **Updates.** When the build has a release feed, the app checks it at launch, offers the new version with its download size and notes, downloads and SHA-256 verifies the APK in the background, and then hands it to Android's installer after handling the "install unknown apps" permission. Settings always reports the current state, and a dismissed release is only re-offered when the next one exists. Updates only arrive while the app can run; there is no background updater.
 
 ## Android system notifications
@@ -93,12 +110,13 @@ Limits worth knowing: this is presentation and action delivery only. It does not
 
 ```text
 App.tsx                     Screen composition and navigation only
-src/domain/                 Types, mock data and pure helpers (no React, no storage)
-src/data/                   Typed persistence, cache and the repository seam
-src/services/               Thin typed bridges to the two native modules
-src/state/                  App state: messenger, notifications, notification actions
+convex/                     Convex schema, auth, chat, files, devices, stories, release feed
+src/domain/                 Types and pure helpers (no React, no storage)
+src/data/                   Typed local persistence, cache and the repository seam
+src/services/               Convex client, uploads, media cache, secure identity, native bridges
+src/state/                  Local-first state: remote messenger, cache, sync, presence, writers
 src/notifications/          Notification payloads, settings, bridge and ledger
-src/features/               Screens grouped by area: chats, conversations, contacts,
+src/features/               Screens grouped by area: auth, chats, conversations, contacts,
                             calls, profile, stories
 src/ui/                     Shared primitives, theme, quick actions, navigation
 modules/system-notifications/  Kotlin: Android call and message notifications
@@ -134,12 +152,13 @@ The app checks for a newer build only when the APK was built with `EXPO_PUBLIC_U
 
 ## Known limitations
 
-- No backend for app data, no push, no accounts. Replies and calls are simulated while the app process is alive.
+- No push notifications. Message and call notifications are posted by the running app, so they do not arrive after the process is killed.
+- Calls are local simulations: there is no audio or remote video transport, no signalling server and no Telecom integration. Group calls are intentionally unavailable.
+- The app stores its local cache unencrypted and the Convex deployment is the source of truth for accounts and messages. There is no end-to-end encryption, and signing out deletes this device's local copy so the next account cannot read it.
 - The in-app updater only runs when the build was published with a feed URL, and it cannot install silently: Android always shows its installer, and the "install unknown apps" switch must be on.
 - Switching from the generated debug key to a real release keystore needs one manual uninstall and reinstall, because Android refuses to update across a signature change.
-- Block, mute, forwarding and deletion change local state only.
-- Story uploads never expire, and picked media uses app-managed cache locations that the OS may reclaim.
-- Media and avatar images load from Unsplash over the network; bundled fonts work offline.
+- Story media is removed from the database and app state after 24 hours; cached story files are not proactively deleted from app storage.
+- Media and avatar images load from Convex storage after upload; fonts remain bundled.
 - The composer uses the system keyboard rather than a custom emoji grid.
 - Dismissing a call notification does not end the call, and a call cannot be answered from a notification while the JavaScript runtime is dead.
 - `npm audit` reports advisories inherited from Expo and React Native tooling. Do not run `npm audit fix --force`: its proposed downgrades break the SDK 57 toolchain.

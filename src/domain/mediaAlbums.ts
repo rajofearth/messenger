@@ -14,6 +14,9 @@ function eligible(message: AlbumMessage): boolean {
     (message.kind === "image" || message.kind === "video") &&
     !message.deleted &&
     !message.forwarded &&
+    // A pending or failed send keeps its own bubble so the status and retry
+    // affordance are never hidden inside an album.
+    !message.status &&
     !gif
   );
 }

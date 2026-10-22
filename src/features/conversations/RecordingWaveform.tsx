@@ -2,7 +2,13 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { coral } from "../../ui/theme";
 
-export default function RecordingWaveform({ metering }: { metering?: number }) {
+export default function RecordingWaveform({
+  metering,
+  color = coral,
+}: {
+  metering?: number;
+  color?: string;
+}) {
   const [bars, setBars] = useState<number[]>(Array(18).fill(5));
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,7 +34,7 @@ export default function RecordingWaveform({ metering }: { metering?: number }) {
       {bars.map((height, index) => (
         <View
           key={index}
-          style={{ width: 3, height, borderRadius: 2, backgroundColor: coral }}
+          style={{ width: 3, height, borderRadius: 2, backgroundColor: color }}
         />
       ))}
     </View>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Image, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { styles as s } from "./Stories.styles";
 
@@ -66,6 +67,6 @@ export function StoryMedia(props: Props) {
   return props.video ? (
     <StoryVideo {...props} />
   ) : (
-    <Image source={{ uri: props.uri }} style={s.image} resizeMode="contain" />
+    <Image source={{ uri: props.uri }} style={s.image} contentFit="contain" />
   );
 }

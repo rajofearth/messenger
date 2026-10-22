@@ -1,6 +1,6 @@
 {
   "name": "messenger",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "private": true,
   "main": "index.ts",
   "expo": {
@@ -8,6 +8,9 @@
       "android": {
         "buildFromSource": [
           "expo-camera"
+        ],
+        "exclude": [
+          "@expo/log-box"
         ]
       }
     }
@@ -18,15 +21,18 @@
     "android:build": "node scripts/android.mjs build",
     "android:install": "node scripts/android.mjs install",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/mediaAlbums.test.mjs scripts/conversation.test.mjs scripts/manifest.test.mjs scripts/update-manifest.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs src/features/calls/CallScreenCamera.test.mjs src/data/cache.test.mjs src/data/appearance.test.mjs src/data/store.test.mjs src/domain/updates.test.mjs src/ui/theme.test.mjs src/notifications/payloads.test.mjs modules/keyboard-media/KeyboardMediaInput.test.cjs",
+    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/mediaAlbums.test.mjs scripts/conversation.test.mjs scripts/manifest.test.mjs scripts/update-manifest.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs src/features/calls/CallScreenCamera.test.mjs src/data/cache.test.mjs src/data/appearance.test.mjs src/data/store.test.mjs src/domain/updates.test.mjs src/domain/threadMerge.test.mjs src/domain/time.test.mjs src/ui/theme.test.mjs src/notifications/payloads.test.mjs modules/keyboard-media/KeyboardMediaInput.test.cjs",
     "check": "npm run typecheck && expo install --check",
     "release:check": "npm run typecheck && npm test && node scripts/release-check.mjs"
   },
   "dependencies": {
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.96",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.30",
+    "convex-chat": "^0.1.0",
+    "expo": "~57.0.31",
     "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
     "expo-blur": "~57.0.3",
@@ -39,8 +45,10 @@
     "expo-image": "~57.0.5",
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
+    "expo-media-library": "~57.0.5",
     "expo-navigation-bar": "~57.0.3",
-    "expo-sharing": "~57.0.23",
+    "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.24",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
     "expo-video": "~57.0.5",

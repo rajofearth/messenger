@@ -6,6 +6,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.1.0] - 2026-10-22
+
+Convex now backs accounts and chat. The client keeps its local cache in front of
+every read, so cached chats, threads, stories and settings paint on an offline
+start while writes reconcile with the deployment.
+
+### Added
+
+- Username/password accounts with an editable display name, username, bio and
+  profile photo. Usernames are unique and are also the sign-in id.
+- Signed-in device management. The current device can revoke other sessions
+  only after it has been registered for 24 hours.
+- Contact discovery by username, direct conversations, and groups with member
+  and admin lists.
+- Text, photo, video, audio and file messages, replies, reactions, forwarding,
+  delete for me/everyone, mute and block.
+- Online and typing presence, unread counts, and per-conversation clearing.
+- Per-conversation media visibility: keep received media in app storage or also
+  copy photos and videos to a `Messenger` gallery album.
+- 24-hour stories with upload, view tracking, newest-first prefetch, local
+  expiry timers and an hourly server cleanup cron.
+- A device cache for chats, threads, stories, call history, preferences and
+  gallery markers, plus one-time media downloads into app storage.
+
+### Changed
+
+- The runtime no longer falls back to bundled demo chats, stories or messages.
+  The legacy local-only hook and its seed data were removed.
+- Calls remain local simulations, and group calls stay disabled in the header,
+  the contact profile and the `startCall` guard.
+- Notifications are still posted only by the running app; there is no push
+  service.
+- Signing out unregisters the device and clears cached account data while
+  keeping the appearance preference.
+- Uploads are finalized against storage's real size (25 MiB cap) and MIME
+  metadata, and a rejected object is deleted; forwarding respects delete-for-me
+  and cleared history.
+- Story lists and seen marks are limited to the owner and people who share a
+  conversation with them.
+- A conversation that is on screen marks new messages read on the server, and a
+  failed notification reply is retried instead of being treated as sent.
+- Failed sends keep their bubble, text and local attachment so the message can
+  be retried in place instead of vanishing. The composer and inbox distinguish
+  sending, failed and accepted sends, and a blocked conversation shows a lock
+  bar instead of an active composer.
+- The inbox and thread use local Today / Yesterday / weekday / date labels, with
+  day separators and honest empty-thread copy. Message and conversation actions
+  expose accessible labels and custom actions, and image avatars fall back to
+  initials or a person icon. Light-mode coral labels use a darker accent ink so
+  they clear normal-text contrast; failed-send states use a theme-aware red.
+- All images render through `expo-image`; the release build excludes the unused
+  Fresco GIF/WebP decoders and the dev-only `@expo/log-box` package.
+- CI and release builds receive `EXPO_PUBLIC_CONVEX_URL` and
+  `EXPO_PUBLIC_CONVEX_SITE_URL`; releases also deploy the Convex functions when
+  `CONVEX_DEPLOY_KEY` is present.
+- Expo is on the SDK 57 patch line (`57.0.31` and `expo-sharing` `57.0.24`), so
+  `expo install --check` passes without skipped validation.
+- `expo-media-library` and its app config plugin are now part of the build.
+
+### Size
+
+- Release APK: 14,375,470 bytes (13.71 MiB), 1,140,945 bytes (-7.4%) below the
+  first Convex build and 591,665 bytes (-4.0%) below published v0.0.6. The
+  JavaScript bundle grew 17,460 bytes to 2,058,288 for the UX work and stays
+  uncompressed for startup; compressed dex fell 365,344 bytes, native libraries
+  313,512 across two fewer files, `res/` 81,697 and `resources.arsc` 351,020.
+  The build is 2.29 MiB below the 16 MiB gate. See `docs/PERFORMANCE.md`.
+
 ## [0.0.6] - 2026-10-19
 
 This release hardens the local prototype around failed storage, startup
@@ -300,7 +370,8 @@ Device testing was not performed for this release. Installation, notification
 behaviour, keyboard insertion and the camera preview still need a physical
 Android device; see the limitations in `README.md`.
 
-[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/rajofearth/messenger/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/rajofearth/messenger/releases/tag/v0.0.6
 [0.0.5]: https://github.com/rajofearth/messenger/releases/tag/v0.0.5
 [0.0.4]: https://github.com/rajofearth/messenger/releases/tag/v0.0.4
 [0.0.3]: https://github.com/rajofearth/messenger/releases/tag/v0.0.3

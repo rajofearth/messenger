@@ -7,14 +7,14 @@ import { AlbumItem } from "./MediaAlbum";
 import type { MessageBubbleProps } from "./MessageBubble";
 import VideoAttachment from "./VideoAttachment";
 
-type Props = Pick<MessageBubbleProps, "onActions" | "onReact"> & {
+type Props = Pick<MessageBubbleProps, "onActions"> & {
   messages: Message[];
   initialId: string;
   visible: boolean;
   onClose: () => void;
 };
 
-export default function AlbumViewer({ messages, initialId, visible, onClose, onActions, onReact }: Props) {
+export default function AlbumViewer({ messages, initialId, visible, onClose, onActions }: Props) {
   const [selectedId, setSelectedId] = useState(initialId);
   const found = messages.findIndex((message) => message.id === selectedId);
   const index = Math.max(0, found);
@@ -37,7 +37,6 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
             message={message}
             visible={visible}
             onActions={(target) => { onClose(); onActions(target); }}
-            onReact={onReact}
             onOpen={() => {}}
             label={`${message.kind === "video" ? "Video" : "Photo"} ${index + 1} of ${messages.length}`}
             style={s.media}

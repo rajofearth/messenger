@@ -19,8 +19,6 @@ import { messagePayload } from "../notifications/payloads";
 export type MessageNotificationOptions = {
   chats: Chat[];
   messages: Record<string, Message[]>;
-  /** Fallback thread for conversations that were never opened. */
-  seed: (chat: Chat) => Message[];
   self: { id: string; name: string; avatarUri?: string };
   /** Conversation on screen, if any. */
   visibleChatId: string | null;
@@ -36,7 +34,6 @@ export type MessageNotificationOptions = {
 export function useMessageNotifications({
   chats,
   messages,
-  seed,
   self,
   visibleChatId,
   visible,
@@ -55,7 +52,7 @@ export function useMessageNotifications({
       // Record rather than forget: the newest message is being read right now,
       // so leaving the conversation must not announce it as news.
       const open = chats.find((chat) => chat.id === onScreen);
-      const last = open ? newestIncoming(messages[onScreen] || seed(open)) : undefined;
+      const last = open ? newestIncoming(messages[onScreen] || []) : undefined;
       if (last) announced.current.set(onScreen, last);
       else announced.current.delete(onScreen);
       void dismissConversation(onScreen).catch(() => {});
@@ -63,7 +60,7 @@ export function useMessageNotifications({
     if (!primed.current) {
       // Existing history is not news: record it without notifying.
       for (const chat of chats) {
-        const last = newestIncoming(messages[chat.id] || seed(chat));
+        const last = newestIncoming(messages[chat.id] || []);
         if (last) announced.current.set(chat.id, last);
       }
       primed.current = true;
@@ -71,7 +68,7 @@ export function useMessageNotifications({
     }
     const targets = chats.filter((chat) => {
       if (chat.id === onScreen || chat.muted || chat.blocked) return false;
-      const thread = messages[chat.id] || seed(chat);
+      const thread = messages[chat.id] || [];
       const last = newestIncoming(thread);
       return !!last && announced.current.get(chat.id) !== last;
     });
@@ -90,7 +87,7 @@ export function useMessageNotifications({
       if (cancelled) return;
       for (const chat of targets) {
         if (cancelled) return;
-        const thread = messages[chat.id] || seed(chat);
+        const thread = messages[chat.id] || [];
         const payload = messagePayload({
           chat,
           messages: thread,
@@ -129,7 +126,7 @@ export function useMessageNotifications({
     return () => {
       cancelled = true;
     };
-  }, [chats, messages, visibleChatId, visible, previews, sound, enabled, seed, self.name, self.avatarUri]);
+  }, [chats, messages, visibleChatId, visible, previews, sound, enabled, self.name, self.avatarUri]);
 
   // Keep the contacts they are most likely to hear from ready to ring.
   useEffect(() => {

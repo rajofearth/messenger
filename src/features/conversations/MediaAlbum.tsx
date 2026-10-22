@@ -1,14 +1,14 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Message } from "../../domain/data";
 import { albumOverflowCount } from "../../domain/mediaAlbums";
-import { palette, coral } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import type { MessageBubbleProps } from "./MessageBubble";
 
-type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "onReact" | "visible"> & {
+type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "visible"> & {
   onOpen: () => void;
   label: string;
   style?: StyleProp<ViewStyle>;
@@ -16,20 +16,12 @@ type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "onReact" | 
 };
 
 /** Shared gestures keep each album item independently actionable, including in the viewer. */
-export function AlbumItem({ message, onActions, onReact, visible = true, onOpen, label, style, children }: ItemProps) {
+export function AlbumItem({ message, onActions, visible = true, onOpen, label, style, children }: ItemProps) {
   const target = useRef<View>(null);
-  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
   const active = useRef(visible);
   active.current = visible && !message.deleted;
-  function cancelTap() {
-    if (pending.current) clearTimeout(pending.current);
-    pending.current = null;
-  }
-  useEffect(() => { if (!visible) cancelTap(); }, [visible]);
-  useEffect(() => cancelTap, []);
   function actions() {
-    cancelTap();
     longPressed.current = true;
     if (!active.current) return;
     target.current?.measureInWindow((x, y, width, height) => {
@@ -44,7 +36,7 @@ export function AlbumItem({ message, onActions, onReact, visible = true, onOpen,
       style={style}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint="Double tap quickly to react. Long press for message actions."
+      accessibilityHint="Double tap to open. Long press for message actions."
       accessibilityActions={[{ name: "longpress", label: "Message actions" }]}
       onAccessibilityAction={({ nativeEvent }) => {
         if (nativeEvent.actionName === "longpress") actions();
@@ -54,14 +46,7 @@ export function AlbumItem({ message, onActions, onReact, visible = true, onOpen,
       delayLongPress={300}
       onPress={() => {
         if (!active.current || longPressed.current) return;
-        if (pending.current) {
-          cancelTap();
-          tap();
-          onReact(message.id, "🤍");
-        } else pending.current = setTimeout(() => {
-          pending.current = null;
-          if (active.current) onOpen();
-        }, 260);
+        onOpen();
       }}
     >
       {children}
@@ -79,18 +64,19 @@ export function AlbumItem({ message, onActions, onReact, visible = true, onOpen,
 }
 
 type Props = Omit<MessageBubbleProps, "message"> & { messages: Message[] };
-export default function MediaAlbum({ messages, dark, showTimestamp, visible = true, onActions, onReact, onViewMedia }: Props) {
+export default function MediaAlbum({ messages, dark, showTimestamp, visible = true, onActions, onViewMedia }: Props) {
   const first = messages[0];
   const last = messages[messages.length - 1];
-  const { card, fg, muted } = palette(dark);
+  const { card, coralInk, fg, muted, outgoingFg, outgoingMuted } =
+    palette(dark);
   const overflow = albumOverflowCount(messages.length);
   return (
     <View style={[s.row, first.mine && { alignItems: "flex-end" }]}>
       <View style={[s.album, { backgroundColor: first.mine ? (dark ? "#B86B57" : "#F4A18B") : card }]}>
         {first.replyTo && (
-          <View style={s.reply}>
-            <Text style={{ color: first.mine ? "white" : muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
-            <Text numberOfLines={2} style={{ color: first.mine ? "white" : fg }}>{first.replyTo.text}</Text>
+          <View style={[s.reply, { borderLeftColor: first.mine ? outgoingMuted : coralInk }]}>
+            <Text style={{ color: first.mine ? outgoingMuted : muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
+            <Text numberOfLines={2} style={{ color: first.mine ? outgoingFg : fg }}>{first.replyTo.text}</Text>
           </View>
         )}
         <View style={s.grid}>
@@ -100,7 +86,6 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
               message={message}
               visible={visible}
               onActions={onActions}
-              onReact={onReact}
               onOpen={() => onViewMedia(message)}
               label={index === 3 && overflow
                 ? `${overflow} more ${messages.some((item) => item.kind === "video") ? "media items" : "photos"}`
@@ -128,7 +113,7 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
       {showTimestamp && (
         <View style={s.meta}>
           <Text style={{ color: muted, fontSize: 11 }}>{last.time}</Text>
-          {last.mine && <Ionicons name="checkmark-done" size={14} color={coral} />}
+          {last.mine && <Ionicons name="checkmark" size={15} color={coralInk} />}
         </View>
       )}
     </View>
@@ -145,6 +130,6 @@ const s = StyleSheet.create({
   count: { color: "white", fontSize: 32, fontWeight: "600" },
   caption: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 5, color: "white", backgroundColor: "#00000088", fontSize: 12 },
   reaction: { position: "absolute", bottom: 4, right: 4, backgroundColor: "white", borderRadius: 12, padding: 2 },
-  reply: { borderLeftWidth: 3, borderLeftColor: coral, padding: 8, marginBottom: 4 },
+  reply: { borderLeftWidth: 3, padding: 8, marginBottom: 4 },
   meta: { flexDirection: "row", gap: 4, marginTop: 5 },
 });

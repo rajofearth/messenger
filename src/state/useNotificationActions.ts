@@ -7,7 +7,11 @@
  */
 
 import { useCallback } from "react";
-import { clock, uid, type CallRecord } from "./useMessenger";
+import {
+  remoteUid,
+  timeLabel,
+  type RemoteCallRecord,
+} from "./remoteMessengerTypes";
 import type { Chat } from "../domain/data";
 import {
   dismissConversation,
@@ -18,7 +22,7 @@ import { forgetIncomingCall, readIncomingCall, resumeIncomingCall } from "../fea
 
 type Messenger = {
   chats: Chat[];
-  addCall: (record: CallRecord) => void;
+  addCall: (record: RemoteCallRecord) => void;
   setMuted: (id: string, muted: boolean) => void;
   markRead: (id: string) => void;
   sendTo: (chatId: string, text: string, actionId?: string) => Promise<void>;
@@ -88,11 +92,11 @@ export function useNotificationActions({
           const chat = messenger.chats.find((item) => item.id === pending?.chatId);
           if (pending && chat) {
             messenger.addCall({
-              id: uid(),
+              id: remoteUid(),
               chat,
               video: pending.video,
               seconds: 0,
-              time: clock(),
+              time: timeLabel(),
               missed: true,
             });
           }

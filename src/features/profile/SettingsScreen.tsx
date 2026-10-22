@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
-  Image,
   Pressable,
   ScrollView,
   Switch,
@@ -10,17 +9,19 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { CORAL, styles, settingsColors } from "./SettingsScreen.styles";
+import { Image } from "expo-image";
+import { styles, settingsColors } from "./SettingsScreen.styles";
 import {
   useSettingsPreferences,
-  type SettingsProfile,
+  type ProfileChangeHandler,
 } from "./SettingsPreferences";
 import SettingsDialogs from "./SettingsDialogs";
 import { IconButton, tap } from "../../ui/primitives";
 import { useNotificationSettings } from "../../notifications/useNotificationSettings";
-import type { ThemePreference } from "../../ui/theme";
+import { coral, type ThemePreference } from "../../ui/theme";
 import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
+import AccountSection from "./AccountSection";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -33,7 +34,7 @@ export type SettingsScreenProps = {
   theme: ThemePreference;
   onThemeChange: (value: ThemePreference) => void;
   onIncoming: () => void;
-  onProfileChange?: (profile: SettingsProfile) => void;
+  onProfileChange?: ProfileChangeHandler;
   /** The app-wide updater, so the card and the launch prompt share one state. */
   updates: AppUpdater;
 };
@@ -148,7 +149,7 @@ export default function SettingsScreen({
           value={value}
           onValueChange={change}
           disabled={disabled}
-          trackColor={{ false: dark ? "#50574E" : "#DEDfD5", true: CORAL }}
+          trackColor={{ false: dark ? "#50574E" : "#DEDfD5", true: coral }}
           thumbColor="#FFFFFF"
           ios_backgroundColor={dark ? "#50574E" : "#DEDFD5"}
         />
@@ -207,9 +208,9 @@ export default function SettingsScreen({
                 )}
                 <View style={[styles.camera, { borderColor: colors.card }]}>
                   {picking ? (
-                    <ActivityIndicator size="small" color="#29372F" />
+                    <ActivityIndicator size="small" color={colors.onCoral} />
                   ) : (
-                    <Ionicons name="camera" size={15} color="#29372F" />
+                    <Ionicons name="camera" size={15} color={colors.onCoral} />
                   )}
                 </View>
               </Pressable>
@@ -252,7 +253,7 @@ export default function SettingsScreen({
               {!ready && (
                 <ActivityIndicator
                   style={styles.loader}
-                  color={CORAL}
+                  color={colors.coralInk}
                   accessibilityLabel="Loading settings"
                 />
               )}
@@ -270,6 +271,7 @@ export default function SettingsScreen({
           </>
         ) : (
           <>
+            <AccountSection colors={colors} />
             {section("APPEARANCE")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.row}>
@@ -305,7 +307,7 @@ export default function SettingsScreen({
                       <Text
                         style={[
                           styles.segmentText,
-                          { color: active ? "#29372F" : colors.muted },
+                          { color: active ? colors.onCoral : colors.muted },
                         ]}
                       >
                         {option.label}
@@ -424,7 +426,7 @@ export default function SettingsScreen({
               ]}
             >
               <View style={styles.callIcon}>
-                <Ionicons name="call-outline" size={24} color="#29372F" />
+                <Ionicons name="call-outline" size={24} color={colors.onCoral} />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={[styles.rowTitle, { color: colors.text }]}>

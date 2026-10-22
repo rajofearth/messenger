@@ -176,7 +176,7 @@ export function StoryViewer(props: Props) {
             ))}
           </View>
           <View style={s.header}>
-            <Avatar uri={group.avatar} size={38} />
+            <Avatar uri={group.avatar} name={group.name} size={38} />
             <Text style={s.name}>{group.name}</Text>
             {(active.name === "You" || active.ownerId === "self") && (
               <IconButton

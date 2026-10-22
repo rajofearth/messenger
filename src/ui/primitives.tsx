@@ -1,5 +1,6 @@
 import React from "react";
-import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -50,37 +51,85 @@ export function IconButton({
     </Pressable>
   );
 }
+/** The first letter of the first two words, so "Ada Lovelace" becomes "AL". */
+function avatarInitials(name: string | undefined) {
+  return (name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function Avatar({
   uri,
+  name,
   size = 54,
   online = false,
 }: {
-  uri: string;
+  uri?: string;
+  name?: string;
   size?: number;
   online?: boolean;
 }) {
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => setFailed(false), [uri]);
+  const initials = avatarInitials(name);
+  const fallback = !uri || failed;
   return (
     <View style={{ width: size, height: size }}>
-      <Image
-        source={{ uri }}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: "#E5DCD3",
-        }}
-      />
+      {fallback ? (
+        <View
+          accessible={false}
+          style={[
+            styles.avatarFallback,
+            { width: size, height: size, borderRadius: size / 2 },
+          ]}
+        >
+          {initials ? (
+            <Text style={[styles.initials, { fontSize: Math.max(11, size * 0.34) }]}>
+              {initials}
+            </Text>
+          ) : (
+            <Ionicons name="person" size={size * 0.48} color="#6B5A4E" />
+          )}
+        </View>
+      ) : (
+        <Image
+          source={{ uri }}
+          cachePolicy="memory-disk"
+          accessible={false}
+          onError={() => setFailed(true)}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: "#E5DCD3",
+          }}
+        />
+      )}
       {online && <View style={styles.online} />}
     </View>
   );
 }
 const styles = StyleSheet.create({
   button: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  avatarFallback: {
+    backgroundColor: "#E5DCD3",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  initials: {
+    color: "#5B4A3F",
+    fontFamily: "DMSans_700Bold",
+    letterSpacing: 0.3,
   },
   online: {
     position: "absolute",

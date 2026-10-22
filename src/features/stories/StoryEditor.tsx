@@ -15,7 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import { requestRecordingPermissionsAsync } from "expo-audio";
 import type { Story } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import { StoryMedia } from "./StoryMedia";
 import { styles as s } from "./Stories.styles";
 
@@ -180,7 +180,7 @@ export function StoryEditor(props: Props) {
               onPress={() => void pick(source)}
               style={[s.choice, { opacity: picking ? 0.5 : 1 }]}
             >
-              <Ionicons name={icon} size={24} color={coral} />
+              <Ionicons name={icon} size={24} color={colors.coralInk} />
               <Text style={[s.choiceText, { color: colors.fg }]}>{label}</Text>
             </Pressable>
           ))}

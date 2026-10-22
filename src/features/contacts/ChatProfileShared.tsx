@@ -13,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import VideoAttachment from "../conversations/VideoAttachment";
 import { sharedLinks } from "./ChatProfileMetadata";
 import { openAttachment } from "../../ui/openAttachment";
@@ -80,7 +80,7 @@ export default function ChatProfileShared({
             onPress={() => setTab(name)}
             style={[
               s.tab,
-              { borderBottomColor: tab === name ? coral : colors.line },
+              { borderBottomColor: tab === name ? colors.coralInk : colors.line },
             ]}
           >
             <Text
@@ -128,7 +128,7 @@ export default function ChatProfileShared({
                   style={s.thumbnail}
                 />
               ) : (
-                <Ionicons name="videocam-outline" size={32} color={coral} />
+                <Ionicons name="videocam-outline" size={32} color={colors.coralInk} />
               )}
               <View style={s.tileLabel}>
                 <Text style={s.tileText}>
@@ -148,7 +148,7 @@ export default function ChatProfileShared({
             onPress={() => void openSharedUri(message.uri, true)}
             style={[s.row, { borderBottomColor: colors.line }]}
           >
-            <Ionicons name="document-text-outline" size={25} color={coral} />
+            <Ionicons name="document-text-outline" size={25} color={colors.coralInk} />
             <View style={s.body}>
               <Text style={[s.label, { color: colors.fg }]}>
                 {message.filename || "Document"}
@@ -169,7 +169,7 @@ export default function ChatProfileShared({
             onPress={() => void openSharedUri(link.url, false)}
             style={[s.row, { borderBottomColor: colors.line }]}
           >
-            <Ionicons name="link-outline" size={25} color={coral} />
+            <Ionicons name="link-outline" size={25} color={colors.coralInk} />
             <View style={s.body}>
               <Text numberOfLines={2} style={[s.label, { color: colors.fg }]}>
                 {link.url}

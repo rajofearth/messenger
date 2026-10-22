@@ -22,6 +22,8 @@ export type Store = {
   save: <T>(key: string, value: T | null) => Promise<void>;
   keys: () => Promise<string[]>;
   flush: () => Promise<void>;
+  /** Removes every slice in this namespace, including in-memory values. */
+  clear: () => Promise<void>;
 };
 
 export const STORE_VERSION = "v2";
@@ -120,7 +122,8 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
           return value as T | undefined;
         })
         .finally(() => {
-          reading.delete(key);
+          // A clear() may have replaced this request with a newer read.
+          if (reading.get(key) === request) reading.delete(key);
         });
       reading.set(key, request);
       return request;
@@ -142,5 +145,31 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
     },
     keys: () => driver.keys(),
     flush: () => schedule(),
+    clear: async () => {
+      await schedule().catch(() => undefined);
+      const prefix = `${namespace}/`;
+      const queuedKeys = [...queue.keys()];
+      queue.clear();
+      // Memory and in-flight reads can hold data that never reached storage,
+      // so include them as well as the keys the driver reports.
+      const keys = new Set([
+        ...memory.keys(),
+        ...reading.keys(),
+        ...queuedKeys.map((key) => key.slice(prefix.length)),
+        ...(await driver.keys())
+          .filter((key) => key.startsWith(prefix))
+          .map((key) => key.slice(prefix.length)),
+      ]);
+      for (const key of keys) {
+        await driver.write(full(key), null);
+      }
+      // Invalidate reads only after the deletes land, so a read that started
+      // during the loop cannot put the old value back into memory.
+      for (const key of keys) {
+        generations.set(key, (generations.get(key) ?? 0) + 1);
+        memory.delete(key);
+      }
+      reading.clear();
+    },
   };
 }

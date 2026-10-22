@@ -1,8 +1,6 @@
 # Contributing
 
-Thanks for looking at Messenger. It is a local Android prototype: there is no
-backend, no accounts and no push notifications. Bug reports, feature requests
-and pull requests are welcome.
+Thanks for looking at Messenger. It is an Android messenger with a Convex backend for accounts and chat, a local-first cache, and Android system notifications while the app is running. Bug reports, feature requests and pull requests are welcome.
 
 By participating you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 Report security issues privately as described in [SECURITY.md](SECURITY.md), not
@@ -29,10 +27,21 @@ checks that are still outstanding.
 npm ci
 npm run check
 npm test
+npx convex dev
 ```
 
 `npm run check` runs `tsc --noEmit` and `expo install --check`. `npm test` runs
-the Node test suite. Both must pass before you open a pull request.
+the Node test suite. Both must pass before you open a pull request. `npx convex
+dev` runs the backend against your development deployment, regenerates
+`convex/_generated/`, and fills `EXPO_PUBLIC_CONVEX_URL` in `.env.local`; the
+Convex Auth setup also needs `JWT_PRIVATE_KEY` and `JWKS` on the deployment, as
+described in [convex/README.md](convex/README.md).
+
+The app reads `EXPO_PUBLIC_CONVEX_URL` at build time. A build without it fails
+during startup, before cached chats can render; a build with the URL still
+shows the cached inbox and threads when the device is offline and syncs when a
+connection returns. `EXPO_PUBLIC_CONVEX_SITE_URL` is the deployment's
+`.convex.site` origin and is used by the auth HTTP routes.
 
 ## Build and install the Android APK
 
@@ -85,6 +94,15 @@ following:
 In practice, features depend on `src/domain` and the shared modules under
 `src/ui`, and `src/domain` depends on nothing but itself. Keep React Native and
 Expo package versions aligned when you upgrade.
+
+Convex functions live in `convex/` and use the `convex-chat` component for
+conversation membership, messages, unread counts, reactions and presence. The
+client talks to them only through `src/state/useRemoteMessenger.ts` and its
+focused helpers (`useRemoteCache`, `useRemoteServerSync`, `useRemotePresence`,
+`useRemoteThreadMedia`, `remoteMessenger*`). Screens must not call Convex
+directly; add a mutation or query to the state layer and keep the screen props
+the same. Run `npx convex dev --once` after changing backend functions so the
+generated types stay in sync.
 
 ## Adding a test
 

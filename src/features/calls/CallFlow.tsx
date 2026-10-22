@@ -97,7 +97,7 @@ export default function CallFlow({
         onPress={onBack}
       />
       <View style={s.center}>
-        <Avatar uri={call.chat.avatar} size={124} />
+        <Avatar uri={call.chat.avatar} name={call.chat.name} size={124} />
         <Text style={s.name}>{call.chat.name}</Text>
         <Text style={s.status}>
           {call.status === "incoming" ? "Incoming" : "Calling"}{" "}

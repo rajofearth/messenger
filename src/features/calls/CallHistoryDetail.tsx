@@ -2,14 +2,14 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
-import type { CallRecord } from "../../state/useMessenger";
+import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { formatDuration } from "../../domain/model";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 
 export type CallHistoryDetailProps = {
   chat: Chat;
-  history: CallRecord[];
+  history: RemoteCallRecord[];
   dark: boolean;
   onBack: () => void;
   onProfile: () => void;
@@ -45,13 +45,25 @@ export function CallHistoryList({
                   : "call-outline"
             }
             size={20}
-            color={record.missed ? "#D87171" : colors.muted}
+            color={
+              record.missed
+                ? dark
+                  ? "#FFB4AB"
+                  : "#B3261E"
+                : colors.muted
+            }
           />
           <View style={s.body}>
             <Text
               style={[
                 s.label,
-                { color: record.missed ? "#D87171" : colors.fg },
+                {
+                  color: record.missed
+                    ? dark
+                      ? "#FFB4AB"
+                      : "#B3261E"
+                    : colors.fg,
+                },
               ]}
             >
               {record.missed ? "Missed " : ""}
@@ -64,7 +76,7 @@ export function CallHistoryList({
           </View>
           <IconButton
             name={record.video ? "videocam-outline" : "call-outline"}
-            color={coral}
+            color={colors.coralInk}
             label={`Start ${record.video ? "video" : "voice"} call with ${chat.name}`}
             onPress={() => onCall(record.video)}
           />
@@ -92,7 +104,7 @@ export function CallHistoryActions({
           <Ionicons
             name={video ? "videocam-outline" : "call-outline"}
             size={23}
-            color={coral}
+            color={colors.coralInk}
           />
           <Text style={[s.label, { color: colors.fg }]}>
             {video ? "Video call" : "Voice call"}
@@ -130,7 +142,7 @@ export default function CallHistoryDetail({
           onPress={onProfile}
           style={s.profile}
         >
-          <Avatar uri={chat.avatar} size={88} />
+          <Avatar uri={chat.avatar} name={chat.name} size={88} />
           <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
           <Text style={[s.caption, { color: colors.muted }]}>
             View {chat.group ? "group" : "contact"} profile

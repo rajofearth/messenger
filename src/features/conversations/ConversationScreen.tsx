@@ -23,13 +23,14 @@ import {
 import { Image } from "expo-image";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
 import MessageRow from "./MessageRow";
 import AlbumViewer from "./AlbumViewer";
 import { groupMediaMessages, type MediaRow } from "../../domain/mediaAlbums";
+import { daySeparatorLabel, localDayKey } from "../../domain/time";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
 import { styles as s } from "./ConversationScreen.styles";
@@ -48,6 +49,9 @@ export type ConversationScreenProps = {
   onProfile: () => void;
   onDelete: (id: string, everyone: boolean) => void;
   onForward: (message: Message) => void;
+  onSaveMedia?: (message: Message) => Promise<boolean>;
+  onTypingChange?: (typing: boolean) => void;
+  onRetry: (messageId: string) => void;
 };
 
 export default function ConversationScreen({
@@ -64,14 +68,29 @@ export default function ConversationScreen({
   onProfile,
   onDelete,
   onForward,
+  onSaveMedia,
+  onTypingChange,
+  onRetry,
 }: ConversationScreenProps) {
-  const { bg, fg, muted, card, line } = palette(dark);
+  const { bg, fg, muted, card, line, coralInk } = palette(dark);
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [target, setTarget] = useState<ActionTarget | null>(null);
   const [viewer, setViewer] = useState<Message | null>(null);
   const [album, setAlbum] = useState<{ ids: string[]; initialId: string } | null>(null);
   const rows = useMemo(() => groupMediaMessages(messages), [messages]);
+  // One label per row: the first row of a local day gets a chip, later rows
+  // on the same day get none. A row without a timestamp never starts a day.
+  const dayLabels = useMemo(() => {
+    let previous: string | null = null;
+    return rows.map((row) => {
+      const first = row.type === "album" ? row.messages[0] : row.message;
+      const key = localDayKey(first.createdAt);
+      if (!key || key === previous) return null;
+      previous = key;
+      return daySeparatorLabel(first.createdAt);
+    });
+  }, [rows]);
   const tail = messages.length
     ? `${messages.length}:${messages[messages.length - 1].id}`
     : "";
@@ -126,6 +145,25 @@ export default function ConversationScreen({
     setAlbum(null);
     setReply(null);
   }, [chat.id]);
+  // Only signal a transition: React runs effect cleanups before every key, so
+  // the old version sent a false/true pair for every character typed.
+  const typingCallback = useRef(onTypingChange);
+  typingCallback.current = onTypingChange;
+  const typingActive = useRef(false);
+  useEffect(() => {
+    const next = draft.trim().length > 0;
+    if (typingActive.current === next) return;
+    typingActive.current = next;
+    typingCallback.current?.(next);
+  }, [draft]);
+  useEffect(
+    () => () => {
+      if (!typingActive.current) return;
+      typingActive.current = false;
+      typingCallback.current?.(false);
+    },
+    [],
+  );
   useEffect(() => {
     if (!visible) {
       setTarget(null);
@@ -206,7 +244,7 @@ export default function ConversationScreen({
       const next = rows[index + 1];
       const nextMine =
         next?.type === "album" ? next.messages[0].mine : next?.message.mine;
-      return (
+      const content = (
         <MessageRow
           row={item}
           dark={dark}
@@ -216,10 +254,31 @@ export default function ConversationScreen({
           onReact={onReact}
           onViewMedia={setViewer}
           onOpenAlbum={onOpenAlbum}
+          onRetry={onRetry}
         />
       );
+      const label = dayLabels[index];
+      if (!label) return content;
+      return (
+        <View>
+          <View style={s.dateChip}>
+            <Text style={[s.tiny, { color: muted }]}>{label}</Text>
+          </View>
+          {content}
+        </View>
+      );
     },
-    [rows, dark, visible, onActions, onReact, onOpenAlbum],
+    [
+      rows,
+      dark,
+      visible,
+      onActions,
+      onReact,
+      onOpenAlbum,
+      onRetry,
+      dayLabels,
+      muted,
+    ],
   );
 
   return (
@@ -239,7 +298,7 @@ export default function ConversationScreen({
           accessibilityLabel={`View ${chat.name}'s profile`}
           onPress={() => guardRecording(onProfile)}
         >
-          <Avatar uri={chat.avatar} size={44} />
+          <Avatar uri={chat.avatar} name={chat.name} size={44} />
         </Pressable>
         <Pressable
           style={s.contact}
@@ -255,7 +314,12 @@ export default function ConversationScreen({
             style={[
               s.tiny,
               {
-                color: chat.online || typing ? "#74A68A" : muted,
+                color:
+                  chat.online || typing
+                    ? dark
+                      ? "#9FD0B2"
+                      : "#2F6A4B"
+                    : muted,
                 marginTop: 3,
               },
             ]}
@@ -271,18 +335,22 @@ export default function ConversationScreen({
                     : "Last seen recently"}
           </Text>
         </Pressable>
-        <IconButton
-          name="call-outline"
-          label="Start voice call"
-          color={fg}
-          onPress={() => guardRecording(() => onCall(false))}
-        />
-        <IconButton
-          name="videocam-outline"
-          label="Start video call"
-          color={fg}
-          onPress={() => guardRecording(() => onCall(true))}
-        />
+        {!chat.group && (
+          <>
+            <IconButton
+              name="call-outline"
+              label="Start voice call"
+              color={fg}
+              onPress={() => guardRecording(() => onCall(false))}
+            />
+            <IconButton
+              name="videocam-outline"
+              label="Start video call"
+              color={fg}
+              onPress={() => guardRecording(() => onCall(true))}
+            />
+          </>
+        )}
       </View>
       <View style={s.root}>
         <FlatList
@@ -300,15 +368,15 @@ export default function ConversationScreen({
           initialNumToRender={12}
           maxToRenderPerBatch={8}
           windowSize={9}
-          ListHeaderComponent={
-            <View style={s.dateChip}>
-              <Text style={[s.tiny, { color: muted }]}>TODAY</Text>
-            </View>
+          ListEmptyComponent={
+            <Text style={[s.emptyThread, { color: muted }]}>
+              No messages yet. Say hello to start the conversation.
+            </Text>
           }
           ListFooterComponent={
             typing ? (
               <View style={[s.typing, { backgroundColor: card }]}>
-                <Text style={{ color: coral, letterSpacing: 5 }}>● ● ●</Text>
+                <Text style={{ color: coralInk, letterSpacing: 5 }}>● ● ●</Text>
               </View>
             ) : null
           }
@@ -340,7 +408,26 @@ export default function ConversationScreen({
         onReact={onReact}
         onReply={selectReply}
         onForward={(message) => guardRecording(() => onForward(message))}
+        onSave={
+          onSaveMedia
+            ? (message) => {
+                void onSaveMedia(message)
+                  .then((saved) =>
+                    Alert.alert(
+                      saved ? "Saved to gallery" : "Not saved",
+                      saved
+                        ? "The media is in your Messenger album."
+                        : "The media could not be copied to your gallery.",
+                    ),
+                  )
+                  .catch(() =>
+                    Alert.alert("Not saved", "Please try again."),
+                  );
+              }
+            : undefined
+        }
         onDelete={onDelete}
+        onRetry={onRetry}
       />
       {album && (
         <AlbumViewer
@@ -353,7 +440,6 @@ export default function ConversationScreen({
             setAttachmentOpen(false);
             setTarget(nextTarget);
           }}
-          onReact={onReact}
         />
       )}
       <Modal

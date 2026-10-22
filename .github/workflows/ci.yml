@@ -53,6 +53,10 @@ jobs:
     name: Export the JavaScript bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # Match the release build so Metro sees the same public URLs.
+      EXPO_PUBLIC_CONVEX_URL: ${{ vars.EXPO_PUBLIC_CONVEX_URL }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.EXPO_PUBLIC_CONVEX_SITE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -62,6 +66,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      # The bundle is not useful if the app throws at startup. Keep this in
+      # step with the release workflow's pre-build check.
+      - name: Require Convex deployment URL
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          set -euo pipefail
+          if [[ -z "${EXPO_PUBLIC_CONVEX_URL:-}" ]]; then
+            echo "::error::EXPO_PUBLIC_CONVEX_URL is empty. Set the repository variable to the deployment's .convex.cloud URL."
+            exit 1
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -87,6 +102,8 @@ jobs:
     env:
       # Keep in step with .github/workflows/release.yml.
       EXPO_PUBLIC_UPDATE_FEED_URL: ${{ vars.EXPO_PUBLIC_UPDATE_FEED_URL }}
+      EXPO_PUBLIC_CONVEX_URL: ${{ vars.EXPO_PUBLIC_CONVEX_URL }}
+      EXPO_PUBLIC_CONVEX_SITE_URL: ${{ vars.EXPO_PUBLIC_CONVEX_SITE_URL }}
       NDK_VERSION: 27.1.12297006
       BUILD_TOOLS_VERSION: 36.0.0
       PLATFORM_VERSION: android-36

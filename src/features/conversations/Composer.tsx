@@ -6,6 +6,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardMediaInput } from "../../ui/KeyboardMediaInput";
 import type { Message } from "../../domain/data";
 import { formatDuration } from "../../domain/model";
@@ -39,7 +40,7 @@ export default function Composer({
   setAttachmentOpen: (open: boolean) => void;
   disabled: boolean;
 }) {
-  const { card, fg, muted } = palette(dark);
+  const { card, coralInk, fg, muted, onCoral } = palette(dark);
   const input = useRef<TextInput>(null);
   const [top, setTop] = useState(260);
   const host = useRef<View>(null);
@@ -59,12 +60,12 @@ export default function Composer({
           onRecord={() => void media.record()}
         />
       )}
-      {reply && (
+      {reply && !disabled && (
         <View
           style={{
             marginHorizontal: 20,
             borderLeftWidth: 3,
-            borderLeftColor: coral,
+            borderLeftColor: coralInk,
             backgroundColor: card,
             paddingLeft: 12,
             flexDirection: "row",
@@ -73,7 +74,7 @@ export default function Composer({
           }}
         >
           <View style={{ flex: 1, paddingVertical: 8 }}>
-            <Text style={{ color: coral, fontSize: 12 }}>
+            <Text style={{ color: coralInk, fontSize: 12 }}>
               Replying to {reply.mine ? "yourself" : "message"}
             </Text>
             <Text numberOfLines={2} style={{ color: fg }}>
@@ -89,16 +90,27 @@ export default function Composer({
         </View>
       )}
       <View style={[s.composer, { backgroundColor: card }]}>
-        {media.recording ? (
+        {disabled ? (
+          <>
+            <Ionicons name="lock-closed-outline" size={17} color={muted} />
+            <Text style={[s.blockedText, { color: muted }]}>
+              This contact is blocked. Unblock them in chat details to send
+              messages.
+            </Text>
+          </>
+        ) : media.recording ? (
           <>
             <IconButton
               name="trash-outline"
               label="Cancel recording"
-              color="#DE6666"
+              color={dark ? "#FFB4AB" : "#B3261E"}
               onPress={() => void media.cancelRecord()}
             />
             <View style={s.liveDot} />
-            <RecordingWaveform metering={media.metering} />
+            <RecordingWaveform
+              metering={media.metering}
+              color={coralInk}
+            />
             <Text style={{ color: fg }}>
               {formatDuration(Math.floor(media.durationMillis / 1000))}
             </Text>
@@ -106,7 +118,7 @@ export default function Composer({
               name="send"
               label="Send voice note"
               background={coral}
-              color="white"
+              color={onCoral}
               onPress={() => void media.record()}
             />
           </>
@@ -157,7 +169,7 @@ export default function Composer({
               name={draft.trim() ? "arrow-up" : "mic-outline"}
               label={draft.trim() ? "Send message" : "Record voice note"}
               background={coral}
-              color="white"
+              color={onCoral}
               onPress={() => {
                 if (!disabled) {
                   setAttachmentOpen(false);

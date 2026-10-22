@@ -83,6 +83,28 @@ test("a failed key is retried by a later flush", async () => {
   assert.equal(attempts, 2);
 });
 
+test("clear drops memory keys that never reached storage", async () => {
+  const values = new Map();
+  let fail = true;
+  const store = createStore({
+    read: async (key) => values.get(key) ?? null,
+    write: async (key, value) => {
+      if (fail) throw new Error("offline");
+      if (value === null) values.delete(key);
+      else values.set(key, value);
+    },
+    keys: async () => [...values.keys()],
+  }, "test");
+
+  await assert.rejects(store.save("profile", { name: "Alex" }), /offline/);
+  assert.deepEqual(store.peek("profile"), { name: "Alex" });
+
+  fail = false;
+  await store.clear();
+  assert.equal(store.peek("profile"), undefined);
+  assert.equal(await store.load("profile"), undefined);
+});
+
 test("an in-flight read cannot replace a value saved after it started", async () => {
   const oldRead = deferred();
   const values = new Map([["test/thread", JSON.stringify(["old"])]]);

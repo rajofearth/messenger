@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
-import type { CallRecord } from "../../state/useMessenger";
+import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton, type IconName } from "../../ui/primitives";
 import { coral, palette } from "../../ui/theme";
 import {
@@ -24,12 +24,13 @@ export type ChatProfileProps = {
   chat: Chat;
   chats: Chat[];
   messages: Message[];
-  history: CallRecord[];
+  history: RemoteCallRecord[];
   dark: boolean;
   onBack: () => void;
   onCall: (video: boolean) => void;
   onMuteChange: (muted: boolean) => void;
   onBlockChange: (blocked: boolean) => void;
+  onMediaVisibilityChange?: (gallery: boolean) => void;
   onDeleteChat: () => void;
   onClearHistory: () => void;
   onOpenChat: (chat: Chat) => void;
@@ -45,6 +46,7 @@ export default function ChatProfile({
   onCall,
   onMuteChange,
   onBlockChange,
+  onMediaVisibilityChange,
   onDeleteChat,
   onClearHistory,
   onOpenChat,
@@ -91,11 +93,26 @@ export default function ChatProfile({
         <Ionicons
           name={icon}
           size={23}
-          color={destructive ? "#D87171" : coral}
+          color={
+            destructive
+              ? dark
+                ? "#FFB4AB"
+                : "#B3261E"
+              : colors.coralInk
+          }
         />
         <View style={s.body}>
           <Text
-            style={[s.label, { color: destructive ? "#D87171" : colors.fg }]}
+            style={[
+              s.label,
+              {
+                color: destructive
+                  ? dark
+                    ? "#FFB4AB"
+                    : "#B3261E"
+                  : colors.fg,
+              },
+            ]}
           >
             {title}
           </Text>
@@ -116,7 +133,7 @@ export default function ChatProfile({
   ) {
     return (
       <View style={[s.row, { borderBottomColor: colors.line }]}>
-        <Ionicons name={icon} size={23} color={coral} />
+        <Ionicons name={icon} size={23} color={colors.coralInk} />
         <View style={s.body}>
           <Text style={[s.label, { color: colors.fg }]}>{title}</Text>
           <Text style={[s.caption, { color: colors.muted }]}>{status}</Text>
@@ -150,12 +167,13 @@ export default function ChatProfile({
         <View style={s.hero}>
           <Avatar
             uri={chat.avatar}
+            name={chat.name}
             size={112}
             online={!chat.group && chat.online}
           />
           <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
           {!!chat.username && (
-            <Text style={[s.label, { color: coral }]}>
+            <Text style={[s.label, { color: colors.coralInk }]}>
               @{chat.username.replace(/^@/, "")}
             </Text>
           )}
@@ -174,7 +192,14 @@ export default function ChatProfile({
             </Text>
           )}
         </View>
-        <CallHistoryActions dark={dark} onCall={onCall} />
+        {chat.group ? (
+          <Text style={[s.note, { color: colors.muted }]}>
+            Group voice and video calls are unavailable. Start a one-to-one call
+            from a member's profile instead.
+          </Text>
+        ) : (
+          <CallHistoryActions dark={dark} onCall={onCall} />
+        )}
         <View style={[s.card, { backgroundColor: colors.card }]}>
           <Text style={[s.heading, { color: colors.fg }]}>
             {chat.group ? "Description" : "About"}
@@ -221,7 +246,7 @@ export default function ChatProfile({
                   onPress={() => onOpenChat(member)}
                   style={[s.row, { borderBottomColor: colors.line }]}
                 >
-                  <Avatar uri={member.avatar} size={42} />
+                  <Avatar uri={member.avatar} name={member.name} size={42} />
                   <Text style={[s.label, s.body, { color: colors.fg }]}>
                     {member.name}
                   </Text>
@@ -229,7 +254,7 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: coral, backgroundColor: colors.tint },
+                        { color: colors.coralInk, backgroundColor: colors.tint },
                       ]}
                     >
                       Admin
@@ -258,7 +283,7 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: coral, backgroundColor: colors.tint },
+                        { color: colors.coralInk, backgroundColor: colors.tint },
                       ]}
                     >
                       Admin
@@ -286,7 +311,7 @@ export default function ChatProfile({
                 onPress={() => onOpenChat(group)}
                 style={[s.row, { borderBottomColor: colors.line }]}
               >
-                <Avatar uri={group.avatar} size={42} />
+                <Avatar uri={group.avatar} name={group.name} size={42} />
                 <View style={s.body}>
                   <Text style={[s.label, { color: colors.fg }]}>
                     {group.name}
@@ -307,15 +332,17 @@ export default function ChatProfile({
           </View>
         )}
         <ChatProfileShared key={chat.id} messages={messages} dark={dark} />
-        <View style={s.section}>
-          <Text style={[s.heading, { color: colors.fg }]}>Call history</Text>
-          <CallHistoryList
-            chat={chat}
-            history={history}
-            dark={dark}
-            onCall={onCall}
-          />
-        </View>
+        {!chat.group && (
+          <View style={s.section}>
+            <Text style={[s.heading, { color: colors.fg }]}>Call history</Text>
+            <CallHistoryList
+              chat={chat}
+              history={history}
+              dark={dark}
+              onCall={onCall}
+            />
+          </View>
+        )}
         <View style={s.section}>
           <Text style={[s.heading, { color: colors.fg }]}>
             Conversation settings
@@ -328,6 +355,16 @@ export default function ChatProfile({
               : "Notifications on",
             !!chat.muted,
             onMuteChange,
+          )}
+          {toggleRow(
+            "images-outline",
+            "Save media to gallery",
+            chat.mediaVisibility === "gallery"
+              ? "Received photos and videos are copied to the Messenger album"
+              : "Media stays inside Messenger only",
+            chat.mediaVisibility === "gallery",
+            (value) => onMediaVisibilityChange?.(value),
+            !onMediaVisibilityChange,
           )}
           {toggleRow(
             "ban-outline",
@@ -382,6 +419,13 @@ const s = StyleSheet.create({
   },
   label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
   caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: 5 },
+  note: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 14,
+    marginHorizontal: 4,
+  },
   description: {
     fontFamily: "DMSans_400Regular",
     fontSize: 15,

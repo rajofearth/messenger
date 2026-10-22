@@ -56,3 +56,24 @@ test("outgoing message text meets normal-copy contrast in both themes", () => {
 test("dark outgoing muted text meets normal-copy contrast", () => {
   assert.ok(contrast(palette(true).outgoingMuted, "#B86B57") >= 4.5);
 });
+
+test("dark copy on coral buttons passes normal-text contrast in both themes", () => {
+  assert.ok(contrast(palette(false).onCoral, "#EF8E76") >= 4.5);
+  assert.ok(contrast(palette(true).onCoral, "#EF8E76") >= 4.5);
+});
+
+test("muted copy stays readable on every shared surface", () => {
+  for (const dark of [false, true]) {
+    const colors = palette(dark);
+    assert.ok(contrast(colors.muted, colors.bg) >= 4.5, `muted on bg (dark ${dark})`);
+    assert.ok(contrast(colors.muted, colors.card) >= 4.5, `muted on card (dark ${dark})`);
+  }
+});
+
+test("accent ink stays readable on app and card surfaces", () => {
+  for (const dark of [false, true]) {
+    const colors = palette(dark);
+    assert.ok(contrast(colors.coralInk, colors.bg) >= 4.5, `accent on bg (dark ${dark})`);
+    assert.ok(contrast(colors.coralInk, colors.card) >= 4.5, `accent on card (dark ${dark})`);
+  }
+});

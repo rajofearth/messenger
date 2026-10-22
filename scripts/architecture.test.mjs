@@ -119,3 +119,41 @@ test("application sources ship no debug logging", () => {
     );
   }
 });
+test("every DM Sans face used in the app is loaded by StartupGate", () => {
+  const families = new Set();
+  for (const file of files) {
+    const code = readFileSync(file, "utf8");
+    for (const match of code.matchAll(
+      /fontFamily:\s*["'](DMSans_[A-Za-z0-9]+)["']/g,
+    )) {
+      families.add(match[1]);
+    }
+  }
+  assert.ok(families.size > 0, "expected the app to use a bundled DM Sans face");
+  const gate = readFileSync(
+    path.join(root, "src/ui/StartupGate.tsx"),
+    "utf8",
+  );
+  const block = gate.match(/useFonts\(\{([\s\S]*?)\}\)/);
+  assert.ok(
+    block,
+    "src/ui/StartupGate.tsx must declare its fonts in a useFonts({...}) call",
+  );
+  for (const family of families) {
+    assert.match(
+      block[1],
+      new RegExp(`\\b${family}\\b`),
+      `${family} is used in a style but missing from StartupGate's useFonts object`,
+    );
+  }
+});
+test("images render through expo-image, not React Native's Fresco Image", () => {
+  for (const file of files) {
+    const code = readFileSync(file, "utf8");
+    assert.doesNotMatch(
+      code,
+      /import\s*\{[^}]*\bImage\b[^}]*\}\s*from\s*["']react-native["']/,
+      `${path.relative(root, file)} imports Image from react-native`,
+    );
+  }
+});

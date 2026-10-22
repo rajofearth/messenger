@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { coral } from "../../ui/theme";
+import { coral, onCoral } from "../../ui/theme";
 
 export const s = StyleSheet.create({
   screen: { flex: 1 },
@@ -64,7 +64,7 @@ export const s = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 44,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -80,7 +80,7 @@ export const s = StyleSheet.create({
   },
   tabCountText: {
     fontSize: 10,
-    color: "white",
+    color: onCoral,
     fontFamily: "DMSans_600SemiBold",
   },
   chatRow: {
@@ -121,7 +121,7 @@ export const s = StyleSheet.create({
     paddingHorizontal: 5,
   },
   unreadText: {
-    color: "white",
+    color: onCoral,
     fontFamily: "DMSans_600SemiBold",
     fontSize: 10,
   },

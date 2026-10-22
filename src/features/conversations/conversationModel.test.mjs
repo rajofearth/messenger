@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   deleteOptions,
+  messageAccessibilityLabel,
   messageSummary,
   replySnapshot,
   withReply,
@@ -79,6 +80,19 @@ test("own deletion offers three choices and dispatches exact callback arguments"
   assert.equal(options[2].onPress, undefined);
 });
 
+test("local-only sends never offer deletion for everyone", () => {
+  for (const status of ["sending", "sent", "failed"]) {
+    const options = deleteOptions(
+      { ...original, mine: true, status },
+      () => {},
+    );
+    assert.deepEqual(
+      options.map((option) => option.text),
+      ["Delete for me", "Cancel"],
+    );
+  }
+});
+
 test("received messages never offer deletion for everyone", () => {
   const calls = [];
   const options = deleteOptions(original, (...args) => calls.push(args));
@@ -88,4 +102,57 @@ test("received messages never offer deletion for everyone", () => {
   );
   options[0].onPress();
   assert.deepEqual(calls, [[original.id, false]]);
+});
+
+test("accessible message labels compose sender, content, context and state", () => {
+  assert.equal(
+    messageAccessibilityLabel({ ...original, mine: true }),
+    "You: Original, 10:00",
+  );
+  assert.equal(
+    messageAccessibilityLabel({ ...original, mine: false }),
+    "Message: Original, 10:00",
+  );
+  assert.equal(
+    messageAccessibilityLabel({
+      ...original,
+      mine: true,
+      forwarded: true,
+      reaction: "🤍",
+      replyTo: { id: "parent", text: "Earlier", mine: false },
+      status: "failed",
+    }),
+    "Forwarded, You: Original, Replying to Earlier, Reaction 🤍, 10:00, Not sent. Tap to retry.",
+  );
+  assert.equal(
+    messageAccessibilityLabel({ ...original, mine: true, status: "sending" }),
+    "You: Original, 10:00, Sending",
+  );
+});
+
+test("accessible labels describe media even when a file has no text", () => {
+  assert.equal(
+    messageAccessibilityLabel({
+      id: "photo",
+      mine: true,
+      time: "10:02",
+      kind: "image",
+      status: "sent",
+    }),
+    "You: Photo, 10:02",
+  );
+  assert.equal(
+    messageAccessibilityLabel({
+      id: "file",
+      mine: false,
+      time: "",
+      kind: "file",
+      filename: "report.pdf",
+    }),
+    "Message: report.pdf",
+  );
+  assert.equal(
+    messageAccessibilityLabel({ id: "gone", mine: false, time: "", deleted: true }),
+    "Deleted message",
+  );
 });

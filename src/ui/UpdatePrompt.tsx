@@ -7,9 +7,10 @@
  * or hand a verified file to Android's installer.
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Modal,
   Pressable,
   StyleSheet,
@@ -19,7 +20,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatBytes } from "../domain/updates";
 import type { AppUpdater } from "../state/useAppUpdater";
-import { palette, coral } from "./theme";
+import { palette, coral, onCoral } from "./theme";
 import { tap } from "./primitives";
 
 export default function UpdatePrompt({
@@ -32,8 +33,22 @@ export default function UpdatePrompt({
   visible: boolean;
 }) {
   const colors = palette(dark);
-  const { manifest, progress, download } = updates;
-  if (!visible || !updates.promptVisible || !manifest) return null;
+  const { manifest, progress, download, dismissible } = updates;
+  const showing = visible && updates.promptVisible;
+
+  // A forced update has no way back: Android's back gesture must not hide the
+  // only screen that can install it. The modal's onRequestClose is the usual
+  // path; this listener also covers devices that dispatch the event directly.
+  useEffect(() => {
+    if (!showing || dismissible) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => true,
+    );
+    return () => subscription.remove();
+  }, [showing, dismissible]);
+
+  if (!showing || !manifest) return null;
 
   const percent =
     progress && progress.total > 0
@@ -80,6 +95,8 @@ export default function UpdatePrompt({
     </Pressable>
   );
 
+  const later = dismissible ? secondary("Later", updates.dismiss) : null;
+
   function actions() {
     if (download.stage === "downloading") {
       return (
@@ -89,13 +106,16 @@ export default function UpdatePrompt({
               style={[
                 s.fill,
                 {
-                  backgroundColor: coral,
+                  backgroundColor: colors.coralInk,
                   width: `${Math.round((percent ?? 0) * 100)}%`,
                 },
               ]}
             />
           </View>
-          <Text style={[s.progress, { color: colors.muted }]}>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[s.progress, { color: colors.muted }]}
+          >
             {percent === null
               ? `Downloading… ${formatBytes(progress?.done ?? 0)}`
               : `Downloading… ${Math.round(percent * 100)}% of ${size}`}
@@ -111,7 +131,7 @@ export default function UpdatePrompt({
             Android needs your permission before it can install the update.
           </Text>
           {primary("Allow installs", updates.openInstallSettings)}
-          {secondary("Later", updates.dismiss)}
+          {later}
         </>
       );
     }
@@ -123,18 +143,18 @@ export default function UpdatePrompt({
             and your chats and settings stay in place.
           </Text>
           {primary("Install update", () => void updates.install())}
-          {secondary("Later", updates.dismiss)}
+          {later}
         </>
       );
     }
     if (download.stage === "installing") {
       return (
         <>
-          <ActivityIndicator color={coral} style={s.spinner} />
+          <ActivityIndicator color={colors.coralInk} style={s.spinner} />
           <Text style={[s.hint, { color: colors.muted }]}>
             Finish in Android's installer. The app reopens on the new version.
           </Text>
-          {secondary("Close", updates.dismiss)}
+          {dismissible ? secondary("Close", updates.dismiss) : null}
         </>
       );
     }
@@ -147,7 +167,7 @@ export default function UpdatePrompt({
           {!updates.canInstall
             ? primary("Allow installs", updates.openInstallSettings)
             : primary("Try again", () => void updates.startDownload())}
-          {secondary("Later", updates.dismiss)}
+          {later}
         </>
       );
     }
@@ -164,7 +184,7 @@ export default function UpdatePrompt({
             ? () => void updates.startDownload()
             : updates.openInstallSettings,
         )}
-        {secondary("Later", updates.dismiss)}
+        {later}
       </>
     );
   }
@@ -175,7 +195,9 @@ export default function UpdatePrompt({
       visible
       animationType="fade"
       statusBarTranslucent
-      onRequestClose={updates.dismiss}
+      onRequestClose={() => {
+        if (dismissible) updates.dismiss();
+      }}
     >
       <View style={s.overlay}>
         <View
@@ -187,9 +209,11 @@ export default function UpdatePrompt({
           </View>
           <Text style={[s.title, { color: colors.fg }]}>{title}</Text>
           <Text style={[s.body, { color: colors.muted }]}>
-            {installed
-              ? `Version ${manifest.versionName} is available. You are on ${installed}.`
-              : `Version ${manifest.versionName} is available.`}
+            {updates.forced
+              ? `Version ${manifest.versionName} is required. This version of Messenger can no longer connect, so the update must be installed to keep using the app${installed ? ` (you are on ${installed})` : ""}.`
+              : installed
+                ? `Version ${manifest.versionName} is available. You are on ${installed}.`
+                : `Version ${manifest.versionName} is available.`}
           </Text>
           {manifest.notes ? (
             <Text style={[s.body, { color: colors.muted }]}>
@@ -272,7 +296,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginTop: 6,
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: "#29372F", fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
   secondary: {
     alignItems: "center",
     justifyContent: "center",

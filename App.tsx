@@ -9,10 +9,6 @@ import { StatusBar } from "expo-status-bar";
 import { NavigationBar } from "expo-navigation-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useFonts } from "expo-font";
-import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
-import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
-import { DMSans_700Bold } from "@expo-google-fonts/dm-sans/700Bold";
 import ChatsScreen from "./src/features/chats/ChatsScreen";
 import CallsScreen from "./src/features/calls/CallsScreen";
 import ConversationScreen from "./src/features/conversations/ConversationScreen";
@@ -23,14 +19,13 @@ import Stories from "./src/features/stories/Stories";
 import Navigation from "./src/ui/Navigation";
 import type { Tab } from "./src/ui/Navigation";
 import CallFlow, { CallPill } from "./src/features/calls/CallFlow";
-import { useMessenger } from "./src/state/useMessenger";
+import { useRemoteMessenger } from "./src/state/useRemoteMessenger";
 import { useCalls } from "./src/features/calls/useCalls";
 import type { Chat, Message } from "./src/domain/data";
-import { seedMessages } from "./src/domain/data";
-import ChatProfile from "./src/features/contacts/ChatProfile";
-import CallHistoryDetail from "./src/features/calls/CallHistoryDetail";
+import ContactDetail from "./src/features/contacts/ContactDetail";
 import ForwardScreen from "./src/features/conversations/ForwardScreen";
-import { palette, coral } from "./src/ui/theme";
+import { palette } from "./src/ui/theme";
+import StartupGate from "./src/ui/StartupGate";
 import { useSystemAppearance } from "./src/ui/useSystemAppearance";
 import { useCallNotifications } from "./src/features/calls/useCallNotifications";
 import { forgetIncomingCall, rememberIncomingCall } from "./src/features/calls/pendingCall";
@@ -43,16 +38,20 @@ import {
   isSystemNotificationsAvailable,
   setConversationMuted,
 } from "./src/services/systemNotifications";
-
+import AuthGate from "./src/features/auth/AuthGate";
 type ComposeMode = "message" | "voice" | "video";
-
 export default function App() {
-  const [fonts, fontError] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_700Bold,
-  });
-  const messenger = useMessenger();
+  return (
+    <StartupGate>
+      <AuthGate>
+        <MessengerApp />
+      </AuthGate>
+    </StartupGate>
+  );
+}
+
+function MessengerApp() {
+  const messenger = useRemoteMessenger();
   const calls = useCalls(messenger.addCall);
   const updates = useAppUpdater();
   const [tab, setTab] = useState<Tab>("chats");
@@ -128,7 +127,6 @@ export default function App() {
   useMessageNotifications({
     chats: messenger.chats,
     messages: messenger.messages,
-    seed: seedMessages,
     self: {
       id: "self",
       name: messenger.profile.name,
@@ -154,6 +152,13 @@ export default function App() {
     }
     const currentContact =
       messenger.chats.find((item) => item.id === contact.id) || contact;
+    if (currentContact.group) {
+      Alert.alert(
+        "Group calls are unavailable",
+        "Open a member's profile to start a one-to-one voice or video call.",
+      );
+      return;
+    }
     if (currentContact.blocked) {
       Alert.alert(
         "Contact blocked",
@@ -252,10 +257,10 @@ export default function App() {
     !calls.call &&
     !recording;
 
-  if ((!fonts && !fontError) || !messenger.loaded) {
+  if (!messenger.loaded) {
     return (
-      <View style={[s.loading, { backgroundColor: palette(systemDark).bg }]}>
-        <Ionicons name="chatbubble-ellipses" size={42} color={coral} />
+      <View style={[s.loading, { backgroundColor: colors.bg }]}>
+        <Ionicons name="chatbubble-ellipses" size={42} color={colors.coralInk} />
       </View>
     );
   }
@@ -291,42 +296,35 @@ export default function App() {
           </View>
         )}
         {!calls.full && detailChat && (
-          <View style={{ flex: 1 }}>
-            {detail?.kind === "history" ? (
-              <CallHistoryDetail
-                chat={detailChat}
-                history={messenger.history}
-                dark={messenger.dark}
-                onBack={() => setDetail(null)}
-                onProfile={() =>
-                  setDetail({ id: detailChat.id, kind: "profile" })
-                }
-                onCall={(video) => startCall(detailChat, video)}
-              />
-            ) : (
-              <ChatProfile
-                chat={detailChat}
-                chats={messenger.chats}
-                messages={
-                  messenger.messages[detailChat.id] || seedMessages(detailChat)
-                }
-                history={messenger.history}
-                dark={messenger.dark}
-                onBack={() => setDetail(null)}
-                onCall={(video) => startCall(detailChat, video)}
-                onMuteChange={(muted) => muteChat(detailChat.id, muted)}
-                onBlockChange={(blocked) =>
-                  messenger.setBlocked(detailChat.id, blocked)
-                }
-                onDeleteChat={() => {
-                  messenger.deleteChat(detailChat.id);
-                  setDetail(null);
-                }}
-                onClearHistory={() => messenger.clearChat(detailChat.id)}
-                onOpenChat={openChat}
-              />
-            )}
-          </View>
+          <ContactDetail
+            kind={detail?.kind || "profile"}
+            chat={detailChat}
+            chats={messenger.chats}
+            messages={messenger.messages[detailChat.id] || []}
+            history={messenger.history}
+            dark={messenger.dark}
+            onBack={() => setDetail(null)}
+            onProfile={() =>
+              setDetail({ id: detailChat.id, kind: "profile" })
+            }
+            onCall={(video) => startCall(detailChat, video)}
+            onMuteChange={(muted) => muteChat(detailChat.id, muted)}
+            onBlockChange={(blocked) =>
+              messenger.setBlocked(detailChat.id, blocked)
+            }
+            onMediaVisibilityChange={(gallery) =>
+              messenger.setMediaVisibility(
+                detailChat.id,
+                gallery ? "gallery" : "app",
+              )
+            }
+            onDeleteChat={() => {
+              messenger.deleteChat(detailChat.id);
+              setDetail(null);
+            }}
+            onClearHistory={() => messenger.clearChat(detailChat.id)}
+            onOpenChat={openChat}
+          />
         )}
         {!calls.full && forward && (
           <ForwardScreen
@@ -376,10 +374,13 @@ export default function App() {
               onCall={(video) => startCall(chat, video)}
               onSend={messenger.send}
               onReact={messenger.react}
+              onRetry={messenger.retryMessage}
               onRecordingChange={setRecording}
               onProfile={() => setDetail({ id: chat.id, kind: "profile" })}
               onDelete={messenger.deleteMessage}
               onForward={setForward}
+              onSaveMedia={messenger.saveMedia}
+              onTypingChange={messenger.setTyping}
             />
           ) : compose ? (
             <NewConversationScreen
@@ -435,6 +436,7 @@ export default function App() {
             <Navigation
               active={tab}
               avatar={messenger.profile.avatar}
+              name={messenger.profile.name}
               dark={messenger.dark}
               onChange={setTab}
             />
@@ -445,9 +447,18 @@ export default function App() {
           dark={messenger.dark}
           onClose={() => setEditor(null)}
           onSave={(name, handle, group) => {
-            const contact = messenger.addContact(name, handle, group);
             setEditor(null);
-            if (group || compose === "message") openChat(contact);
+            void messenger
+              .addContact(name, handle, group)
+              .then((contact) => {
+                if (group || compose === "message") openChat(contact);
+              })
+              .catch((error) =>
+                Alert.alert(
+                  "Could not add contact",
+                  error instanceof Error ? error.message : "Please try again.",
+                ),
+              );
           }}
         />
         <Stories
