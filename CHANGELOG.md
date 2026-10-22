@@ -17,10 +17,12 @@ and this project adheres to
   `InvalidAccountId`. Incorrect passwords and rate-limited attempts also get
   their own copy.
 
-The local v0.1.1 gate build is 14,376,582 bytes, 1,148 bytes (+0.01%) above the
-published v0.1.0 APK. The JavaScript bundle grew 1,116 bytes for the error
-mapping and the alert's create-account action; the native libraries, dex,
-resources and locales are unchanged. See `docs/PERFORMANCE.md`.
+The published v0.1.1 APK is 14,376,546 bytes, 1,112 bytes (+0.01%) above the
+published v0.1.0 APK; the local gate build measured 14,376,582 bytes, 36 bytes
+higher from build-to-build compression variation. The JavaScript bundle grew
+1,116 bytes for the error mapping and the alert's create-account action; the
+native libraries, dex, resources and locales are unchanged. See
+`docs/PERFORMANCE.md`.
 
 ## [0.1.0] - 2026-10-22
 
