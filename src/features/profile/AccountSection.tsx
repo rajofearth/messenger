@@ -283,7 +283,7 @@ export default function AccountSection({
                   style={[styles.primary, { opacity: busy ? 0.65 : 1 }]}
                 >
                   {busy ? (
-                    <ActivityIndicator color="#29372F" />
+                    <ActivityIndicator color={colors.onCoral} />
                   ) : (
                     <Text style={styles.primaryText}>Change password</Text>
                   )}

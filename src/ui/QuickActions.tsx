@@ -89,7 +89,7 @@ export default function QuickActions({
   });
   const plus = (
     <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-      <Ionicons name="add" size={29} color="white" />
+      <Ionicons name="add" size={29} color={colors.onCoral} />
     </Animated.View>
   );
 
@@ -157,7 +157,7 @@ export default function QuickActions({
                 ]}
               >
                 <View style={[s.icon, { backgroundColor: colors.tint }]}>
-                  <Ionicons name={icon} size={21} color={coral} />
+                  <Ionicons name={icon} size={21} color={colors.coralInk} />
                 </View>
                 <Text style={[s.label, { color: colors.fg }]}>{label}</Text>
               </Pressable>

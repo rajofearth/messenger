@@ -1,3 +1,6 @@
+/** Delivery state for a message this device sent. Server rows omit it. */
+export type MessageStatus = "sending" | "sent" | "failed";
+
 export type Message = {
   id: string;
   text?: string;
@@ -23,6 +26,8 @@ export type Message = {
   reaction?: string;
   sequence?: number;
   revision?: number;
+  /** Local-only delivery state; confirmed server rows leave it undefined. */
+  status?: MessageStatus;
 };
 
 export type Chat = {
@@ -46,6 +51,10 @@ export type Chat = {
   pinned?: boolean;
   /** "gallery" also copies received media into the device photo library. */
   mediaVisibility?: "app" | "gallery";
+  /** Unix milliseconds of the last message, used to reconcile local sends. */
+  lastMessageAt?: number;
+  /** Delivery state of the last message when this device sent it. */
+  lastMessageStatus?: MessageStatus;
 };
 
 export type Story = {

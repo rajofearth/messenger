@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message, Story } from "../domain/data";
+import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { deviceIdentity } from "../services/deviceIdentity";
 import type { ThemePreference } from "../ui/theme";
@@ -12,7 +12,6 @@ import type { SettingsProfile } from "../features/profile/SettingsPreferences";
 import {
   mapMessage,
   remoteUid,
-  timeLabel,
   type RemoteCallRecord,
   type RemoteProfile,
 } from "./remoteMessengerTypes";
@@ -26,9 +25,9 @@ import { createChatPreferences } from "./remoteMessengerPreferences";
 import { saveRemoteProfile } from "./remoteMessengerProfile";
 import {
   uploadAndCreateStory,
-  uploadAndSendAttachment,
 } from "./remoteMessengerUploads";
-import { createRemoteWriters, deleteLocalMessage } from "./remoteMessengerWriters";
+import { createRemoteWriters } from "./remoteMessengerWriters";
+import { createRemoteSend } from "./remoteMessengerSend";
 import {
   createRemoteReadMarker,
   createRemoteReplySender,
@@ -220,7 +219,12 @@ export function useRemoteMessenger() {
   );
   const loaded = localReady;
 
-  const { updateMessages, updateChats, appendLocal } = createRemoteWriters({
+  const {
+    updateMessages,
+    updateChats,
+    appendLocal,
+    markLocalMessageStatus,
+  } = createRemoteWriters({
     setMessages,
     setCachedChats,
     messagesRef,
@@ -230,6 +234,7 @@ export function useRemoteMessenger() {
     chatsRef,
     messagesRef,
     appendLocal,
+    markLocalMessageStatus,
     sendText: sendTextMutation,
   });
   const markRead = createRemoteReadMarker({
@@ -241,6 +246,7 @@ export function useRemoteMessenger() {
     selectedRef,
     messagesRef,
     updateMessages,
+    updateChats,
     deleteForMe: deleteForMeMutation,
     deleteForEveryone: deleteMessageMutation,
     forward: forwardMessageMutation,
@@ -285,7 +291,7 @@ export function useRemoteMessenger() {
     );
     void thread(chat)
       .then((items) => {
-        const sequence = items[items.length - 1]?.sequence;
+        const sequence = newestReadSequence(items);
         if (sequence) {
           void markReadMutation({
             conversationId: chat.id,
@@ -305,7 +311,7 @@ export function useRemoteMessenger() {
     setConversationVisibleState(visible);
     if (visible && selectedRef.current) {
       const items = messagesRef.current[selectedRef.current] || [];
-      const sequence = items[items.length - 1]?.sequence;
+      const sequence = newestReadSequence(items);
       if (sequence) {
         void markReadMutation({
           conversationId: selectedRef.current,
@@ -315,54 +321,22 @@ export function useRemoteMessenger() {
     }
   }
 
-  const removeOptimistic = (chatId: string, messageId: string) =>
-    deleteLocalMessage({ chatId, messageId, updateMessages });
-
-  function send(partial: Partial<Message>) {
-    const chat = chatsRef.current.find(
-      (item) => item.id === selectedRef.current,
-    );
-    if (!chat || chat.blocked) return;
-    if (partial.kind) {
-      void uploadAndSendAttachment(
-        chat,
-        partial,
-        appendLocal,
-        sendAttachmentMutation,
-        removeOptimistic,
-      );
-      return;
-    }
-    const text = partial.text?.trim();
-    if (!text) return;
-    const clientMessageId = remoteUid();
-    const message: Message = {
-      ...partial,
-      id: clientMessageId,
-      text,
-      mine: true,
-      time: timeLabel(),
-      createdAt: new Date().toISOString(),
-    };
-    appendLocal(chat, message, text);
-    void sendTextMutation({
-      conversationId: chat.id,
-      clientMessageId,
-      text,
-      replyToMessageId: partial.replyTo?.id,
-    }).catch(() => {
-      // A failed bubble must not be merged back on every refresh.
-      removeOptimistic(chat.id, clientMessageId);
-      Alert.alert("Message not sent", "Check your connection and try again.");
-    });
-  }
+  const { send, retryMessage } = createRemoteSend({
+    selectedRef,
+    chatsRef,
+    messagesRef,
+    appendLocal,
+    markLocalMessageStatus,
+    sendText: sendTextMutation,
+    sendAttachment: sendAttachmentMutation,
+  });
 
   function react(messageId: string, emoji: string) {
     const chatId = selectedRef.current;
     if (!chatId) return;
     const current = messagesRef.current[chatId] || [];
     const message = current.find((item) => item.id === messageId);
-    if (!message) return;
+    if (!message || message.status) return;
     updateMessages((items) => ({
       ...items,
       [chatId]: (items[chatId] || []).map((item) =>
@@ -472,6 +446,7 @@ export function useRemoteMessenger() {
     closeChat,
     setConversationVisible,
     send,
+    retryMessage,
     sendTo,
     markRead,
     react,

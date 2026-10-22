@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { coral } from "../../ui/theme";
+import { coral, onCoral } from "../../ui/theme";
 
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -59,7 +59,7 @@ export const styles = StyleSheet.create({
   },
   shareText: {
     fontFamily: "DMSans_700Bold",
-    color: "#28332E",
+    color: onCoral,
     fontSize: 15,
   },
   sheetWrap: { flex: 1, justifyContent: "flex-end" },

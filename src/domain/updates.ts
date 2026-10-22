@@ -113,6 +113,14 @@ export function parseUpdateManifest(value: unknown): UpdateManifest | null {
 }
 
 /**
+ * Only an optional release may be postponed. A forced update - mandatory in
+ * the feed, or installed below its floor - keeps the prompt until installed.
+ */
+export function canDismiss(decision: UpdateDecision): boolean {
+  return decision.status === "available" && !decision.forced;
+}
+
+/**
  * A release feed answers either `{ upToDate: true }` or a manifest. Anything
  * else - an HTML error page, a truncated body, a proxy banner - reads as
  * unreadable, which is never an update.

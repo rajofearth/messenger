@@ -4,8 +4,8 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-Measured: **43,537,847 bytes (41.52 MiB) before any size work, 15,516,415 bytes
-(14.80 MiB) in the current unreleased build** — 64.4% smaller, in seven stages. R8
+Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,375,470 bytes
+(13.71 MiB) in v0.1.0** — 67.0% smaller, in nine measured stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
 (33.98 MiB). Compressing the native libraries, removing the unused camera
 barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
@@ -13,9 +13,10 @@ barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 (14.23 MiB), the in-app updater added 32,964 bytes for 14,959,279 bytes
 (14.27 MiB), the device-scheme module added 3,720 for 14,962,999 bytes
 (14.27 MiB), and the audit fixes added 4,136 bytes for 14,967,135 bytes
-(14.27 MiB). The Convex-backed chat work added 549,280 bytes for 15,516,415
-bytes (14.80 MiB), including 4,796 bytes in the review fixes. The stage table
-and the per-entry breakdown are under "Measured APK size".
+(14.27 MiB). The first Convex-backed chat build reached 15,516,415 bytes
+(14.80 MiB). The mobile polish and size pass then removed 1,140,945 bytes,
+ending at 14,375,470 bytes (13.71 MiB), 2.29 MiB below the 16 MiB gate. The
+stage table and the per-entry breakdown are under "Measured APK size".
 
 ### Build configuration in `app.json`
 
@@ -56,21 +57,42 @@ availability check is a `Class.forName` probe that now reports the scanner as
 unavailable. Preview, photo capture and video recording are unaffected, and the
 manifest keeps `android.permission.CAMERA`.
 
+### Fresco decoders and LogBox are not packaged
+
+Every image call site now uses `expo-image`; an architecture test fails if a
+source file imports React Native's Fresco `Image` again. That makes the Fresco
+GIF and WebP decoders unused, so `plugins/withSizeTunables.js` writes
+`expo.gif.enabled=false`, `expo.webp.enabled=false` and
+`expo.webp.animated=false` into the generated `android/gradle.properties`.
+Expo Image still uses Glide for GIF and WebP, so animated media keeps working.
+
+The same plugin sets `android.r8.optimizedResourceShrinking=true`, which lets
+resource shrinking run against R8's optimized graph as well as its unoptimized
+one. Separately, `package.json` excludes the dev-only `@expo/log-box` package
+from Android autolinking; it is not reachable in a release build and no longer
+contributes native code or dex.
+
+The combined result is 17 native libraries instead of 19, 5,164,570 bytes of
+compressed dex instead of 5,529,914, and a 171,316-byte `resources.arsc` instead
+of 522,336. The JavaScript bundle grew 17,460 bytes over the same pass for the
+UX and accessibility work; it is still stored uncompressed at 2,058,288 bytes.
+
 ### Fonts and icons are trimmed to what the app uses
 
-- `App.tsx` loads three DM Sans weights and used to import them from the
-  package root, whose `index.js` requires all eighteen weights. It now imports
-  `@expo-google-fonts/dm-sans/400Regular`, `/500Medium` and `/700Bold`
-  directly, and takes `useFonts` from `expo-font`, so Metro pulls in only the
-  three fonts the app renders.
+- `src/ui/StartupGate.tsx` loads four DM Sans weights: 400, 500, 600 and 700.
+  It used to import them from the package root, whose `index.js` requires all
+  eighteen weights. Direct imports from
+  `@expo-google-fonts/dm-sans/400Regular` and its siblings, plus `useFonts` from
+  `expo-font`, make Metro pull in only the faces the app renders. The 600 face
+  added by the UX pass costs 29,863 stored bytes.
 - Every file that imported `{ Ionicons }` from `@expo/vector-icons` now imports
   the Ionicons module directly. The package root re-exports every icon family,
   which bundled each family's glyph map and font; MaterialCommunityIcons alone
   was 1.31 MiB. Ionicons is the only family the UI uses.
 
 The bundled `.ttf` resources fell from 38 files, 2,609,365 stored bytes (about
-2.5 MiB), to 5 files, 303,380 stored bytes (about 0.3 MiB). The five are the
-three DM Sans weights, Ionicons and a 2 KiB Roboto resource that arrives from
+2.5 MiB), to 6 files, 333,243 stored bytes (about 0.32 MiB). The six are the
+four DM Sans weights, Ionicons and a 2 KiB Roboto resource that arrives from
 another dependency.
 
 ### Only English resources are packaged
@@ -103,7 +125,7 @@ The generated `android/gradle.properties` default is `reactNativeArchitectures=a
 
 | Option | Current state | Why it was not changed |
 | --- | --- | --- |
-| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (1,633,748 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 0.8 MiB; the size goal is met without it, so the faster startup stays. |
+| `enableBundleCompression` | Not set in `app.json`. The React Native Gradle plugin's `ReactExtension` default is `false`, so the JS bundle is stored uncompressed (2,058,288 bytes) and can be memory-mapped at startup. | The plugin's own comment documents the trade: skipping compression improves startup at the cost of a larger APK. The bundle compresses about 2.1×, so enabling this would save roughly 1.0 MiB; the size goal is met without it, so the faster startup stays. |
 | `enablePngCrunchInReleaseBuilds` | Not set in `app.json`. The generated project keeps it on (`android.enablePngCrunchInReleaseBuilds=true`, and the Gradle fallback is `'true'`). | This is the setting that reduces asset size; turning it off would grow the APK to save build time only. |
 | Metro `inlineRequires` | Not overridden. There is no `metro.config.js` in the repository, so bundling uses the Expo and Metro defaults. | Inline requires move module initialisation to first use, which affects startup and bundle layout. Changing it without before/after `adb shell am start -W` numbers would be a guess. |
 
@@ -122,7 +144,8 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.0.4 (in-app updater; versionCode 4) | 14,959,279 bytes (14.27 MiB) | **+32,964 bytes, +0.2%** against v0.0.3, -65.6% overall |
 | v0.0.5 (device scheme; the system theme follows the device live; versionCode 5) | 14,962,999 bytes (14.27 MiB) | **+3,720 bytes, +0.02%** against v0.0.4, -65.6% overall |
 | Current v0.0.6 (storage, notification, updater and contrast fixes; versionCode 6) | 14,967,135 bytes (14.27 MiB) | **+4,136 bytes, +0.03%** against published v0.0.5, -65.6% overall |
-| Unreleased Convex branch (accounts, chat, stories, media cache and review fixes; versionCode 6) | 15,516,415 bytes (14.80 MiB) | **+549,280 bytes, +3.7%** against published v0.0.6, -64.4% overall |
+| First Convex build (accounts, chat, stories, media cache and review fixes; versionCode 6) | 15,516,415 bytes (14.80 MiB) | **+549,280 bytes, +3.7%** against published v0.0.6, -64.4% overall |
+| v0.1.0 release (send/retry UX, dates and accessibility, `expo-image`, Fresco decoder trim, LogBox excluded; versionCode 7) | 14,375,470 bytes (13.71 MiB) | **-1,140,945 bytes, -7.4%** against the first Convex build, -4.0% against v0.0.6, -67.0% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -139,23 +162,34 @@ Where the size went, read from the archives with
 The bytes below are stored sizes, so the `lib/` row compares the two packaging
 modes:
 
-| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | v0.0.5 | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. Unchanged since v0.0.2; the updater and the device-scheme module add no native library. |
-| `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | 5,400,457 bytes (5.15 MiB) in 2 files, 12,928,160 unpacked | 5,402,478 bytes (5.15 MiB) in 2 files, 12,931,744 unpacked | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed, the updater module 7,571 and the device-scheme module 2,021. |
-| `res/` | 3.36 MiB, 1015 entries | 1.13 MiB, 938 entries | 1.13 MiB, 938 entries | 1,190,160 bytes (1.14 MiB), 939 entries | 1,190,160 bytes (1.14 MiB), 939 entries | Font trimming is most of the v0.0.2 drop. The locale filter does not touch `res/`: compiled `values` resources live in `resources.arsc`. The updater adds one provider paths XML; the device-scheme module adds no resource. |
-| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | 1,636,860 bytes (1.56 MiB), 4 files | 1,638,559 bytes (1.56 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 1,633,748 bytes, 24,940 more than v0.0.3 for the updater and 1,688 more than v0.0.4 for the device-scheme bridge, and is still stored uncompressed. |
-| `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. |
-| Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | 163,883 bytes (0.16 MiB) | 163,883 bytes (0.16 MiB) | Packages, Kotlin metadata and property files; effectively unchanged in substance. The device-scheme module adds no package of its own. |
+| Entry group | v0.0.1 | v0.0.2 | v0.0.3 | v0.0.4 | v0.0.5 | v0.1.0 | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `lib/` | 21,601,488 bytes (20.60 MiB) in 20 files, stored as-is | 5,896,334 bytes (5.62 MiB) in 19 files, 16,655,264 bytes (15.88 MiB) unpacked | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | 5,896,334 bytes in 19 files | 5,582,822 bytes (5.32 MiB) in 17 files | Deflate-compressed between 1.9× and 4×, and `libbarhopper_v3.so` is gone. The two Fresco decoder libraries removed by the 0.1.0 pass account for the latest drop; the updater and device-scheme modules add no native library. |
+| `classes*.dex` | 5,810,873 bytes (5.54 MiB) in 2 files | 5,387,206 bytes (5.14 MiB) in 2 files | 5,392,886 bytes (5.14 MiB) in 2 files | 5,400,457 bytes (5.15 MiB) in 2 files, 12,928,160 unpacked | 5,402,478 bytes (5.15 MiB) in 2 files, 12,931,744 unpacked | 5,164,570 bytes (4.92 MiB) in 2 files, 12,473,764 unpacked | MLKit's barcode classes and their transport, firebase and play-services dependencies left the dex: 14,063,276 bytes unpacked fall to 12,892,812. The theme work added 5,680 bytes compressed, the updater module 7,571 and the device-scheme module 2,021. The 0.1.0 pass removes `@expo/log-box` and the Fresco decoder code. |
+| `res/` | 3.36 MiB, 1015 entries | 1.13 MiB, 938 entries | 1.13 MiB, 938 entries | 1,190,160 bytes (1.14 MiB), 939 entries | 1,190,160 bytes (1.14 MiB), 939 entries | 1,108,463 bytes (1.06 MiB), 636 entries | Font trimming is most of the v0.0.2 drop. The locale filter does not touch `res/`: compiled `values` resources live in `resources.arsc`. The updater adds one provider paths XML; the device-scheme module adds no resource. Optimized resource shrinking prunes the 0.1.0 build further. |
+| `assets/` | 2.69 MiB, 7 files | 1.53 MiB, 4 files | 1,611,858 bytes (1.54 MiB), 4 files | 1,636,860 bytes (1.56 MiB), 4 files | 1,638,559 bytes (1.56 MiB), 4 files | 2,062,818 bytes (1.97 MiB), 4 files | The 880,888 bytes of MLKit `.tflite` models are gone. The JS bundle is 2,058,288 bytes in v0.1.0, 17,460 more than the first Convex build for the UX and accessibility work, and is still stored uncompressed. |
+| `resources.arsc` | 1.36 MiB | 1.23 MiB | 515,120 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | 515,176 bytes (0.49 MiB) | 171,316 bytes (0.16 MiB) | v0.0.2 is smaller after resource shrinking; the locale filter is the rest: around 100 languages of library strings are gone. The 0.1.0 pass's optimized shrinking removes more unreachable library resources. |
+| Other (`org/`, `okhttp3/`, `kotlin/`, `META-INF/`, property files) | 0.15 MiB | 0.14 MiB | 0.14 MiB | 163,883 bytes (0.16 MiB) | 163,883 bytes (0.16 MiB) | 164,078 bytes (0.16 MiB) | Packages, Kotlin metadata and property files; effectively unchanged in substance. The device-scheme module adds no package of its own. |
 
-The unreleased Convex branch is 15,516,415 bytes, 549,280 bytes (+3.7%) above
-published v0.0.6. The JavaScript bundle grew by 402,269 bytes (1,638,559 to
-2,040,828) for the Convex client, Convex Auth and the SecureStore session. The
-dex grew by 127,436 bytes (5,402,478 to 5,529,914) for `expo-secure-store` and
-`expo-media-library`; `res/` grew by 10,108 bytes across 12 new entries and
-`resources.arsc` by 7,160, both from media-library resources. `lib/` is
-unchanged at 5,896,334 bytes and 19 libraries. The build is 1.20 MiB below the
-16 MiB gate.
+The first Convex build was 15,516,415 bytes, 549,280 bytes (+3.7%)
+above published v0.0.6. The JavaScript bundle grew by 402,269 bytes (1,638,559
+to 2,040,828) for the Convex client, Convex Auth and the SecureStore session.
+The dex grew by 127,436 bytes (5,402,478 to 5,529,914) for `expo-secure-store`
+and `expo-media-library`; `res/` grew by 10,108 bytes across 12 new entries and
+`resources.arsc` by 7,160, both from media-library resources. `lib/` was
+unchanged at 5,896,334 bytes and 19 libraries.
+
+The v0.1.0 build is 14,375,470 bytes, 1,140,945 bytes (-7.4%) below that first
+Convex build and 591,665 bytes (-4.0%) below published v0.0.6. The JavaScript
+bundle did not drive the saving: it grew 17,460 bytes to 2,058,288 for the send
+state, date labels, accessibility and blocked-composer work, and remains stored
+uncompressed. The saving came from code and resources that left the APK:
+compressed dex fell 365,344 bytes, `lib/` fell 313,512 across two fewer
+libraries, `res/` fell 81,697, and `resources.arsc` fell 351,020. The build is
+2.29 MiB below the 16 MiB gate. `npm run release:check` reports 17 native
+libraries, 2 dex files (11.90 MiB unpacked), a 1.96 MiB JavaScript bundle stored
+uncompressed, a 0.16 MiB `resources.arsc`, English-only resources, and 10
+passing checks with no warnings.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging
@@ -194,7 +228,7 @@ The cost of this choice is that each row is measured on first render. The benefi
 
 ### Images
 
-`expo-image` renders message images (`MessageBubble.tsx`), media albums (`MediaAlbum.tsx`), the full-screen media viewer (`ConversationScreen.tsx`, `AlbumViewer.tsx`) and the shared-media grids (`ChatProfileShared.tsx`). Story media uses React Native's own `Image`, and video playback uses `expo-video`.
+`expo-image` renders every image surface, including message images (`MessageBubble.tsx`), media albums (`MediaAlbum.tsx`), the full-screen media viewer (`ConversationScreen.tsx`, `AlbumViewer.tsx`), the shared-media grids (`ChatProfileShared.tsx`) and story media (`StoryMedia.tsx`). Video playback uses `expo-video`.
 
 - `recyclingKey={message.id}` (in `MessageBubble.tsx`, `MediaAlbum.tsx`, `AlbumViewer.tsx` and `ChatProfileShared.tsx`) tells `expo-image` that a recycled view now shows a different image, so the view and its decode can be reused instead of holding a second image while the old one is still mounted.
 - `cachePolicy="memory-disk"` is set on the two media grid callers (`MediaAlbum.tsx` and `ChatProfileShared.tsx`); other `expo-image` callers use the default policy. The memory tier makes scrolling back over already-seen media cheap, and the disk tier keeps the memory tier from having to hold everything.
@@ -304,6 +338,6 @@ There is no automated performance harness here. No baseline for startup, frame t
 - **FlashList was not added.** A new dependency and a new list API would not pay for themselves without measured jank, and the thread is capped at the newest 100 messages.
 - **No deep virtualisation experiments.** No fixed row heights, no `getItemLayout`, no cell-recycling tricks beyond what `FlatList` and `expo-image` already provide. The reasons are in the `getItemLayout` section: variable font scale and content-dependent rows.
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
-- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 0.8 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 14.80 MiB there is no reason to take that trade without on-device startup numbers.
+- **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 1.0 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 13.71 MiB there is no reason to take that trade without on-device startup numbers.
 - **No JS-level profiling.** Hermes is on (`hermesEnabled=true` in the generated `android/gradle.properties`), but no sampling or tracing run has been recorded in this repository.
 - **JDK 21 was not adopted, and JDK 26/27 are not options.** The build runs on JDK 17, which is also Android Gradle Plugin 8.12's target. An app-wipe build on JDK 21 took 88.1s against 65.7s on JDK 17 over an identical task set on this Windows-on-ARM machine (one run each; x86 Linux numbers elsewhere differ), so 21 buys nothing here. JDK 26 needs Gradle 9.4 and JDK 27 needs Gradle 9.8; the wrapper ships 9.3.1, which supports JVM 17-25. The measured win was caching, which is JDK-independent.

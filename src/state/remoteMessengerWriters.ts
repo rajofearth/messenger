@@ -1,6 +1,20 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { Chat, Message } from "../domain/data";
+import type { Chat, Message, MessageStatus } from "../domain/data";
+import { messagePreview } from "../domain/messageActions";
+import { isConfirmed } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
+
+export type AppendLocal = (
+  chat: Chat,
+  message: Message,
+  preview: string,
+) => void;
+
+export type MarkLocalMessageStatus = (args: {
+  chatId: string;
+  messageId: string;
+  status: MessageStatus;
+}) => void;
 
 type Args = {
   setMessages: Dispatch<SetStateAction<Record<string, Message[]>>>;
@@ -29,35 +43,99 @@ export function createRemoteWriters({
     });
   }
 
-  function updateChats(next: (current: Chat[]) => Chat[]) {
+  function updateChats(next: (current: Chat[]) => Chat[], persist = true) {
     setCachedChats((current) => {
       const value = next(current);
       chatsRef.current = value;
-      void messengerRepository.saveChats(value).catch(() => {});
+      if (persist) void messengerRepository.saveChats(value).catch(() => {});
       return value;
     });
   }
 
+  /**
+   * Adds an outgoing bubble in memory. Neither the bubble nor the optimistic
+   * inbox row reaches disk: only a server-confirmed snapshot may be persisted,
+   * so a killed process cannot revive a message that never arrived.
+   */
   function appendLocal(chat: Chat, message: Message, preview: string) {
+    const createdAt = message.createdAt ? Date.parse(message.createdAt) : NaN;
+    const lastMessageAt = Number.isFinite(createdAt) ? createdAt : Date.now();
+    const local: Message =
+      message.mine && !message.status
+        ? { ...message, status: "sending" }
+        : message;
     updateMessages((current) => ({
       ...current,
-      [chat.id]: [...(current[chat.id] || []), message],
+      [chat.id]: [...(current[chat.id] || []), local],
     }));
-    updateChats((current) =>
-      [chat, ...current.filter((item) => item.id !== chat.id)].map((item) =>
-        item.id === chat.id
-          ? {
-              ...item,
-              preview,
-              time: message.time,
-              unread: message.mine ? item.unread : item.unread + 1,
-            }
-          : item,
-      ),
+    updateChats(
+      (current) =>
+        [chat, ...current.filter((item) => item.id !== chat.id)].map((item) =>
+          item.id === chat.id
+            ? {
+                ...item,
+                preview,
+                time: local.time,
+                lastMessageAt,
+                lastMessageStatus: local.mine ? local.status : undefined,
+                unread: local.mine ? item.unread : item.unread + 1,
+              }
+            : item,
+        ),
+      false,
     );
   }
 
-  return { updateMessages, updateChats, appendLocal };
+  /**
+   * Moves an optimistic message between sending, sent and failed. The inbox
+   * row is only written to disk once the server confirms the send.
+   */
+  function markLocalMessageStatus({
+    chatId,
+    messageId,
+    status,
+  }: {
+    chatId: string;
+    messageId: string;
+    status: MessageStatus;
+  }) {
+    const thread = messagesRef.current[chatId] || [];
+    const message = thread.find((item) => item.id === messageId);
+    if (!message) return;
+    const next = { ...message, status };
+    updateMessages((current) => ({
+      ...current,
+      [chatId]: (current[chatId] || []).map((item) =>
+        item.id === messageId ? next : item,
+      ),
+    }));
+    if (thread[thread.length - 1]?.id !== messageId) return;
+    const createdAt = next.createdAt ? Date.parse(next.createdAt) : NaN;
+    updateChats(
+      (current) =>
+        current.map((item) =>
+          item.id === chatId
+            ? {
+                ...item,
+                preview: messagePreview(next),
+                time: next.time,
+                lastMessageAt: Number.isFinite(createdAt)
+                  ? createdAt
+                  : item.lastMessageAt,
+                lastMessageStatus: status,
+              }
+            : item,
+        ),
+      status === "sent",
+    );
+  }
+
+  return {
+    updateMessages,
+    updateChats,
+    appendLocal,
+    markLocalMessageStatus,
+  };
 }
 
 /** Removes one message from the device copy without touching the server. */
@@ -77,7 +155,7 @@ export function deleteLocalMessage(args: {
     void messengerRepository
       .saveMessages(
         args.chatId,
-        next.filter((item) => item.sequence !== undefined),
+        next.filter((item) => isConfirmed(item)),
       )
       .catch(() => {});
     return { ...current, [args.chatId]: next };

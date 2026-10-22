@@ -1,5 +1,12 @@
 export const coral = "#EF8E76";
 
+/**
+ * Copy and icons that sit on a coral surface. The coral is the same shade in
+ * both palettes, so this dark ink is measured once: 6.7:1 against #EF8E76.
+ * White would land near 2.3:1 and fails normal-size text.
+ */
+export const onCoral = "#3A1710";
+
 /** How the app chooses its palette: follow the device, or pin one theme. */
 export type ThemePreference = "system" | "light" | "dark";
 
@@ -33,6 +40,14 @@ export function palette(dark: boolean) {
     // bubbles in both themes; the muted variant is for secondary labels.
     outgoingFg: dark ? "#120805" : "#3A1710",
     outgoingMuted: dark ? "#24100C" : "#54251A",
+    /** Dark copy for coral buttons, unread badges and the story plus. */
+    onCoral,
+    /**
+     * Accent copy and icons on app or card surfaces. `coral` is a fill colour
+     * and is too light for normal-size text on white; this darker ink keeps the
+     * same hue while clearing 4.5:1 in the light theme.
+     */
+    coralInk: dark ? coral : "#9A3D2A",
   };
 }
 export type Colors = ReturnType<typeof palette>;

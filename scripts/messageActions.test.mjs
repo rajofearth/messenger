@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createForward,
   deleteFromThread,
+  localChatPreview,
   messagePreview,
   refreshChatPreview,
 } from "../src/domain/messageActions.ts";
@@ -122,4 +123,32 @@ test("previews describe videos and the actual latest message", () => {
     "You: Sent a video",
   );
   assert.equal(refreshChatPreview(chat, [incoming, own]).time, own.time);
+});
+
+test("local previews keep the latest send state for delete-time reconciliation", () => {
+  assert.deepEqual(localChatPreview([]), {
+    preview: "No messages yet",
+    time: "",
+    lastMessageAt: undefined,
+    lastMessageStatus: undefined,
+  });
+  const failed = {
+    id: "pending",
+    text: "Later",
+    mine: true,
+    time: "10:05",
+    createdAt: "2026-10-18T10:05:00Z",
+    status: "failed",
+  };
+  assert.deepEqual(localChatPreview([incoming, failed]), {
+    preview: "You: Later",
+    time: "10:05",
+    lastMessageAt: Date.parse(failed.createdAt),
+    lastMessageStatus: "failed",
+  });
+  assert.equal(localChatPreview([incoming]).preview, "hello");
+  assert.equal(
+    localChatPreview([{ ...incoming, createdAt: "not a date" }]).lastMessageAt,
+    undefined,
+  );
 });

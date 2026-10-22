@@ -14,7 +14,7 @@ import type { Message } from "../../domain/data";
 import { messageActionsLayout } from "./messageActionsLayout";
 import { palette } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
-import { deleteOptions } from "./conversationModel";
+import { deleteOptions, messageSummary } from "./conversationModel";
 
 export type MessageRect = {
   x: number;
@@ -47,6 +47,7 @@ export default function MessageActions({
   onForward,
   onSave,
   onDelete,
+  onRetry,
 }: {
   target: ActionTarget | null;
   dark: boolean;
@@ -56,6 +57,7 @@ export default function MessageActions({
   onForward: (message: Message) => void;
   onSave?: (message: Message) => void;
   onDelete: (id: string, everyone: boolean) => void;
+  onRetry?: (messageId: string) => void;
 }) {
   const { width, height } = useWindowDimensions();
   const [menuHeight, setMenuHeight] = useState(200);
@@ -63,6 +65,10 @@ export default function MessageActions({
   const { card, fg } = palette(dark);
   if (!target) return null;
   const { message, rect } = target;
+  const summary = messageSummary(message);
+  // Reactions, replies and forwards all address the server message id; a
+  // local-only bubble has no such id until its send is confirmed.
+  const serverMessage = !message.status;
   const placement = messageActionsLayout(
     rect,
     { height, top: insets.top, bottom: insets.bottom },
@@ -85,10 +91,13 @@ export default function MessageActions({
       <View style={styles.overlay}>
         <Pressable
           style={StyleSheet.absoluteFill}
+          accessibilityRole="button"
           accessibilityLabel="Dismiss message actions"
           onPress={onClose}
         />
         <View
+          accessibilityViewIsModal
+          onAccessibilityEscape={onClose}
           onLayout={(event) => setMenuHeight(event.nativeEvent.layout.height)}
           style={[
             styles.menu,
@@ -104,22 +113,36 @@ export default function MessageActions({
           ]}
         >
           <ScrollView keyboardShouldPersistTaps="always">
-            <View style={styles.emojis}>
-              {reactionEmojis.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  accessibilityRole="button"
-                  accessibilityLabel={`React ${emoji}`}
-                  onPress={() => run(() => onReact(message.id, emoji))}
-                  style={styles.emoji}
-                >
-                  <Text style={{ fontSize: 27 }}>{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
+            {serverMessage ? (
+              <View style={styles.emojis}>
+                {reactionEmojis.map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    accessibilityRole="button"
+                    accessibilityLabel={`React ${emoji}`}
+                    onPress={() => run(() => onReact(message.id, emoji))}
+                    style={styles.emoji}
+                  >
+                    <Text style={{ fontSize: 27 }}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             {[
-              { label: "Reply", action: () => onReply(message) },
-              { label: "Forward", action: () => onForward(message) },
+              ...(onRetry && message.status === "failed"
+                ? [
+                    {
+                      label: "Retry sending",
+                      action: () => onRetry(message.id),
+                    },
+                  ]
+                : []),
+              ...(serverMessage
+                ? [
+                    { label: "Reply", action: () => onReply(message) },
+                    { label: "Forward", action: () => onForward(message) },
+                  ]
+                : []),
               ...(onSave && message.uri && (message.kind === "image" || message.kind === "video")
                 ? [
                     {
@@ -136,12 +159,18 @@ export default function MessageActions({
               <Pressable
                 key={label}
                 accessibilityRole="button"
+                accessibilityLabel={`${label}: ${summary}`}
                 onPress={() => run(action)}
                 style={styles.action}
               >
                 <Text
                   style={{
-                    color: label === "Delete" ? "#DE6666" : fg,
+                    color:
+                      label === "Delete"
+                        ? dark
+                          ? "#FFB4AB"
+                          : "#B3261E"
+                        : fg,
                     fontSize: 16,
                   }}
                 >

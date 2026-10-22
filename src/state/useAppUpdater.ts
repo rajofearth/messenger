@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import {
+  canDismiss,
   decideUpdate,
   shouldPrompt,
   type UpdateDecision,
@@ -239,7 +240,7 @@ export function useAppUpdater() {
   /** Dismissal is remembered per release, so the next one asks again. */
   const dismiss = useCallback(() => {
     const current = latest.current.decision;
-    if (current.status !== "available" || current.forced) return;
+    if (current.status !== "available" || !canDismiss(current)) return;
     setHiddenNow(true);
     setDismissed(current.manifest.versionCode);
     void messengerRepository
@@ -263,6 +264,7 @@ export function useAppUpdater() {
     status,
     manifest,
     forced: decision.status === "available" && decision.forced,
+    dismissible: canDismiss(decision),
     size: decision.status === "available" ? decision.size : null,
     installed,
     canInstall: installed?.canInstall ?? false,

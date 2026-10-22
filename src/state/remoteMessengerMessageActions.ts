@@ -1,11 +1,17 @@
 import { Alert } from "react-native";
 import type { MutableRefObject } from "react";
-import type { Message } from "../domain/data";
+import type { Chat, Message } from "../domain/data";
+import { localChatPreview } from "../domain/messageActions";
 import { deleteLocalMessage } from "./remoteMessengerWriters";
 import { remoteUid } from "./remoteMessengerTypes";
 
 type UpdateMessages = (
   next: (current: Record<string, Message[]>) => Record<string, Message[]>,
+) => void;
+
+type UpdateChats = (
+  next: (current: Chat[]) => Chat[],
+  persist?: boolean,
 ) => void;
 
 type DeleteForMe = (args: {
@@ -34,6 +40,7 @@ export function createRemoteMessageActions({
   selectedRef,
   messagesRef,
   updateMessages,
+  updateChats,
   deleteForMe,
   deleteForEveryone,
   forward,
@@ -41,6 +48,7 @@ export function createRemoteMessageActions({
   selectedRef: MutableRefObject<string | null>;
   messagesRef: MutableRefObject<Record<string, Message[]>>;
   updateMessages: UpdateMessages;
+  updateChats: UpdateChats;
   deleteForMe: DeleteForMe;
   deleteForEveryone: DeleteForEveryone;
   forward: Forward;
@@ -52,7 +60,21 @@ export function createRemoteMessageActions({
       : undefined;
     if (!chatId || !message) return;
     if (!everyone) {
+      const remaining = (messagesRef.current[chatId] || []).filter(
+        (item) => item.id !== id,
+      );
       deleteLocalMessage({ chatId, messageId: id, updateMessages });
+      // The server never saw an unconfirmed bubble, so no inbox refresh will
+      // fix the preview after it is deleted. Recompute it from what is left.
+      updateChats(
+        (current) =>
+          current.map((item) =>
+            item.id === chatId
+              ? { ...item, ...localChatPreview(remaining) }
+              : item,
+          ),
+        false,
+      );
       void deleteForMe({ conversationId: chatId, messageId: id }).catch(
         () => {},
       );
@@ -75,6 +97,13 @@ export function createRemoteMessageActions({
   async function forwardMessage(message: Message, targetChatId: string) {
     const sourceConversationId = selectedRef.current;
     if (!sourceConversationId) return;
+    if (message.status) {
+      Alert.alert(
+        "Message not ready",
+        "Wait for this message to finish sending before forwarding it.",
+      );
+      return;
+    }
     try {
       await forward({
         sourceConversationId,

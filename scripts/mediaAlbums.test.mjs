@@ -30,6 +30,16 @@ test("sender changes and text, file, audio, deleted and forwarded gaps break alb
   }
 });
 
+test("pending and failed media keep their own bubble for status and retry", () => {
+  for (const status of ["sending", "failed", "sent"]) {
+    assert.deepEqual(
+      types([photo(1, 0, { status }), photo(2, 1)]),
+      ["message", "message"],
+    );
+  }
+  assert.deepEqual(types([photo(1), photo(2, 1)]), ["album"]);
+});
+
 test("reply targets must match, including absence of a reply", () => {
   const replyTo = { id: "parent", text: "original", mine: false };
   assert.deepEqual(types([photo(1, 0, { replyTo }), photo(2, 1, { replyTo })]), ["album"]);

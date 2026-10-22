@@ -80,6 +80,7 @@ export function mapChat(item: {
     bio: item.bio,
     preview: item.preview,
     time: item.lastMessageAt ? timeLabel(item.lastMessageAt) : "",
+    lastMessageAt: item.lastMessageAt,
     unread: item.unread,
     group: item.group,
     color: item.color,

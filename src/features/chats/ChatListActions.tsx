@@ -10,9 +10,9 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Chat } from "../../domain/data";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 
-export type ChatActionTarget = { chat: Chat; x: number; y: number };
+export type ChatActionTarget = { chat: Chat; x?: number; y?: number };
 
 type Props = {
   target: ChatActionTarget | null;
@@ -42,14 +42,17 @@ export default function ChatListActions({
   const { chat, x, y } = target;
   const menuWidth = Math.min(280, width - 24);
   const menuHeight = confirming ? 250 : 272;
-  const left = Math.max(
-    12,
-    Math.min(x - menuWidth / 2, width - menuWidth - 12),
-  );
-  const top = Math.max(
-    insets.top + 12,
-    Math.min(y + 8, height - insets.bottom - menuHeight - 12),
-  );
+  const left =
+    x === undefined
+      ? Math.max(12, (width - menuWidth) / 2)
+      : Math.max(12, Math.min(x - menuWidth / 2, width - menuWidth - 12));
+  const top =
+    y === undefined
+      ? Math.max(insets.top + 12, (height - menuHeight) / 2)
+      : Math.max(
+          insets.top + 12,
+          Math.min(y + 8, height - insets.bottom - menuHeight - 12),
+        );
 
   function run(action: (chat: Chat) => void) {
     onClose();
@@ -62,10 +65,11 @@ export default function ChatListActions({
     action: () => void,
     destructive = false,
   ) {
+    const ink = destructive ? (dark ? "#FFB4AB" : "#B3261E") : colors.fg;
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={`${label} for ${chat.name}`}
         onPress={action}
         style={({ pressed }) => [
           s.option,
@@ -75,9 +79,9 @@ export default function ChatListActions({
         <Ionicons
           name={icon}
           size={19}
-          color={destructive ? coral : colors.fg}
+          color={ink}
         />
-        <Text style={[s.label, { color: destructive ? coral : colors.fg }]}>
+        <Text style={[s.label, { color: ink }]}>
           {label}
         </Text>
       </Pressable>

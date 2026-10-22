@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-22
+
 Convex now backs accounts and chat. The client keeps its local cache in front of
 every read, so cached chats, threads, stories and settings paint on an offline
 start while writes reconcile with the deployment.
@@ -47,18 +49,32 @@ start while writes reconcile with the deployment.
   conversation with them.
 - A conversation that is on screen marks new messages read on the server, and a
   failed notification reply is retried instead of being treated as sent.
+- Failed sends keep their bubble, text and local attachment so the message can
+  be retried in place instead of vanishing. The composer and inbox distinguish
+  sending, failed and accepted sends, and a blocked conversation shows a lock
+  bar instead of an active composer.
+- The inbox and thread use local Today / Yesterday / weekday / date labels, with
+  day separators and honest empty-thread copy. Message and conversation actions
+  expose accessible labels and custom actions, and image avatars fall back to
+  initials or a person icon. Light-mode coral labels use a darker accent ink so
+  they clear normal-text contrast; failed-send states use a theme-aware red.
+- All images render through `expo-image`; the release build excludes the unused
+  Fresco GIF/WebP decoders and the dev-only `@expo/log-box` package.
 - CI and release builds receive `EXPO_PUBLIC_CONVEX_URL` and
   `EXPO_PUBLIC_CONVEX_SITE_URL`; releases also deploy the Convex functions when
   `CONVEX_DEPLOY_KEY` is present.
+- Expo is on the SDK 57 patch line (`57.0.31` and `expo-sharing` `57.0.24`), so
+  `expo install --check` passes without skipped validation.
 - `expo-media-library` and its app config plugin are now part of the build.
 
 ### Size
 
-- Release APK: 15,516,415 bytes (14.80 MiB), 549,280 bytes (+3.7%) above
-  published v0.0.6 and 1.20 MiB below the 16 MiB gate. The JavaScript bundle,
-  `expo-secure-store` and `expo-media-library` account for almost all of the
-  growth; the review fixes added 4,796 bytes over the first feature build. See
-  `docs/PERFORMANCE.md`.
+- Release APK: 14,375,470 bytes (13.71 MiB), 1,140,945 bytes (-7.4%) below the
+  first Convex build and 591,665 bytes (-4.0%) below published v0.0.6. The
+  JavaScript bundle grew 17,460 bytes to 2,058,288 for the UX work and stays
+  uncompressed for startup; compressed dex fell 365,344 bytes, native libraries
+  313,512 across two fewer files, `res/` 81,697 and `resources.arsc` 351,020.
+  The build is 2.29 MiB below the 16 MiB gate. See `docs/PERFORMANCE.md`.
 
 ## [0.0.6] - 2026-10-19
 

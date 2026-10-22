@@ -2,8 +2,9 @@ import React, { useRef } from "react";
 import { Keyboard, Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
+import { chatTimeLabel } from "../../domain/time";
 import { Avatar } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import { s } from "./ChatsScreen.styles";
 
 type Props = {
@@ -11,19 +12,46 @@ type Props = {
   dark: boolean;
   typing: boolean;
   onOpen: (chat: Chat) => void;
-  onActions: (chat: Chat, x: number, y: number) => void;
+  onActions: (chat: Chat, x?: number, y?: number) => void;
 };
 
 /** Memoized row so typing or an open action menu does not re-render the whole list. */
 function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
   const colors = palette(dark);
   const longPressed = useRef(false);
-  const preview = typing ? "typing •••" : chat.preview;
+  const pending =
+    chat.lastMessageStatus === "sending" || chat.lastMessageStatus === "failed";
+  const failed = chat.lastMessageStatus === "failed";
+  const preview =
+    chat.lastMessageStatus === "sending"
+      ? "Sending…"
+      : chat.lastMessageStatus === "failed"
+        ? "Not sent"
+        : typing
+          ? "typing •••"
+          : chat.preview;
+  const confirmed =
+    !typing &&
+    !pending &&
+    (chat.lastMessageStatus === "sent" ||
+      (!chat.lastMessageStatus && chat.preview.startsWith("You:")));
+  // Server chats carry a timestamp; the cached `time` label is the fallback
+  // for rows written before that field existed, or for a contact with no
+  // messages yet.
+  const timestamp = chatTimeLabel(chat.lastMessageAt) ?? chat.time;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${chat.name}, ${chat.unread > 0 ? `${chat.unread} unread messages, ` : ""}${preview}`}
-      accessibilityHint="Long press for conversation actions"
+      accessibilityHint="Long press or use conversation actions for more options"
+      accessibilityActions={[
+        { name: "longpress", label: `Conversation actions for ${chat.name}` },
+      ]}
+      onAccessibilityAction={({ nativeEvent }) => {
+        if (nativeEvent.actionName !== "longpress") return;
+        Keyboard.dismiss();
+        onActions(chat);
+      }}
       onPressIn={() => {
         longPressed.current = false;
       }}
@@ -40,16 +68,16 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
         pressed && { backgroundColor: colors.card },
       ]}
     >
-      <Avatar uri={chat.avatar} online={chat.online} />
+      <Avatar uri={chat.avatar} name={chat.name} online={chat.online} />
       <View style={s.chatBody}>
         <View style={s.rowTop}>
           <Text numberOfLines={1} style={[s.name, { color: colors.fg }]}>
             {chat.name}
           </Text>
           <Text
-            style={[s.time, { color: chat.unread > 0 ? coral : colors.muted }]}
+            style={[s.time, { color: chat.unread > 0 ? colors.coralInk : colors.muted }]}
           >
-            {chat.time}
+            {timestamp}
           </Text>
         </View>
         <View style={s.rowBottom}>
@@ -58,13 +86,17 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
             style={[
               s.preview,
               {
-                color: typing
-                  ? coral
-                  : chat.unread > 0
-                    ? dark
-                      ? "#D7DAD3"
-                      : "#667268"
-                    : colors.muted,
+                color: failed
+                  ? dark
+                    ? "#FFB4AB"
+                    : "#B3261E"
+                  : typing
+                    ? colors.coralInk
+                    : chat.unread > 0
+                      ? dark
+                        ? "#D7DAD3"
+                        : "#667268"
+                      : colors.muted,
               },
             ]}
           >
@@ -91,8 +123,8 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
               <Text style={s.unreadText}>{chat.unread}</Text>
             </View>
           )}
-          {chat.unread <= 0 && !typing && chat.preview.startsWith("You:") && (
-            <Ionicons name="checkmark-done" color={colors.muted} size={15} />
+          {chat.unread <= 0 && confirmed && (
+            <Ionicons name="checkmark" color={colors.muted} size={15} />
           )}
         </View>
       </View>

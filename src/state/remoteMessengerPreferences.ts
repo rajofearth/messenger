@@ -83,7 +83,14 @@ export function createChatPreferences({
     updateChats((current) =>
       current.map((item) =>
         item.id === id
-          ? { ...item, preview: "No messages yet", time: "", unread: 0 }
+          ? {
+              ...item,
+              preview: "No messages yet",
+              time: "",
+              unread: 0,
+              lastMessageAt: undefined,
+              lastMessageStatus: undefined,
+            }
           : item,
       ),
     );

@@ -14,7 +14,15 @@ export const styles = StyleSheet.create({
   contact: { flex: 1, marginLeft: 11 },
   name: { fontFamily: "DMSans_700Bold", fontSize: 16 },
   messageList: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 14 },
-  dateChip: { alignItems: "center", marginBottom: 19 },
+  dateChip: { alignItems: "center", marginBottom: 14, marginTop: 2 },
+  emptyThread: {
+    textAlign: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 52,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 14,
+    lineHeight: 22,
+  },
   typing: {
     borderRadius: 19,
     borderBottomLeftRadius: 5,
@@ -41,6 +49,13 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: 9,
     paddingHorizontal: 4,
+  },
+  blockedText: {
+    flex: 1,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    paddingHorizontal: 10,
   },
   liveDot: { width: 7, height: 7, backgroundColor: "#DE6666", borderRadius: 4 },
   imageViewer: {

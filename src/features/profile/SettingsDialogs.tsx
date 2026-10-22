@@ -1,7 +1,6 @@
 import React from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -12,6 +11,7 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearAvatarCache } from "../../data/avatars";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
@@ -210,7 +210,7 @@ export default function SettingsDialogs({
                   style={[styles.primary, { opacity: busy ? 0.65 : 1 }]}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#29372F" />
+                    <ActivityIndicator color={colors.onCoral} />
                   ) : (
                     <Text style={styles.primaryText}>Save changes</Text>
                   )}
@@ -244,7 +244,7 @@ export default function SettingsDialogs({
                     onPress={clearAvatars}
                     style={[styles.secondary, { marginTop: 14 }]}
                   >
-                    <Text style={styles.secondaryText}>
+                    <Text style={[styles.secondaryText, { color: colors.coralInk }]}>
                       {avatarsCleared
                         ? "Downloaded avatars cleared"
                         : "Clear downloaded avatars"}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Messenger",
     "slug": "messenger",
-    "version": "0.0.6",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.yashraj.messenger",
-      "versionCode": 6,
+      "versionCode": 7,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -60,6 +60,7 @@
       "./plugins/withBarcodeScannerDisabled",
       "./plugins/withEnglishOnlyResources",
       "./plugins/withGradlePerformance",
+      "./plugins/withSizeTunables",
       "./plugins/withUpdateInstaller",
       [
         "expo-build-properties",

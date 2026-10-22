@@ -9,10 +9,6 @@ import { StatusBar } from "expo-status-bar";
 import { NavigationBar } from "expo-navigation-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useFonts } from "expo-font";
-import { DMSans_400Regular } from "@expo-google-fonts/dm-sans/400Regular";
-import { DMSans_500Medium } from "@expo-google-fonts/dm-sans/500Medium";
-import { DMSans_700Bold } from "@expo-google-fonts/dm-sans/700Bold";
 import ChatsScreen from "./src/features/chats/ChatsScreen";
 import CallsScreen from "./src/features/calls/CallsScreen";
 import ConversationScreen from "./src/features/conversations/ConversationScreen";
@@ -27,7 +23,9 @@ import { useRemoteMessenger } from "./src/state/useRemoteMessenger";
 import { useCalls } from "./src/features/calls/useCalls";
 import type { Chat, Message } from "./src/domain/data";
 import ContactDetail from "./src/features/contacts/ContactDetail";
-import ForwardScreen from "./src/features/conversations/ForwardScreen";import { palette, coral } from "./src/ui/theme";
+import ForwardScreen from "./src/features/conversations/ForwardScreen";
+import { palette } from "./src/ui/theme";
+import StartupGate from "./src/ui/StartupGate";
 import { useSystemAppearance } from "./src/ui/useSystemAppearance";
 import { useCallNotifications } from "./src/features/calls/useCallNotifications";
 import { forgetIncomingCall, rememberIncomingCall } from "./src/features/calls/pendingCall";
@@ -44,18 +42,15 @@ import AuthGate from "./src/features/auth/AuthGate";
 type ComposeMode = "message" | "voice" | "video";
 export default function App() {
   return (
-    <AuthGate>
-      <MessengerApp />
-    </AuthGate>
+    <StartupGate>
+      <AuthGate>
+        <MessengerApp />
+      </AuthGate>
+    </StartupGate>
   );
 }
 
 function MessengerApp() {
-  const [fonts, fontError] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_700Bold,
-  });
   const messenger = useRemoteMessenger();
   const calls = useCalls(messenger.addCall);
   const updates = useAppUpdater();
@@ -262,10 +257,10 @@ function MessengerApp() {
     !calls.call &&
     !recording;
 
-  if ((!fonts && !fontError) || !messenger.loaded) {
+  if (!messenger.loaded) {
     return (
-      <View style={[s.loading, { backgroundColor: palette(systemDark).bg }]}>
-        <Ionicons name="chatbubble-ellipses" size={42} color={coral} />
+      <View style={[s.loading, { backgroundColor: colors.bg }]}>
+        <Ionicons name="chatbubble-ellipses" size={42} color={colors.coralInk} />
       </View>
     );
   }
@@ -379,6 +374,7 @@ function MessengerApp() {
               onCall={(video) => startCall(chat, video)}
               onSend={messenger.send}
               onReact={messenger.react}
+              onRetry={messenger.retryMessage}
               onRecordingChange={setRecording}
               onProfile={() => setDetail({ id: chat.id, kind: "profile" })}
               onDelete={messenger.deleteMessage}
@@ -440,6 +436,7 @@ function MessengerApp() {
             <Navigation
               active={tab}
               avatar={messenger.profile.avatar}
+              name={messenger.profile.name}
               dark={messenger.dark}
               onChange={setTab}
             />

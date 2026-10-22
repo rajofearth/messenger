@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
@@ -75,8 +75,7 @@ export default function CallScreen({
         <Image
           source={{ uri: avatar.replace(/w=\d+/, "w=1080") }}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          accessibilityIgnoresInvertColors
+          contentFit="cover"
           accessible={false}
           onError={() => setRemoteFailed(true)}
         />

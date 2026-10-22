@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { IconButton } from "../../ui/primitives";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { palette, coral } from "../../ui/theme";
+import { palette, coral, onCoral } from "../../ui/theme";
 export default function ContactEditor({
   kind,
   dark,
@@ -170,5 +170,5 @@ const s = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: "#FFF", fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
 });

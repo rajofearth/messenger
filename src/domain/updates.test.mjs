@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  canDismiss,
   decideUpdate,
   formatBytes,
   parseUpdateFeed,
@@ -144,6 +145,24 @@ test("a mandatory release or one below the feed floor cannot be dismissed", () =
     installed,
   );
   assert.equal(allowed.status === "available" && allowed.forced, false);
+});
+
+test("only an optional release can be postponed", () => {
+  const installed = { versionName: "0.0.3", versionCode: 3 };
+  const optional = decideUpdate(parseUpdateFeed(manifest()), installed);
+  const mandatory = decideUpdate(
+    parseUpdateFeed(manifest({ mandatory: true })),
+    installed,
+  );
+  const belowFloor = decideUpdate(
+    parseUpdateFeed(manifest({ minVersionCode: 4 })),
+    installed,
+  );
+  assert.equal(canDismiss(optional), true);
+  assert.equal(canDismiss(mandatory), false);
+  assert.equal(canDismiss(belowFloor), false);
+  assert.equal(canDismiss({ status: "current" }), false);
+  assert.equal(canDismiss({ status: "unknown" }), false);
 });
 
 test("the prompt is per release, and a forced one ignores dismissal", () => {

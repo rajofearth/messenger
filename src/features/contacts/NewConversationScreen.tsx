@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,7 +9,8 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
-import { palette } from "../../ui/theme";
+import { Avatar } from "../../ui/primitives";
+import { coral, palette } from "../../ui/theme";
 
 export type NewConversationScreenProps = {
   contacts: Chat[];
@@ -22,7 +22,6 @@ export type NewConversationScreenProps = {
   onNewGroup: () => void;
 };
 
-const CORAL = "#EF8E76";
 const titles = {
   message: "New conversation",
   voice: "Voice call",
@@ -87,7 +86,7 @@ export default function NewConversationScreen({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          selectionColor={CORAL}
+          selectionColor={coral}
           style={[s.searchInput, { color: colors.text }]}
         />
         {search.length > 0 && (
@@ -143,7 +142,7 @@ export default function NewConversationScreen({
                     <Ionicons
                       name={action.icon}
                       size={23}
-                      color={CORAL}
+                      color={colors.coralInk}
                       accessible={false}
                     />
                   </View>
@@ -176,11 +175,7 @@ export default function NewConversationScreen({
             style={({ pressed }) => [s.row, pressed && s.pressed]}
           >
             <View style={s.avatarWrap}>
-              <Image
-                source={{ uri: chat.avatar }}
-                style={[s.avatar, { backgroundColor: colors.input }]}
-                accessible={false}
-              />
+              <Avatar uri={chat.avatar} name={chat.name} size={52} />
               {chat.online && (
                 <View style={[s.online, { borderColor: colors.bg }]} />
               )}
@@ -266,7 +261,6 @@ const s = StyleSheet.create({
   },
   sectionLabel: { fontFamily: "DMSans_700Bold", fontSize: 14 },
   avatarWrap: { width: 52, height: 52 },
-  avatar: { width: 52, height: 52, borderRadius: 26 },
   online: {
     position: "absolute",
     bottom: 0,

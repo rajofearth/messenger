@@ -14,6 +14,7 @@ type Props = {
   onReact: (messageId: string, emoji: string) => void;
   onViewMedia: (message: Message) => void;
   onOpenAlbum: (ids: string[], initialId: string) => void;
+  onRetry: (messageId: string) => void;
 };
 
 /** Memoized list row: either a message bubble or a grouped media album. */
@@ -26,6 +27,7 @@ function MessageRow({
   onReact,
   onViewMedia,
   onOpenAlbum,
+  onRetry,
 }: Props) {
   const openAlbum = useCallback(
     (selected: Message) =>
@@ -44,6 +46,7 @@ function MessageRow({
       onActions={onActions}
       onReact={onReact}
       onViewMedia={openAlbum}
+      onRetry={onRetry}
     />
   ) : (
     <MessageBubble
@@ -54,6 +57,7 @@ function MessageRow({
       onActions={onActions}
       onReact={onReact}
       onViewMedia={onViewMedia}
+      onRetry={onRetry}
     />
   );
 }

@@ -1,8 +1,12 @@
 import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
+import { messagePreview } from "../domain/messageActions";
+import { newestReadSequence } from "../domain/threadMerge";
 import { remoteUid, timeLabel } from "./remoteMessengerTypes";
-
-type AppendLocal = (chat: Chat, message: Message, preview: string) => void;
+import type {
+  AppendLocal,
+  MarkLocalMessageStatus,
+} from "./remoteMessengerWriters";
 
 type SendText = (args: {
   conversationId: string;
@@ -27,11 +31,13 @@ export function createRemoteReplySender({
   chatsRef,
   messagesRef,
   appendLocal,
+  markLocalMessageStatus,
   sendText,
 }: {
   chatsRef: MutableRefObject<Chat[]>;
   messagesRef: MutableRefObject<Record<string, Message[]>>;
   appendLocal: AppendLocal;
+  markLocalMessageStatus: MarkLocalMessageStatus;
   sendText: SendText;
 }) {
   return async function sendTo(chatId: string, text: string, actionId?: string) {
@@ -55,14 +61,34 @@ export function createRemoteReplySender({
         mine: true,
         time: timeLabel(),
         createdAt: new Date().toISOString(),
+        status: "sending",
       };
-      appendLocal(chat, message, body);
+      appendLocal(chat, message, messagePreview(message));
     }
-    await sendText({
-      conversationId: chatId,
-      clientMessageId,
-      text: body,
+    markLocalMessageStatus({
+      chatId,
+      messageId: clientMessageId,
+      status: "sending",
     });
+    try {
+      await sendText({
+        conversationId: chatId,
+        clientMessageId,
+        text: body,
+      });
+      markLocalMessageStatus({
+        chatId,
+        messageId: clientMessageId,
+        status: "sent",
+      });
+    } catch (error) {
+      markLocalMessageStatus({
+        chatId,
+        messageId: clientMessageId,
+        status: "failed",
+      });
+      throw error;
+    }
   };
 }
 
@@ -82,8 +108,9 @@ export function createRemoteReadMarker({
         item.id === chatId ? { ...item, unread: 0 } : item,
       ),
     );
-    const items = messagesRef.current[chatId] || [];
-    const sequence = items[items.length - 1]?.sequence;
+    // A local-only send can sit after the newest server row; skip it rather
+    // than leaving the actual unread messages unacknowledged.
+    const sequence = newestReadSequence(messagesRef.current[chatId] || []);
     if (!sequence) return;
     void markReadThrough({ conversationId: chatId, sequence }).catch(() => {});
   };

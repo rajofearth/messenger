@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,7 +14,10 @@ import {
 } from "react-native";
 import { useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { palette, coral } from "../../ui/theme";
+import { messengerRepository } from "../../data/messengerRepository";
+import { useDeviceScheme } from "../../state/useDeviceScheme";
+import { coral, palette, resolveDark } from "../../ui/theme";
+import type { ThemePreference } from "../../ui/theme";
 
 function usernameFromName(name: string) {
   const handle = name
@@ -26,15 +30,16 @@ function usernameFromName(name: string) {
   return handle.length >= 3 ? handle : "";
 }
 
-function AuthForm() {
+function AuthForm({ dark }: { dark: boolean }) {
   const { signIn } = useAuthActions();
   const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [usernameEdited, setUsernameEdited] = useState(false);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const colors = palette(false);
+  const colors = palette(dark);
 
   async function submit() {
     if (!username.trim() || !password) {
@@ -69,9 +74,13 @@ function AuthForm() {
       style={[s.root, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={s.content}>
+      <ScrollView
+        contentContainerStyle={s.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[s.logo, { backgroundColor: colors.tint }]}>
-          <Ionicons name="chatbubble-ellipses" size={34} color={coral} />
+          <Ionicons name="chatbubble-ellipses" size={34} color={colors.coralInk} />
         </View>
         <Text style={[s.title, { color: colors.fg }]}>Welcome to Messenger</Text>
         <Text style={[s.subtitle, { color: colors.muted }]}>
@@ -81,6 +90,9 @@ function AuthForm() {
           <TextInput
             accessibilityLabel="Name"
             autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            importantForAutofill="yes"
             placeholder="Your name"
             placeholderTextColor={colors.muted}
             value={name}
@@ -97,6 +109,9 @@ function AuthForm() {
           accessibilityLabel="Username"
           autoCapitalize="none"
           autoCorrect={false}
+          autoComplete="username"
+          textContentType="username"
+          importantForAutofill="yes"
           placeholder="Username"
           placeholderTextColor={colors.muted}
           value={username}
@@ -106,17 +121,37 @@ function AuthForm() {
           }}
           style={[s.input, { color: colors.fg, backgroundColor: colors.card }]}
         />
-        <TextInput
-          accessibilityLabel="Password"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Password"
-          placeholderTextColor={colors.muted}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          style={[s.input, { color: colors.fg, backgroundColor: colors.card }]}
-        />
+        <View style={[s.passwordRow, { backgroundColor: colors.card }]}>
+          <TextInput
+            accessibilityLabel="Password"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete={
+              mode === "signIn" ? "current-password" : "new-password"
+            }
+            textContentType={mode === "signIn" ? "password" : "newPassword"}
+            importantForAutofill="yes"
+            placeholder="Password"
+            placeholderTextColor={colors.muted}
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+            style={[s.passwordInput, { color: colors.fg }]}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            hitSlop={10}
+            onPress={() => setShowPassword((value) => !value)}
+            style={s.reveal}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color={colors.muted}
+            />
+          </Pressable>
+        </View>
         <Pressable
           accessibilityRole="button"
           disabled={busy}
@@ -124,9 +159,9 @@ function AuthForm() {
           style={[s.primary, { opacity: busy ? 0.65 : 1 }]}
         >
           {busy ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.onCoral} />
           ) : (
-            <Text style={s.primaryText}>
+            <Text style={[s.primaryText, { color: colors.onCoral }]}>
               {mode === "signIn" ? "Sign in" : "Create account"}
             </Text>
           )}
@@ -134,6 +169,7 @@ function AuthForm() {
         {mode === "signIn" && (
           <Pressable
             accessibilityRole="button"
+            hitSlop={8}
             onPress={() =>
               Alert.alert(
                 "Password recovery is unavailable",
@@ -141,11 +177,12 @@ function AuthForm() {
               )
             }
           >
-            <Text style={[s.link, { color: coral }]}>Forgot password?</Text>
+            <Text style={[s.link, { color: colors.coralInk }]}>Forgot password?</Text>
           </Pressable>
         )}
         <Pressable
           accessibilityRole="button"
+          hitSlop={8}
           onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
         >
           <Text style={[s.link, { color: colors.muted }]}>
@@ -158,22 +195,44 @@ function AuthForm() {
           Your username is how people find you. Keep your password safe; there is
           deliberately no signed-out password reset.
         </Text>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useConvexAuth();
+  const scheme = useDeviceScheme();
+  const [storedTheme, setStoredTheme] = useState<ThemePreference>("system");
+
+  // The auth screen is the first thing a cold start paints, so it follows the
+  // same appearance preference the signed-in app will use. Reading it needs
+  // no session; a failed read keeps the device scheme.
+  useEffect(() => {
+    if (isAuthenticated) return;
+    let active = true;
+    void messengerRepository
+      .loadAppearance()
+      .then((appearance) => {
+        if (active && appearance) setStoredTheme(appearance.theme);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
+
+  const dark = resolveDark(storedTheme, scheme);
 
   if (isLoading) {
+    const colors = palette(dark);
     return (
-      <SafeAreaView style={s.loading}>
-        <ActivityIndicator color={coral} size="large" />
+      <SafeAreaView style={[s.loading, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator color={colors.coralInk} size="large" />
       </SafeAreaView>
     );
   }
-  if (!isAuthenticated) return <AuthForm />;
+  if (!isAuthenticated) return <AuthForm dark={dark} />;
   // Cached chats render while the profile query is still in flight, so an
   // offline start still shows the local copy instead of a spinner.
   return <>{children}</>;
@@ -182,7 +241,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 const s = StyleSheet.create({
   root: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { flex: 1, justifyContent: "center", padding: 28, gap: 14 },
+  content: { flexGrow: 1, justifyContent: "center", padding: 28, gap: 14 },
   logo: {
     alignSelf: "center",
     width: 76,
@@ -211,6 +270,19 @@ const s = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     fontSize: 16,
   },
+  passwordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingLeft: 16,
+    paddingVertical: 15,
+    fontFamily: "DMSans_400Regular",
+    fontSize: 16,
+  },
+  reveal: { paddingHorizontal: 14, paddingVertical: 14 },
   primary: {
     minHeight: 54,
     borderRadius: 17,
@@ -219,7 +291,7 @@ const s = StyleSheet.create({
     backgroundColor: coral,
     marginTop: 4,
   },
-  primaryText: { color: "white", fontFamily: "DMSans_700Bold", fontSize: 16 },
+  primaryText: { fontFamily: "DMSans_700Bold", fontSize: 16 },
   link: {
     textAlign: "center",
     fontFamily: "DMSans_500Medium",

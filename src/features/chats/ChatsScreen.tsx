@@ -20,7 +20,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Story } from "../../domain/data";
 import { filterConversations, unreadConversations } from "../../domain/model";
 import { Avatar, IconButton, tap } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import QuickActions from "../../ui/QuickActions";
 import { s } from "./ChatsScreen.styles";
 import { groupStories } from "../../domain/stories";
@@ -89,7 +89,7 @@ export default function ChatsScreen({
     setSearch(false);
   }
 
-  const onRowActions = useCallback((chat: Chat, x: number, y: number) => {
+  const onRowActions = useCallback((chat: Chat, x?: number, y?: number) => {
     setActions({ chat, x, y });
   }, []);
   const keyExtractor = useCallback((chat: Chat) => chat.id, []);
@@ -188,24 +188,28 @@ export default function ChatsScreen({
                         borderColor: self
                           ? self.seen
                             ? colors.line
-                            : coral
+                            : colors.coralInk
                           : colors.line,
                         borderStyle: self ? "solid" : "dashed",
                       },
                     ]}
                   >
-                    <Avatar uri={self?.avatar ?? avatar} size={58} />
+                    <Avatar
+                      uri={self?.avatar ?? avatar}
+                      name={self?.name ?? "You"}
+                      size={58}
+                    />
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel="Add your story"
-                      hitSlop={4}
+                      hitSlop={12}
                       onPress={(event) => {
                         event.stopPropagation();
                         onAddStory();
                       }}
                       style={[s.storyPlus, { borderColor: colors.bg }]}
                     >
-                      <Ionicons name="add" size={17} color="white" />
+                      <Ionicons name="add" size={17} color={colors.onCoral} />
                     </Pressable>
                   </View>
                   <Text style={[s.storyName, { color: colors.muted }]}>
@@ -224,10 +228,14 @@ export default function ChatsScreen({
                       <View
                         style={[
                           s.storyRing,
-                          { borderColor: story.seen ? colors.line : coral },
+                          { borderColor: story.seen ? colors.line : colors.coralInk },
                         ]}
                       >
-                        <Avatar uri={story.avatar} size={58} />
+                        <Avatar
+                          uri={story.avatar}
+                          name={story.name}
+                          size={58}
+                        />
                       </View>
                       <Text
                         numberOfLines={1}

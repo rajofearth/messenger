@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { Chat, Message, Story } from "../domain/data";
+import { mergeChats } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { prefetchStories } from "../services/mediaCache";
 import { mapChat, mapStory } from "./remoteMessengerTypes";
@@ -73,10 +74,13 @@ export function useRemoteServerSync({
 
   useEffect(() => {
     if (!remoteChats) return;
-    const next = remoteChats.map(mapChat);
+    // The server snapshot is the only version that may reach disk. The merged
+    // view keeps a pending local row on screen until the inbox catches up.
+    const confirmed = remoteChats.map(mapChat);
+    const next = mergeChats(confirmed, chatsRef.current);
     chatsRef.current = next;
     setCachedChats(next);
-    void messengerRepository.saveChats(next).catch(() => {});
+    void messengerRepository.saveChats(confirmed).catch(() => {});
   }, [chatsRef, remoteChats, setCachedChats]);
 
   useEffect(() => {

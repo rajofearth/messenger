@@ -11,7 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette, coral } from "../../ui/theme";
+import { palette, coral, onCoral } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
 import QuickActions from "../../ui/QuickActions";
 export default function CallsScreen({
@@ -84,7 +84,7 @@ export default function CallsScreen({
             onPress={() => onHistory(record.chat)}
             style={s.row}
           >
-            <Avatar uri={record.chat.avatar} />
+            <Avatar uri={record.chat.avatar} name={record.chat.name} />
             <View style={s.body}>
               <Text style={[s.name, { color: colors.fg }]}>
                 {record.chat.name}
@@ -93,7 +93,15 @@ export default function CallsScreen({
                 <Ionicons
                   name={record.missed ? "arrow-down" : "arrow-up"}
                   size={13}
-                  color={record.missed ? "#D87171" : "#78A58A"}
+                  color={
+                    record.missed
+                      ? dark
+                        ? "#FFB4AB"
+                        : "#B3261E"
+                      : dark
+                        ? "#9FD0B2"
+                        : "#2F6A4B"
+                  }
                 />
                 <Text style={[s.caption, { color: colors.muted }]}>
                   {record.missed
@@ -115,14 +123,14 @@ export default function CallsScreen({
               <Ionicons
                 name={record.video ? "videocam-outline" : "call-outline"}
                 size={23}
-                color={coral}
+                color={colors.coralInk}
               />
             </Pressable>
           </Pressable>
         ))}
         {!filtered.length && (
           <View style={s.empty}>
-            <Ionicons name="call-outline" size={32} color={coral} />
+            <Ionicons name="call-outline" size={32} color={colors.coralInk} />
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
               {query.trim() ? "No matching calls" : "No recent calls"}
             </Text>
@@ -184,5 +192,5 @@ const s = StyleSheet.create({
   empty: { padding: 60, alignItems: "center", gap: 20 },
   emptyTitle: { fontFamily: "DMSans_500Medium", fontSize: 18 },
   primary: { backgroundColor: coral, padding: 16, borderRadius: 17 },
-  primaryText: { fontFamily: "DMSans_700Bold", color: "#FFF", fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
 });

@@ -93,11 +93,26 @@ export default function ChatProfile({
         <Ionicons
           name={icon}
           size={23}
-          color={destructive ? "#D87171" : coral}
+          color={
+            destructive
+              ? dark
+                ? "#FFB4AB"
+                : "#B3261E"
+              : colors.coralInk
+          }
         />
         <View style={s.body}>
           <Text
-            style={[s.label, { color: destructive ? "#D87171" : colors.fg }]}
+            style={[
+              s.label,
+              {
+                color: destructive
+                  ? dark
+                    ? "#FFB4AB"
+                    : "#B3261E"
+                  : colors.fg,
+              },
+            ]}
           >
             {title}
           </Text>
@@ -118,7 +133,7 @@ export default function ChatProfile({
   ) {
     return (
       <View style={[s.row, { borderBottomColor: colors.line }]}>
-        <Ionicons name={icon} size={23} color={coral} />
+        <Ionicons name={icon} size={23} color={colors.coralInk} />
         <View style={s.body}>
           <Text style={[s.label, { color: colors.fg }]}>{title}</Text>
           <Text style={[s.caption, { color: colors.muted }]}>{status}</Text>
@@ -152,12 +167,13 @@ export default function ChatProfile({
         <View style={s.hero}>
           <Avatar
             uri={chat.avatar}
+            name={chat.name}
             size={112}
             online={!chat.group && chat.online}
           />
           <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
           {!!chat.username && (
-            <Text style={[s.label, { color: coral }]}>
+            <Text style={[s.label, { color: colors.coralInk }]}>
               @{chat.username.replace(/^@/, "")}
             </Text>
           )}
@@ -230,7 +246,7 @@ export default function ChatProfile({
                   onPress={() => onOpenChat(member)}
                   style={[s.row, { borderBottomColor: colors.line }]}
                 >
-                  <Avatar uri={member.avatar} size={42} />
+                  <Avatar uri={member.avatar} name={member.name} size={42} />
                   <Text style={[s.label, s.body, { color: colors.fg }]}>
                     {member.name}
                   </Text>
@@ -238,7 +254,7 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: coral, backgroundColor: colors.tint },
+                        { color: colors.coralInk, backgroundColor: colors.tint },
                       ]}
                     >
                       Admin
@@ -267,7 +283,7 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: coral, backgroundColor: colors.tint },
+                        { color: colors.coralInk, backgroundColor: colors.tint },
                       ]}
                     >
                       Admin
@@ -295,7 +311,7 @@ export default function ChatProfile({
                 onPress={() => onOpenChat(group)}
                 style={[s.row, { borderBottomColor: colors.line }]}
               >
-                <Avatar uri={group.avatar} size={42} />
+                <Avatar uri={group.avatar} name={group.name} size={42} />
                 <View style={s.body}>
                   <Text style={[s.label, { color: colors.fg }]}>
                     {group.name}

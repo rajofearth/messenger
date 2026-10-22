@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { tap, type IconName } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 
 export default function AttachmentMenu({
   dark,
@@ -19,7 +19,7 @@ export default function AttachmentMenu({
   onFile: () => void;
   onRecord: () => void;
 }) {
-  const { card, fg } = palette(dark);
+  const { card, coralInk, fg } = palette(dark);
   const actions: { icon: IconName; title: string; run: () => void }[] = [
     {
       icon: "images-outline",
@@ -47,7 +47,7 @@ export default function AttachmentMenu({
               run();
             }}
           >
-            <Ionicons name={icon} size={23} color={coral} />
+            <Ionicons name={icon} size={23} color={coralInk} />
             <Text style={{ color: fg, fontSize: 15 }}>{title}</Text>
           </Pressable>
         ))}
