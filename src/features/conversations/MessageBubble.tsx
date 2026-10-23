@@ -120,6 +120,10 @@ function DeliveryMeta({
   const { muted } = palette(dark);
   const failure = failedColor(dark);
   const pending = message.status === "sending" || message.status === "failed";
+  const uploading =
+    message.status === "sending" && message.kind && message.uploadProgress !== undefined
+      ? Math.max(0, Math.min(100, Math.round(message.uploadProgress * 100)))
+      : null;
   if (!showTimestamp && !pending) return null;
   return (
     <View style={s.messageMeta}>
@@ -136,9 +140,17 @@ function DeliveryMeta({
         </>
       ) : message.mine && message.status === "sending" ? (
         <>
-          <Ionicons name="time-outline" size={14} color={muted} />
+          <Ionicons
+            name={uploading !== null ? "cloud-upload-outline" : "time-outline"}
+            size={14}
+            color={muted}
+          />
           <Text accessibilityLiveRegion="polite" style={[s.tiny, { color: muted }]}>
-            Sending…
+            {uploading === null
+              ? "Sending…"
+              : uploading === 0
+                ? "Uploading…"
+                : `Uploading ${uploading}%`}
           </Text>
         </>
       ) : message.mine ? (

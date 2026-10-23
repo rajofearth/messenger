@@ -10,6 +10,7 @@ import {
 import { remoteUid, timeLabel } from "./remoteMessengerTypes";
 import type {
   AppendLocal,
+  MarkLocalMessageProgress,
   MarkLocalMessageStatus,
 } from "./remoteMessengerWriters";
 
@@ -26,6 +27,7 @@ type Args = {
   messagesRef: MutableRefObject<Record<string, Message[]>>;
   appendLocal: AppendLocal;
   markLocalMessageStatus: MarkLocalMessageStatus;
+  markLocalMessageProgress: MarkLocalMessageProgress;
   sendText: SendText;
   sendAttachment: SendAttachment;
 };
@@ -41,6 +43,7 @@ export function createRemoteSend({
   messagesRef,
   appendLocal,
   markLocalMessageStatus,
+  markLocalMessageProgress,
   sendText,
   sendAttachment,
 }: Args) {
@@ -80,7 +83,17 @@ export function createRemoteSend({
 
   async function deliverAttachment(chatId: string, message: Message) {
     try {
-      await sendAttachmentMessage({ chatId, message, sendAttachment });
+      await sendAttachmentMessage({
+        chatId,
+        message,
+        sendAttachment,
+        onProgress: (progress) =>
+          markLocalMessageProgress({
+            chatId,
+            messageId: message.id,
+            progress,
+          }),
+      });
       markLocalMessageStatus({
         chatId,
         messageId: message.id,
@@ -110,6 +123,7 @@ export function createRemoteSend({
         time: timeLabel(),
         createdAt: new Date().toISOString(),
         status: "sending",
+        uploadProgress: 0,
       };
       appendLocal(chat, message, messagePreview(message));
       void deliverAttachment(chat.id, message);

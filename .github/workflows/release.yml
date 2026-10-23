@@ -202,7 +202,9 @@ jobs:
         run: |
           set -euo pipefail
           args=(android/app/build/outputs/apk/release/app-release.apk)
-          previous=$(gh release list --exclude-drafts --limit 20 --json tagName --jq "[.[] | select(.tagName != \"$TAG\")][0].tagName // empty" || true)
+          # Development builds are prereleases with dev-* tags. They must never
+          # become the size or versionCode baseline for a production release.
+          previous=$(gh release list --exclude-drafts --exclude-pre-releases --limit 20 --json tagName --jq "[.[] | select(.tagName != \"$TAG\") | select(.tagName | startswith(\"v\"))][0].tagName // empty" || true)
           if [ -n "${previous:-}" ]; then
             baseline=$(gh release view "$previous" --json assets --jq '[.assets[] | select(.name | endswith(".apk"))][0].size // empty' || true)
             if [ -n "${baseline:-}" ]; then

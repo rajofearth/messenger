@@ -54,6 +54,36 @@ npm run android:install   # adb install -r, then launch com.yashraj.messenger
 
 The APK contains the JavaScript bundle and runs without a connection to this computer, and without Metro. Rebuild after any code change: there is no hot reload in this workflow. If you prefer a development server with fast refresh, `npx expo run:android` works too; the native modules require a native build either way.
 
+### Development build beside production
+
+The `dev` variant installs alongside Messenger, so it can point at the development Convex deployment without touching the production app's data, package or release feed:
+
+```sh
+npm run android:dev:build    # -> artifacts/messenger-dev.apk
+npm run android:dev:install  # first install only; adb, or sideload the APK by hand
+npm run dev:ship             # build, publish a GitHub prerelease and update the dev feed
+npm run dev:publish          # publish the existing artifacts/messenger-dev.apk
+```
+
+The dev app is named `Messenger Dev`, uses package `com.yashraj.messenger.dev`, gets a fresh `0.1.1-dev.<timestamp>` version name and a version code derived from the build time, and has its own launcher icons under `assets/dev/`. `app.config.js` is the variant switch: production is still exactly `app.json` when `APP_VARIANT` is unset.
+
+`android:dev:build` reads `CONVEX_DEPLOYMENT`, `EXPO_PUBLIC_CONVEX_URL` and `EXPO_PUBLIC_CONVEX_SITE_URL` from `.env.local` (or the environment), derives the dev feed from the `.convex.site` URL, and refuses to build if that would be the production feed. `dev:ship` publishes the APK as a `dev-<versionCode>` GitHub prerelease and writes the manifest to the development deployment with `npx convex run --deployment <dev-slug> releases:publish`; it never uses `--prod`. The first dev APK has to be installed once by hand. Every later build can arrive through the app's normal update prompt, because the local helper preserves the signing key in `artifacts/messenger-dev-debug.keystore` across clean prebuilds.
+
+The dev channel is intentionally local: it needs `gh` authentication and the development Convex deployment, and it is not part of the production release workflow.
+
+### Web tester for a second user
+
+`tools/web-tester/` is a local-only browser client for testing a second account against the phone. It uses the same Convex deployment and the same password auth as the app, so no backend test bypass is involved. It supports direct chats, groups, text and media attachments, replies, reactions, and read state.
+
+```sh
+npm run web:dev      # http://localhost:5174 and the LAN URL Vite prints
+npm run web:agent -- chats
+npm run web:agent -- send --to <username> --text "hello"
+npm run web:control  # optional local HTTP control API on 127.0.0.1:8787
+```
+
+The reusable test account is `webtester_2026`; its password lives in the ignored `tools/web-tester/.env.local`. The CLI uses that account and can target another account with `--username`/`--password`; the control API uses the account from the environment. See [tools/web-tester/README.md](tools/web-tester/README.md) for the full command list, control API routes and test flow. The web tester is not imported by the mobile app and is not part of the APK.
+
 `npm run android:build` is a Windows helper. On macOS or Linux, generate the project and build it yourself:
 
 ```sh
@@ -73,8 +103,16 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 | `npm run android:prebuild` | Regenerates the `android/` project from `app.json` |
 | `npm run android:build` | Release APK, arm64-v8a, copied to `artifacts/messenger-local.apk` |
 | `npm run android:install` | Installs the built APK over adb and starts it |
+| `npm run android:dev:build` | Dev APK for `com.yashraj.messenger.dev`, copied to `artifacts/messenger-dev.apk` |
+| `npm run android:dev:install` | Installs and starts the dev APK over adb |
+| `npm run dev:ship` | Builds the dev APK, publishes its GitHub prerelease and updates the dev feed |
+| `npm run dev:publish` | Publishes the existing dev APK without rebuilding |
 | `npm run android` | Alias for `android:build` |
 | `npm run release:check` | Typecheck, tests and the slim-build gate over `artifacts/messenger-local.apk` |
+| `npm run web:dev` | Local second-user web tester at `http://localhost:5174` |
+| `npm run web:agent` | CLI for the web tester account: chats, send, read, upload, react |
+| `npm run web:control` | Local HTTP control API for the web tester account |
+| `npm run web:check` | Typecheck the web tester independently of the app |
 
 ## Features
 
@@ -110,6 +148,8 @@ Limits worth knowing: this is presentation and action delivery only. It does not
 
 ```text
 App.tsx                     Screen composition and navigation only
+app.config.js               Production app.json, or the dev variant selected by APP_VARIANT
+assets/dev/                 Dev-only launcher icons
 convex/                     Convex schema, auth, chat, files, devices, stories, release feed
 src/domain/                 Types and pure helpers (no React, no storage)
 src/data/                   Typed local persistence, cache and the repository seam
@@ -122,7 +162,8 @@ src/ui/                     Shared primitives, theme, quick actions, navigation
 modules/system-notifications/  Kotlin: Android call and message notifications
 modules/keyboard-media/        Kotlin: rich content from third-party keyboards
 plugins/                    Config plugins; keep unused barcode scanner code and non-English resources out of the APK
-scripts/                    Android build helper and the Node test files
+scripts/                    Android build helpers, dev release publisher and Node test files
+tools/web-tester/           Local-only second-user website, CLI and control API
 ```
 
 Features depend on `src/domain`, `src/data` and `src/ui`, never on `App.tsx`. `npm test` enforces this: a 500-line limit per source file, no imports back into `App.tsx`, and domain modules free of React, storage and native imports.
@@ -131,7 +172,7 @@ Features depend on `src/domain`, `src/data` and `src/ui`, never on `App.tsx`. `n
 
 ## Releases
 
-A release is one version bump and one tag. Push a tag named `v<version>` where `<version>` matches `expo.version` in `app.json`, with `expo.android.versionCode` bumped above the last release's; [`.github/workflows/release.yml`](.github/workflows/release.yml) then runs the tests, regenerates the Android project, builds a signed arm64-v8a APK, verifies the signature, refuses a version-code regression, and publishes the APK with its SHA-256 checksum on a public GitHub release. The same workflow can be started by hand from the Actions tab.
+A release is one version bump and one tag. Push a tag named `v<version>` where `<version>` matches `expo.version` in `app.json`, with `expo.android.versionCode` bumped above the last release's; [`.github/workflows/release.yml`](.github/workflows/release.yml) then runs the tests, regenerates the Android project, builds a signed arm64-v8a APK, verifies the signature, refuses a version-code regression, and publishes the APK with its SHA-256 checksum on a public GitHub release. The same workflow can be started by hand from the Actions tab. Development prereleases are ignored when it chooses the previous production release for its size and version-code baseline.
 
 Set `ANDROID_KEYSTORE_BASE64` (a base64-encoded keystore), `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` as repository secrets to sign with your own key. Without them the workflow falls back to Expo's debug keystore and says so in the release notes. Generate the release key once and keep it safe: Android identifies an app by its signing key, so a lost key ends in-place updates for good.
 
@@ -148,7 +189,9 @@ The first release signed with a new key cannot install over a build signed with 
 
 ### The update feed
 
-The app checks for a newer build only when the APK was built with `EXPO_PUBLIC_UPDATE_FEED_URL` pointing at a manifest endpoint. Set it as a repository **variable** so the workflow bakes it in, and `CONVEX_DEPLOY_KEY` as a secret so the same workflow deploys the Convex functions and publishes the new release to the feed after the GitHub release exists. [convex/README.md](convex/README.md) has the one-time setup, the required key permissions, and the manual publish command. Without either value the release still succeeds; the app simply reports that the build has no update feed.
+The app checks for a newer build only when the APK was built with a feed URL pointing at a manifest endpoint. Production builds use `EXPO_PUBLIC_UPDATE_FEED_URL`; dev builds use `EXPO_PUBLIC_DEV_UPDATE_FEED_URL`, selected in `src/data/updateFeed.ts` by `EXPO_PUBLIC_APP_VARIANT`. Set the production URL as a repository **variable** so the workflow bakes it in, and `CONVEX_DEPLOY_KEY` as a secret so the same workflow deploys the Convex functions and publishes the new release to the feed after the GitHub release exists. [convex/README.md](convex/README.md) has the one-time setup, the required key permissions, and the manual publish command. Without either value the release still succeeds; the app simply reports that the build has no update feed.
+
+The two feeds are separate. Production's `releases` rows live on the production Convex deployment; dev's rows live on the development deployment, and `npm run dev:ship` only targets the latter. Dev GitHub releases are prereleases tagged `dev-<versionCode>`, so the production workflow ignores them when it picks its size and version-code baseline.
 
 ## Known limitations
 
@@ -157,6 +200,8 @@ The app checks for a newer build only when the APK was built with `EXPO_PUBLIC_U
 - The app stores its local cache unencrypted and the Convex deployment is the source of truth for accounts and messages. There is no end-to-end encryption, and signing out deletes this device's local copy so the next account cannot read it.
 - The in-app updater only runs when the build was published with a feed URL, and it cannot install silently: Android always shows its installer, and the "install unknown apps" switch must be on.
 - Switching from the generated debug key to a real release keystore needs one manual uninstall and reinstall, because Android refuses to update across a signature change.
+- The dev channel is published from the local checkout through `npm run dev:ship`. A CI dev channel would need a development Convex deploy key and a stable dev signing key; no such workflow is configured yet.
+- The first dev APK must be installed by hand. If `artifacts/messenger-dev-debug.keystore` is deleted, the signing key can change and Android will require uninstalling the dev app once before in-place updates work again.
 - Story media is removed from the database and app state after 24 hours; cached story files are not proactively deleted from app storage.
 - Media and avatar images load from Convex storage after upload; fonts remain bundled.
 - The composer uses the system keyboard rather than a custom emoji grid.

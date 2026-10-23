@@ -1,6 +1,6 @@
 # Architecture
 
-A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger. Accounts, profiles, contacts, conversations, messages, reactions, unread counts, presence, typing, conversation preferences and 24-hour stories live in a Convex deployment. The client keeps a device cache in front of every read, so the inbox and previously opened threads paint before the network answers and an offline start still shows the last known state. The release feed is a separate HTTP endpoint on the same deployment.
+A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger. Accounts, profiles, contacts, conversations, messages, reactions, unread counts, presence, typing, conversation preferences and 24-hour stories live in a Convex deployment. The client keeps a device cache in front of every read, so the inbox and previously opened threads paint before the network answers and an offline start still shows the last known state. The production and development release feeds are separate HTTP endpoints on separate deployments.
 
 ## Layers and allowed dependency direction
 
@@ -16,6 +16,8 @@ Intended direction: `features` and `state` depend on `domain`, `data`, `services
 | Persistence | `src/data/` | `messengerRepository.ts` (the local cache seam), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`, `updateFeed.ts` (the release-feed client). |
 | Backend | `convex/` | `schema.ts`, Convex Auth (`auth.ts`, `auth.config.ts`), `profiles`, `chat`, `preferences`, `devices`, `files`, `stories`, the `convex-chat` component mount, the expiry cron and the release feed. |
 | Domain | `src/domain/` | `data.ts` (types), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`, `time.ts` (local date labels), `threadMerge.ts` (optimistic message and inbox matching), `updates.ts`. Pure functions and types only. |
+
+`app.json` remains the production identity. `app.config.js` reads it and returns it unchanged unless `APP_VARIANT=dev`; the dev branch changes the name, scheme, package, generated version, launcher icons and feed metadata. `scripts/android.mjs` owns the native side of the switch: it stores the variant identity in `android/.messenger-build.json`, regenerates the generated project when that identity changes, and preserves the debug keystore so builds can update one another.
 
 ### What `scripts/architecture.test.mjs` enforces
 
@@ -41,7 +43,7 @@ Some dependency directions sit outside the ideal picture. `src/state/useRemoteCa
 - **Blocks.** `chat.canWrite` refuses a blocked conversation and, for direct conversations, also refuses when the peer blocked the writer. The block preference is per user but enforced for both sides.
 - **Clearing and hiding.** `conversationPreferences` stores `clearedThrough` and `hiddenAt` per user. The inbox and thread query apply the clear timestamp; the inbox hides a conversation until a newer message arrives. Opening a direct conversation restores a hidden row; deleting a chat writes `hiddenAt`.
 - **Devices.** `devices.register` ties the installation's stable SecureStore id to the current auth session. `devices.list` reports only live sessions, flags the current device and marks whether it is older than 24 hours. `devices.revokeDevice` and `devices.revokeOthers` refuse to act until the current device is a day old, and expire the target auth session so its next request fails.
-- **Files and stories.** Uploads take a Convex storage URL, then `files.finalizeUpload` reads the real object metadata and records its owner; the storage `contentType` is checked against the upload kind instead of trusting the client's MIME string. Finalization rejects an empty object, anything over 25 MiB, and a mismatched MIME type. A rejected object is deleted in a committing mutation and returned as `{ error }`, because throwing would roll the delete back. Message queries return a signed storage URL only after the membership check; there is no standalone file-URL endpoint. Story rows carry an explicit `expiresAt`; `stories.cleanupExpired` runs hourly from `convex/crons.ts` and removes the row, its storage object and its views. `stories.list` and `markSeen` only expose the owner and people who share a `conversationMeta` conversation with them. The client filters expired stories on load and after each sync, and the list query filters the audience before applying its newest-row limit.
+- **Files and stories.** Uploads take a Convex storage URL, then `files.finalizeUpload` reads the real object metadata and records its owner; the storage `contentType` is checked against the upload kind instead of trusting the client's MIME string. Finalization rejects an empty object, anything over 25 MiB, and a mismatched MIME type. A rejected object is deleted in a committing mutation and returned as `{ error }`, because throwing would roll the delete back. Message queries return a signed storage URL only after the membership check; there is no standalone file-URL endpoint. Story rows carry an explicit `expiresAt`; `stories.cleanupExpired` runs hourly from `convex/crons.ts` and removes the row, its storage object and its views. `stories.list` and `markSeen` only expose the owner and people who share a `conversationMeta` conversation with them, and `stories.views` returns a story's viewers only to its owner. The client filters expired stories on load and after each sync, and the list query filters the audience before applying its newest-row limit.
 - **Release feed.** `convex/http.ts` keeps the public `/updates/manifest` route, and `convex/lib/manifest.ts` mirrors the client's validation. The feed remains independent of user data.
 
 ### Client data flow
@@ -146,7 +148,20 @@ GET https://<deployment>.convex.site/updates/manifest?versionCode=4
 
 The answer is either `{"upToDate":true}` or the manifest object (`versionCode`, `versionName`, `apkUrl`, `apkSha256`, `apkBytes`, `minVersionCode`, `mandatory`, `notes`). The document is untrusted: `src/domain/updates.ts` parses and bounds every field, `versionCode` is the only ordering key, and an unreadable or failed request is `unknown`, never "up to date". `minVersionCode` and `mandatory` decide whether the prompt can be dismissed (`decideUpdate`), and dismissal is remembered per version code (`saveDismissedRelease`). A build that is at least as new as the feed's release is `current`; the endpoint deliberately answers `{"upToDate":true}` without the download URL in that case.
 
-The endpoint URL is baked into the bundle at build time from `EXPO_PUBLIC_UPDATE_FEED_URL` (`src/data/updateFeed.ts`). A build without it reports "This build has no update feed" in Settings and never prompts.
+The endpoint URL is baked into the bundle at build time (`src/data/updateFeed.ts`). Production reads `EXPO_PUBLIC_UPDATE_FEED_URL`; a development build reads `EXPO_PUBLIC_DEV_UPDATE_FEED_URL` because `EXPO_PUBLIC_APP_VARIANT` is `dev`. A build without a feed reports "This build has no update feed" in Settings and never prompts.
+
+### Two channels
+
+Development builds are not a mode inside the production app. They are a second installed application:
+
+- `app.config.js` selects `Messenger Dev`, `com.yashraj.messenger.dev`, scheme `messenger-dev`, the icons in `assets/dev/`, and a generated `0.1.1-dev.<timestamp>` version when `APP_VARIANT=dev`.
+- A different application id isolates Android storage, SecureStore entries, notifications, FileProvider authority, cached downloads and the installed package itself. The production app remains installed and untouched.
+- The dev build uses the development Convex URLs and the development deployment's `/updates/manifest`. `scripts/android.mjs` derives that feed from `EXPO_PUBLIC_CONVEX_SITE_URL`, refuses a feed on the production host, and sets the bundle's dev feed variable.
+- `scripts/dev-release.mjs` builds the APK, runs the dev variant of `release-check.mjs`, uploads a `dev-<versionCode>` GitHub prerelease, publishes the manifest to the development deployment with `releases:publish`, and verifies that `GET /updates/manifest?versionCode=0` returns the same digest. It refuses a non-dev `CONVEX_DEPLOYMENT`, a non-dev package, or a feed on the wrong host.
+- `android:build` and `android:dev:build` share the same generated `android/` directory, so switching variants removes and regenerates it. The helper saves `android/app/debug.keystore` to `artifacts/messenger-dev-debug.keystore` and restores it, because Android only installs an update signed by the same key.
+- The production workflow skips prereleases and only considers `v*` tags when it chooses its previous-release baseline, so a dev release cannot affect production size or version checks.
+
+The first dev APK still has to be installed by hand. After that, the existing full-APK updater downloads subsequent dev releases from the dev feed.
 
 ### Client flow
 
@@ -162,7 +177,7 @@ The endpoint URL is baked into the bundle at build time from `EXPO_PUBLIC_UPDATE
 
 ### Server side
 
-`convex/` holds the control plane: a `releases` table, `releases:publish` (internal mutation), `releases:latest`, and the `/updates/manifest` HTTP action. `convex/lib/manifest.ts` mirrors the client's checks and runs before every publish, so the feed cannot serve a document the app would reject; a publish below the current head is refused, and re-publishing the same version replaces its row so a retried workflow is safe. The APK itself is not stored in Convex: it stays on the GitHub release, and the manifest points at that asset. The release workflow runs `npx convex deploy` plus `releases:publish` after the release exists; `scripts/update-manifest.mjs` hashes the real APK and turns the matching `CHANGELOG.md` section into the `notes` field. See `convex/README.md` for the one-time setup. Without `CONVEX_DEPLOY_KEY` the workflow skips the feed and warns; the app ships unconfigured instead.
+`convex/` holds the control plane: a `releases` table, `releases:publish` (internal mutation), `releases:latest`, and the `/updates/manifest` HTTP action. `convex/lib/manifest.ts` mirrors the client's checks and runs before every publish, so the feed cannot serve a document the app would reject; a publish below the current head is refused, and re-publishing the same version replaces its row so a retried workflow is safe. The APK itself is not stored in Convex: it stays on the GitHub release, and the manifest points at that asset. The release workflow runs `npx convex deploy` plus `releases:publish` after the release exists; `scripts/update-manifest.mjs` hashes the real APK and turns the matching `CHANGELOG.md` section into the `notes` field. The dev publisher uses the same table and mutation, but on the development deployment and with explicit generated version values. See `convex/README.md` for the one-time setup. Without `CONVEX_DEPLOY_KEY` the production workflow skips the feed and warns; the app ships unconfigured instead.
 
 Two checks stand between the feed and a replaced app: the digest must match the bytes that arrive, and Android must verify the new APK's signature against the installed build before it installs anything. A compromised feed can offer a newer version, but it cannot produce one that Android will install.
 
@@ -180,6 +195,8 @@ Two checks stand between the feed and a replaced app: the digest must match the 
 `src/data/messengerRepository.ts` is the device cache seam, not the source of truth. `useRemoteCache` loads it once, and `useRemoteServerSync` writes fresh inbox and story snapshots back to it. `useRemoteThreadMedia` writes the opened thread and its downloaded files. Screens read the merged values from `useRemoteMessenger`; they never call Convex directly.
 
 Writes are optimistic. Small helpers (`remoteMessengerWriters.ts`, `remoteMessengerPreferences.ts`, `remoteMessengerMessageActions.ts`, `remoteMessengerUploads.ts`, `remoteMessengerSend.ts`) update the cache before the mutation resolves, and a failure keeps the local copy in place instead of rolling it back. There is no operation log: `src/domain/threadMerge.ts` reconciles pending rows with the next server snapshot, two devices editing the same conversation resolve last-write-wins, and only server-confirmed rows are persisted. The server's thread query pages backwards with `beforeSequence`; the client currently requests the newest 100 messages and does not yet offer "load older".
+
+Story uploads are the exception that stays outside the cache. `useRemoteStories` owns a local upload queue, reports byte progress into each row, and appends those rows after the server stories with `mergeStoryUploads`; a row disappears only when `stories.list` returns the same id. This keeps multi-video shares fully visible while their uploads run. The viewer's owner-only audience comes from `useStoryViewers`, which maps `stories.views` to the same `StoryView` shape as the rest of the domain.
 
 Notification replies use `notice-<actionId>` as the client message id. The `convex-chat` component deduplicates on `clientMessageId`, so a redelivered Android action cannot create a second message.
 

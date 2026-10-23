@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { Chat, Message, Story } from "../domain/data";
+import type { Chat, Message } from "../domain/data";
 import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { deviceIdentity } from "../services/deviceIdentity";
@@ -18,14 +18,12 @@ import {
 import { useRemoteCache } from "./useRemoteCache";
 import { useRemotePresence } from "./useRemotePresence";
 import { useRemoteServerSync } from "./useRemoteServerSync";
+import { useRemoteStories } from "./useRemoteStories";
 import { useRemoteThreadMedia } from "./useRemoteThreadMedia";
 import { createRemoteContact } from "./remoteMessengerContacts";
 import { saveTrackedMedia } from "./remoteMessengerMedia";
 import { createChatPreferences } from "./remoteMessengerPreferences";
 import { saveRemoteProfile } from "./remoteMessengerProfile";
-import {
-  uploadAndCreateStory,
-} from "./remoteMessengerUploads";
 import { createRemoteWriters } from "./remoteMessengerWriters";
 import { createRemoteSend } from "./remoteMessengerSend";
 import {
@@ -51,9 +49,6 @@ export function useRemoteMessenger() {
   const deleteMessageMutation = useMutation(api.chat.deleteOwnMessage);
   const deleteForMeMutation = useMutation(api.chat.deleteForMe);
   const forwardMessageMutation = useMutation(api.chat.forwardMessage);
-  const storySeenMutation = useMutation(api.stories.markSeen);
-  const storyDeleteMutation = useMutation(api.stories.remove);
-  const storyCreateMutation = useMutation(api.stories.create);
   const heartbeatOnlineMutation = useMutation(api.chat.heartbeatOnline);
   const heartbeatPresenceMutation = useMutation(api.chat.heartbeatPresence);
   const setTypingMutation = useMutation(api.chat.setTyping);
@@ -136,6 +131,7 @@ export function useRemoteMessenger() {
     remoteThread,
     selected,
     conversationVisible,
+    selfId: remoteProfile?.userId,
     chatsRef,
     storiesRef,
     setCachedChats,
@@ -143,6 +139,14 @@ export function useRemoteMessenger() {
     setMessages,
     markReadThrough: markReadMutation,
   });
+
+  const {
+    stories: visibleStories,
+    markStorySeen,
+    deleteStory,
+    shareStory,
+    retryStory,
+  } = useRemoteStories({ stories, setStories });
 
   const chats = useMemo(() => {
     // The cache is the single source of truth on screen. The server sync writes
@@ -224,6 +228,7 @@ export function useRemoteMessenger() {
     updateChats,
     appendLocal,
     markLocalMessageStatus,
+    markLocalMessageProgress,
   } = createRemoteWriters({
     setMessages,
     setCachedChats,
@@ -327,6 +332,7 @@ export function useRemoteMessenger() {
     messagesRef,
     appendLocal,
     markLocalMessageStatus,
+    markLocalMessageProgress,
     sendText: sendTextMutation,
     sendAttachment: sendAttachmentMutation,
   });
@@ -380,31 +386,16 @@ export function useRemoteMessenger() {
     }
   }
 
-  function markStorySeen(id: string) {
-    setStories((current) =>
-      current.map((story) =>
-        story.id === id ? { ...story, seen: true } : story,
-      ),
-    );
-    void storySeenMutation({ storyId: id as Id<"stories"> }).catch(() => {});
-  }
-
-  function deleteStory(id: string) {
-    setStories((current) => current.filter((story) => story.id !== id));
-    void storyDeleteMutation({ storyId: id as Id<"stories"> }).catch(() => {});
-  }
-
-  function shareStory(story: Story) {
-    void uploadAndCreateStory(story, storyCreateMutation);
-  }
-
   function saveMedia(message: Message) {
     return saveTrackedMedia(message, gallerySavedRef.current, setGallerySaved);
   }
 
   async function setProfile(
     next: SettingsProfile,
-    options?: { remote?: boolean },
+    options?: {
+      remote?: boolean;
+      avatar?: { mimeType?: string; filename?: string };
+    },
   ) {
     if (options?.remote !== false && remoteProfile) {
       await saveRemoteProfile({
@@ -412,6 +403,8 @@ export function useRemoteMessenger() {
         remote: remoteProfile,
         updateProfile,
         uploaded: uploadedAvatars.current,
+        avatarFile: options?.avatar,
+        ensureProfile: () => ensureProfile({}),
       });
     }
     setSettings((current) => ({ ...current, ...next }));
@@ -431,7 +424,8 @@ export function useRemoteMessenger() {
   return {
     chats,
     messages,
-    stories,
+    stories: visibleStories,
+    selfId: remoteProfile?.userId,
     history,
     dark,
     theme,
@@ -464,6 +458,7 @@ export function useRemoteMessenger() {
     markStorySeen,
     deleteStory,
     shareStory,
+    retryStory,
     saveMedia,
     addCall: (record: RemoteCallRecord) =>
       setHistory((current) => [record, ...current]),

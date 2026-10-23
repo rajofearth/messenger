@@ -18,7 +18,9 @@ barcode scanner and trimming bundled fonts took it to 15,680,499 bytes
 ending at 14,375,470 bytes (13.71 MiB), 2.29 MiB below the 16 MiB gate. The
 v0.1.1 sign-in copy added 1,112 bytes to the local build, for 14,376,582 bytes
 (13.71 MiB), still 2.29 MiB below the gate. The published v0.1.1 APK is
-14,376,546 bytes, 36 bytes below the local gate build. The stage table and the
+14,376,546 bytes, 36 bytes below the local gate build. Upload progress and
+story viewers then added 8,208 bytes to the local gate build, for 14,384,754
+bytes (13.72 MiB), still 2.28 MiB below the gate. The stage table and the
 per-entry breakdown are under "Measured APK size".
 
 ### Build configuration in `app.json`

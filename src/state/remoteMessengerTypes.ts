@@ -103,6 +103,7 @@ export function mapStory(item: {
   video: boolean;
   caption: string;
   seen: boolean;
+  createdAt?: number;
   expiresAt?: number;
 }): Story {
   return {
@@ -114,6 +115,7 @@ export function mapStory(item: {
     video: item.video,
     caption: item.caption,
     seen: item.seen,
+    createdAt: item.createdAt,
     expiresAt: item.expiresAt,
   };
 }

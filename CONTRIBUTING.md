@@ -61,12 +61,29 @@ every change you want to see on the phone.
 `ANDROID_SERIAL` when more than one device is connected. `ANDROID_HOME`,
 `ANDROID_SDK_ROOT` and `JAVA_HOME` are respected.
 
+For a development build that installs beside production and updates itself:
+
+```sh
+npm run android:dev:build    # Messenger Dev -> artifacts/messenger-dev.apk
+npm run android:dev:install  # first install only
+npm run dev:ship             # build, publish a prerelease, update the dev feed
+```
+
+The dev build reads the development Convex URLs from `.env.local` and refuses
+to use the production feed. `dev:ship` needs `gh` authentication and writes
+only to the development deployment; it also refuses a non-dev
+`CONVEX_DEPLOYMENT`. The first APK is installed by hand, and later builds are
+offered by the app's updater. Keep `artifacts/messenger-dev-debug.keystore`
+intact: Android only installs an update signed by the same key. See
+[README.md](README.md) for the full command list.
+
 Two rules for the native side:
 
 - `android/` is generated and ignored by Git. Make native configuration changes
-  in `app.json` plugins, never in generated files. Run
-  `npm run android:prebuild` after a config change; `android:build` only
-  prebuilds when `android/` is missing.
+  in `app.json` plugins, never in generated files. `android:build` regenerates
+  `android/` when the package, version or build variant changes; run
+  `npm run android:prebuild` after a config change you want to apply without a
+  full build.
 - The APK is signed with Expo's generated debug key. It is a local test build
   and must not be published to a store.
 

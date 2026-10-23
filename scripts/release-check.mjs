@@ -3,12 +3,17 @@
 // typecheck, the test suite and this script; the release workflow runs it
 // against the CI APK. What each check protects is written up in AGENTS.md.
 //
-//   node scripts/release-check.mjs [apk] [--baseline <bytes>] [--baseline-label <name>]
+//   node scripts/release-check.mjs [apk] [--variant production|dev]
+//                                  [--version <name>] [--version-code <n>]
+//                                  [--package <applicationId>]
+//                                  [--baseline <bytes>] [--baseline-label <name>]
 //                                  [--baseline-version-code <n>]
 //
 // Without an argument it inspects artifacts/messenger-local.apk, which is what
-// `npm run android:build` writes. Exits non-zero when a check fails, so a
-// bloated or mismatched build cannot be published.
+// `npm run android:build` writes. A dev build passes its generated version and
+// package so the same size, ABI and manifest checks still apply. Exits
+// non-zero when a check fails, so a bloated or mismatched build cannot be
+// published.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -29,18 +34,36 @@ const FORBIDDEN_LIBRARIES = ["libbarhopper_v3.so"];
 const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
   console.log(
-    "Usage: node scripts/release-check.mjs [apk] [--baseline <bytes>] [--baseline-label <name>] [--baseline-version-code <n>]",
+    "Usage: node scripts/release-check.mjs [apk] [--variant production|dev] " +
+      "[--version <name>] [--version-code <n>] [--package <applicationId>] " +
+      "[--baseline <bytes>] [--baseline-label <name>] [--baseline-version-code <n>]",
   );
   process.exit(0);
 }
 
 let apkArgument;
+let variant = "production";
+let versionArgument;
+let versionCodeArgument;
+let packageArgument;
 let baseline;
 let baselineLabel = "the previous release";
 let baselineVersionCode;
 for (let index = 0; index < argv.length; index += 1) {
   const argument = argv[index];
-  if (argument === "--baseline") {
+  if (argument === "--variant") {
+    variant = argv[index + 1];
+    index += 1;
+  } else if (argument === "--version") {
+    versionArgument = argv[index + 1];
+    index += 1;
+  } else if (argument === "--version-code") {
+    versionCodeArgument = Number(argv[index + 1]);
+    index += 1;
+  } else if (argument === "--package") {
+    packageArgument = argv[index + 1];
+    index += 1;
+  } else if (argument === "--baseline") {
     baseline = Number(argv[index + 1]);
     index += 1;
   } else if (argument === "--baseline-label") {
@@ -60,6 +83,31 @@ for (let index = 0; index < argv.length; index += 1) {
   }
 }
 
+if (variant !== "production" && variant !== "dev") {
+  console.error("--variant must be production or dev");
+  process.exit(2);
+}
+if (variant === "dev" && (versionArgument === undefined || versionCodeArgument === undefined)) {
+  console.error("--variant dev requires --version and --version-code");
+  process.exit(2);
+}
+if (versionArgument !== undefined && versionArgument.trim() === "") {
+  console.error("--version must not be empty");
+  process.exit(2);
+}
+if (
+  versionCodeArgument !== undefined &&
+  (!Number.isInteger(versionCodeArgument) ||
+    versionCodeArgument < 1 ||
+    versionCodeArgument > 2_100_000_000)
+) {
+  console.error("--version-code must be an integer between 1 and 2100000000");
+  process.exit(2);
+}
+if (packageArgument !== undefined && /\s/.test(packageArgument)) {
+  console.error("--package must not contain whitespace");
+  process.exit(2);
+}
 if (
   baselineVersionCode !== undefined &&
   (!Number.isInteger(baselineVersionCode) || baselineVersionCode < 1)
@@ -90,25 +138,40 @@ function warn(message) {
 
 const appConfig = JSON.parse(readFileSync(path.join(root, "app.json"), "utf8"));
 const packageConfig = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
-const version = appConfig.expo.version;
-console.log(`Release check for Messenger ${version}`);
+const version = versionArgument ?? appConfig.expo.version;
+const versionCode = versionCodeArgument ?? appConfig.expo?.android?.versionCode;
+const expectedPackage =
+  packageArgument ??
+  (variant === "dev" ? "com.yashraj.messenger.dev" : appConfig.expo?.android?.package);
+console.log(
+  variant === "dev"
+    ? `Dev build check for Messenger Dev ${version}`
+    : `Release check for Messenger ${version}`,
+);
 
-if (packageConfig.version === version) {
-  ok(`app.json and package.json both say ${version}`);
+if (variant === "production") {
+  if (packageConfig.version === version) {
+    ok(`app.json and package.json both say ${version}`);
+  } else {
+    fail(
+      `app.json says ${version} but package.json says ${packageConfig.version}`,
+      "bump both in the release commit",
+    );
+  }
 } else {
-  fail(
-    `app.json says ${version} but package.json says ${packageConfig.version}`,
-    "bump both in the release commit",
-  );
+  ok(`development variant uses ${version}; package.json stays at ${packageConfig.version}`);
 }
 
-const versionCode = appConfig.expo?.android?.versionCode;
-if (Number.isInteger(versionCode) && versionCode >= 1) {
-  ok(`versionCode ${versionCode} is a positive integer`);
+if (
+  Number.isInteger(versionCode) &&
+  versionCode >= 1 &&
+  versionCode <= 2_100_000_000
+) {
+  ok(`versionCode ${versionCode} is a valid Android version code`);
 } else {
   fail(
-    `expo.android.versionCode is ${versionCode ?? "missing"}; Android needs a positive integer to order installs`,
-    "set expo.android.versionCode in app.json and bump it for every release",
+    `versionCode is ${versionCode ?? "missing"}; Android needs an integer between 1 and 2100000000 to order installs`,
+    "set expo.android.versionCode for production, or pass the generated dev version code",
   );
 }
 if (baselineVersionCode !== undefined && Number.isInteger(versionCode)) {
@@ -126,7 +189,7 @@ if (baselineVersionCode !== undefined && Number.isInteger(versionCode)) {
 
 const apkPath = apkArgument
   ? path.resolve(apkArgument)
-  : path.join(root, "artifacts", "messenger-local.apk");
+  : path.join(root, "artifacts", variant === "dev" ? "messenger-dev.apk" : "messenger-local.apk");
 const shownPath =
   path.relative(root, apkPath).split(path.sep).join("/") || apkPath;
 
@@ -134,7 +197,10 @@ if (!existsSync(apkPath)) {
   if (apkArgument) {
     fail(`no APK at ${shownPath}`);
   } else {
-    warn(`no APK at ${shownPath}; build one with \`npm run android:build\` or pass a path`);
+    warn(
+      `no APK at ${shownPath}; build one with ` +
+        `\`npm run ${variant === "dev" ? "android:dev:build" : "android:build"}\` or pass a path`,
+    );
   }
   report();
 }
@@ -221,18 +287,29 @@ if (!aapt2) {
 } else {
   try {
     const badging = execFileSync(aapt2, ["dump", "badging", apkPath], { encoding: "utf8" });
+    const apkPackage = /package: name='([^']*)'/.exec(badging)?.[1];
+    if (apkPackage === expectedPackage) {
+      ok(`APK reports package ${apkPackage}`);
+    } else {
+      fail(
+        `APK reports package ${apkPackage ?? "unknown"} but expected ${expectedPackage}`,
+        variant === "dev"
+          ? "prebuild the dev variant; the APK must use a package other than production's"
+          : "prebuild and rebuild; an APK with the wrong applicationId cannot update this app",
+      );
+    }
     const versionName = /versionName='([^']*)'/.exec(badging)?.[1];
     if (versionName === version) {
       ok(`APK reports versionName ${versionName}`);
     } else {
-      fail(`APK reports versionName ${versionName ?? "unknown"} but app.json says ${version}`);
+      fail(`APK reports versionName ${versionName ?? "unknown"} but expected ${version}`);
     }
     const apkVersionCode = /versionCode='([^']*)'/.exec(badging)?.[1];
     if (apkVersionCode === String(versionCode)) {
       ok(`APK reports versionCode ${apkVersionCode}`);
     } else {
       fail(
-        `APK reports versionCode ${apkVersionCode ?? "unknown"} but app.json says ${versionCode}`,
+        `APK reports versionCode ${apkVersionCode ?? "unknown"} but expected ${versionCode}`,
         "prebuild and rebuild; the APK would be rejected as a downgrade",
       );
     }

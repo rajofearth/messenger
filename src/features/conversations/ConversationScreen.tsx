@@ -33,6 +33,7 @@ import { groupMediaMessages, type MediaRow } from "../../domain/mediaAlbums";
 import { daySeparatorLabel, localDayKey } from "../../domain/time";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
+import { StoryPicker } from "../stories/StoryPicker";
 import { styles as s } from "./ConversationScreen.styles";
 
 export type ConversationScreenProps = {
@@ -401,6 +402,22 @@ export default function ConversationScreen({
         setAttachmentOpen={setAttachmentOpen}
         disabled={!!chat.blocked}
       />
+      <Modal
+        visible={visible && media.pickerOpen}
+        animationType="slide"
+        onRequestClose={media.closePicker}
+      >
+        <StoryPicker
+          dark={dark}
+          title="Share media"
+          permissionTitle="Choose media to share"
+          permissionText="Allow Messenger to see your photos and videos so you can share them in this conversation."
+          emptyTitle="No photos or videos yet"
+          emptyText="Take a photo or video to share it here."
+          onPicked={media.pickMedia}
+          onClose={media.closePicker}
+        />
+      </Modal>
       <MessageActions
         target={visible ? target : null}
         dark={dark}

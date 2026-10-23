@@ -3,8 +3,12 @@
 // real APK and the matching CHANGELOG entry.
 //
 //   node scripts/update-manifest.mjs [apk] --url <https url>
+//        [--version-name <name>] [--version-code N]
 //        [--min-version-code N] [--mandatory]
 //        [--notes <text> | --notes-file <path>]
+//
+// Version values default to app.json for a production release. A development
+// build passes both explicitly because its version is generated per build.
 //
 // Without an APK path it reads artifacts/release/messenger-<version>-arm64-v8a.apk,
 // which is what the release workflow collects. Only the JSON goes to stdout, so
@@ -128,6 +132,8 @@ export function parseArgs(argv) {
   const options = {
     apk: undefined,
     url: undefined,
+    versionName: undefined,
+    versionCode: undefined,
     minVersionCode: 1,
     mandatory: false,
     notes: undefined,
@@ -148,6 +154,22 @@ export function parseArgs(argv) {
       options.help = true;
     } else if (argument === "--url") {
       options.url = value((index += 1), argument);
+    } else if (argument === "--version-name") {
+      const next = value((index += 1), argument).trim();
+      if (!next) throw new Error("--version-name must not be empty");
+      options.versionName = next;
+    } else if (argument === "--version-code") {
+      const raw = value((index += 1), argument);
+      const parsed = Number(raw);
+      if (
+        !/^\d+$/.test(raw) ||
+        !Number.isSafeInteger(parsed) ||
+        parsed < 1 ||
+        parsed > 2_100_000_000
+      ) {
+        throw new Error("--version-code must be an integer between 1 and 2100000000");
+      }
+      options.versionCode = parsed;
     } else if (argument === "--min-version-code") {
       const raw = value((index += 1), argument);
       const parsed = Number(raw);
@@ -181,19 +203,20 @@ export function main(argv) {
   if (options.help) {
     console.log(
       "Usage: node scripts/update-manifest.mjs [apk] --url <https url> " +
+        "[--version-name <name>] [--version-code N] " +
         "[--min-version-code N] [--mandatory] [--notes <text> | --notes-file <path>]",
     );
     return;
   }
 
   const appConfig = JSON.parse(readFileSync(path.join(root, "app.json"), "utf8"));
-  const versionName = appConfig.expo?.version;
-  const versionCode = appConfig.expo?.android?.versionCode;
-  if (typeof versionName !== "string" || versionName.length === 0) {
-    throw new Error("app.json has no expo.version");
+  const versionName = options.versionName ?? appConfig.expo?.version;
+  const versionCode = options.versionCode ?? appConfig.expo?.android?.versionCode;
+  if (typeof versionName !== "string" || versionName.trim().length === 0) {
+    throw new Error("app.json has no expo.version and --version-name was not passed");
   }
   if (!Number.isInteger(versionCode) || versionCode < 1) {
-    throw new Error("app.json has no positive expo.android.versionCode");
+    throw new Error("app.json has no positive expo.android.versionCode and --version-code was not passed");
   }
   if (!options.url) {
     throw new Error("--url is required: it is the release asset URL the app downloads");

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import {
   RecordingPresets,
@@ -10,6 +9,7 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 import type { Message } from "../../domain/data";
+import type { PickedStoryMedia } from "../stories/storyPickerModel";
 import type { KeyboardMedia } from "../../ui/KeyboardMediaInput";
 import { saveKeyboardMedia } from "../../services/keyboardMedia";
 
@@ -20,6 +20,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
   });
   const state = useAudioRecorderState(recorder, 200);
   const [recording, setRecording] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const active = useRef(false);
   const busy = useRef(false);
   const mounted = useRef(true);
@@ -40,57 +41,33 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
     };
   }, [recorder]);
 
-  async function pickPhoto(camera = false) {
+  function pickPhoto(_camera = false) {
     if (busy.current || active.current) return;
-    busy.current = true;
-    try {
-      const permission = camera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "Permission needed",
-          `Allow ${camera ? "camera" : "photo library"} access in your device settings to share photos and videos.`,
-        );
-        return;
-      }
-      const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: ["images", "videos"],
-        quality: camera ? 0.85 : 1,
-        allowsEditing: false,
-        allowsMultipleSelection: !camera,
-        selectionLimit: 0,
-        orderedSelection: true,
-      };
-      const result = camera
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-      if (mounted.current && !result.canceled && result.assets[0]) {
-        const albumId =
-          result.assets.length > 1
-            ? `album-${Date.now()}-${Math.random().toString(36).slice(2)}`
-            : undefined;
-        for (const asset of result.assets) {
-          onSend({
-            kind: asset.type === "video" ? "video" : "image",
-            uri: asset.uri,
-            mimeType: asset.mimeType ?? undefined,
-            filename: asset.fileName ?? undefined,
-            albumId,
-            width: asset.width,
-            height: asset.height,
-            duration: asset.duration ? asset.duration / 1000 : undefined,
-          });
-        }
-      }
-    } catch {
-      Alert.alert(
-        "Couldn't open photos",
-        "Please try choosing the photo again.",
-      );
-    } finally {
-      busy.current = false;
+    setPickerOpen(true);
+  }
+
+  function closePicker() {
+    setPickerOpen(false);
+  }
+
+  function pickMedia(items: PickedStoryMedia[]) {
+    if (busy.current || active.current || !items.length) return;
+    const albumId =
+      items.length > 1
+        ? `album-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        : undefined;
+    for (const item of items) {
+      onSend({
+        kind: item.video ? "video" : "image",
+        uri: item.uri,
+        filename: item.filename,
+        albumId,
+        width: item.width,
+        height: item.height,
+        duration: item.duration,
+      });
     }
+    setPickerOpen(false);
   }
 
   function receiveKeyboardMedia(media: KeyboardMedia) {
@@ -219,6 +196,9 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
 
   return {
     recording,
+    pickerOpen,
+    closePicker,
+    pickMedia,
     durationMillis: state.durationMillis,
     metering: state.metering,
     isRecording: () => active.current,

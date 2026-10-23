@@ -112,7 +112,12 @@ test("options are parsed strictly", () => {
   assert.equal(parseArgs(["--help"]).help, true);
   assert.equal(parseArgs(["--min-version-code", "3"]).minVersionCode, 3);
   assert.equal(parseArgs(["--mandatory"]).mandatory, true);
+  assert.equal(parseArgs(["--version-name", "0.1.1-dev.1"]).versionName, "0.1.1-dev.1");
+  assert.equal(parseArgs(["--version-code", "12345"]).versionCode, 12345);
   assert.throws(() => parseArgs(["--url"]), /needs a value/);
+  assert.throws(() => parseArgs(["--version-name"]), /needs a value/);
+  assert.throws(() => parseArgs(["--version-code", "0"]), /between 1 and/);
+  assert.throws(() => parseArgs(["--version-code", "2.5"]), /between 1 and/);
   assert.throws(() => parseArgs(["--min-version-code", "0"]), /positive integer/);
   assert.throws(() => parseArgs(["--min-version-code", "3.5"]), /positive integer/);
   assert.throws(() => parseArgs(["--nope"]), /unknown option/);
@@ -143,5 +148,29 @@ test("the CLI prints one publishable JSON document and nothing else", () => {
   assert.equal(manifest.minVersionCode, 1);
   assert.equal(manifest.mandatory, false);
   assert.equal(manifest.notes, "Test notes.");
+  assert.equal(releaseProblem(manifest), null);
+});
+
+test("a development build can supply its generated version explicitly", () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      path.join(root, "scripts", "update-manifest.mjs"),
+      packagePath,
+      "--url",
+      "https://example.com/messenger-dev.apk",
+      "--version-name",
+      "0.1.1-dev.20261022.120000",
+      "--version-code",
+      "1780000000",
+      "--notes",
+      "Development build.",
+    ],
+    { encoding: "utf8" },
+  );
+  const manifest = JSON.parse(output);
+  assert.equal(manifest.versionName, "0.1.1-dev.20261022.120000");
+  assert.equal(manifest.versionCode, 1780000000);
+  assert.equal(manifest.minVersionCode, 1);
   assert.equal(releaseProblem(manifest), null);
 });

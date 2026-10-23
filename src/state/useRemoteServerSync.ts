@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { Chat, Message, Story } from "../domain/data";
+import { markOwnStories } from "../domain/stories";
 import { mergeChats } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { prefetchStories } from "../services/mediaCache";
@@ -20,6 +21,7 @@ type Args = {
   remoteThread: Message[] | undefined;
   selected: string | null;
   conversationVisible: boolean;
+  selfId?: string;
   chatsRef: MutableRefObject<Chat[]>;
   storiesRef: MutableRefObject<Story[]>;
   setCachedChats: Dispatch<SetStateAction<Chat[]>>;
@@ -42,6 +44,7 @@ export function useRemoteServerSync({
   remoteThread,
   selected,
   conversationVisible,
+  selfId,
   chatsRef,
   storiesRef,
   setCachedChats,
@@ -87,9 +90,12 @@ export function useRemoteServerSync({
     if (!remoteStories) return;
     let active = true;
     const now = Date.now();
-    const next = remoteStories
-      .map(mapStory)
-      .filter((story) => !story.expiresAt || story.expiresAt > now);
+    const next = markOwnStories(
+      remoteStories
+        .map(mapStory)
+        .filter((story) => !story.expiresAt || story.expiresAt > now),
+      selfId,
+    );
     storiesRef.current = next;
     setStories(next);
     void messengerRepository.saveStories(next).catch(() => {});
@@ -104,7 +110,7 @@ export function useRemoteServerSync({
     return () => {
       active = false;
     };
-  }, [remoteStories, setStories, storiesRef]);
+  }, [remoteStories, selfId, setStories, storiesRef]);
 
   useEffect(() => {
     if (!selected) return;

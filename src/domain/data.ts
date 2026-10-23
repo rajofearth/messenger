@@ -28,6 +28,8 @@ export type Message = {
   revision?: number;
   /** Local-only delivery state; confirmed server rows leave it undefined. */
   status?: MessageStatus;
+  /** Local-only upload fraction (0..1) while an attachment is on its way. */
+  uploadProgress?: number;
 };
 
 export type Chat = {
@@ -57,6 +59,8 @@ export type Chat = {
   lastMessageStatus?: MessageStatus;
 };
 
+export type StoryUploadStatus = "uploading" | "uploaded" | "failed";
+
 export type Story = {
   id: string;
   name: string;
@@ -66,6 +70,21 @@ export type Story = {
   caption: string;
   video?: boolean;
   ownerId?: string;
+  /** Unix milliseconds; used for the "Posted" time in the viewer. */
+  createdAt?: number;
   /** Unix milliseconds; a story disappears after 24 hours. */
   expiresAt?: number;
+  /** Local-only upload state for an item that is still on this device. */
+  uploadStatus?: StoryUploadStatus;
+  /** Local-only upload fraction (0..1) while `uploadStatus` is uploading. */
+  uploadProgress?: number;
+};
+
+/** Someone who opened one of the current user's stories. */
+export type StoryView = {
+  id: string;
+  name: string;
+  avatar?: string;
+  /** Unix milliseconds when they last opened the story. */
+  seenAt: number;
 };

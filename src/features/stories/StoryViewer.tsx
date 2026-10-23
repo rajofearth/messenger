@@ -1,8 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AppState, PanResponder, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { StoryGroup } from "../../domain/stories";
+import { chatTimeLabel } from "../../domain/time";
+import { useStoryViewers } from "../../state/useStoryViewers";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { StoryMedia } from "./StoryMedia";
 import { styles as s } from "./Stories.styles";
@@ -10,8 +21,10 @@ import { styles as s } from "./Stories.styles";
 type Props = {
   groups: StoryGroup[];
   initialIndex: number;
+  selfId?: string | null;
   onSeen: (id: string) => void;
   onDelete: (id: string) => void;
+  onRetryUpload: (id: string) => void;
   onClose: () => void;
 };
 
@@ -26,7 +39,7 @@ export function StoryViewer(props: Props) {
   const foundOwner = groups.findIndex((group) => group.id === selection.owner);
   const ownerIndex =
     foundOwner >= 0
-      ? foundOwner
+      ? Math.max(0, Math.min(foundOwner, groups.length - 1))
       : Math.max(0, Math.min(selection.ownerIndex, groups.length - 1));
   const group = groups[ownerIndex];
   const foundItem =
@@ -39,11 +52,22 @@ export function StoryViewer(props: Props) {
           Math.min(selection.itemIndex, (group?.items.length ?? 1) - 1),
         );
   const active = group?.items[itemIndex];
+  const ownStory =
+    !!active &&
+    (active.ownerId === "self" ||
+      group?.id === "self" ||
+      (!!props.selfId && active.ownerId === props.selfId));
+  const localOnly =
+    active?.uploadStatus === "uploading" || active?.uploadStatus === "failed";
+  const viewers = useStoryViewers(
+    ownStory && active && !localOnly ? active.id : null,
+  );
+  const [viewersOpen, setViewersOpen] = useState(false);
   const [held, setHeld] = useState(false);
   const [background, setBackground] = useState(
     AppState.currentState !== "active",
   );
-  const paused = held || background;
+  const paused = held || background || viewersOpen;
   const [progress, setProgress] = useState({ id: active?.id, value: 0 });
   const elapsed = useRef(0);
   const latest = useRef({ props, ownerIndex, itemIndex, active, paused });
@@ -62,6 +86,7 @@ export function StoryViewer(props: Props) {
       ownerIndex: owner,
       itemIndex: item,
     });
+    setViewersOpen(false);
   }
   function move(direction: number, ownerOnly = false) {
     const current = latest.current;
@@ -121,9 +146,10 @@ export function StoryViewer(props: Props) {
   useEffect(() => {
     elapsed.current = 0;
     setProgress({ id: active?.id, value: 0 });
-    if (active) latest.current.props.onSeen(active.id);
-    else latest.current.props.onClose();
-  }, [active?.id]);
+    setViewersOpen(false);
+    if (active && !ownStory) latest.current.props.onSeen(active.id);
+    else if (!active) latest.current.props.onClose();
+  }, [active?.id, ownStory]);
   useEffect(() => {
     if (!active || active.video || paused) return;
     let last = Date.now();
@@ -144,6 +170,12 @@ export function StoryViewer(props: Props) {
   }, [active?.id, active?.video, paused]);
 
   if (!active || !group) return <View style={s.viewer} />;
+  const posted = active.createdAt ? chatTimeLabel(active.createdAt) : null;
+  const uploadPercent =
+    active.uploadStatus === "uploading"
+      ? Math.max(0, Math.min(100, Math.round((active.uploadProgress ?? 0) * 100)))
+      : null;
+  const viewCount = viewers?.length ?? 0;
   return (
     <SafeAreaView style={s.viewer}>
       <View style={s.flex}>
@@ -164,6 +196,9 @@ export function StoryViewer(props: Props) {
           <View style={s.tracks}>
             {group.items.map((item, i) => (
               <View key={item.id} style={s.track}>
+                {item.uploadStatus === "failed" && (
+                  <View style={s.uploadFailed} />
+                )}
                 <View
                   style={[
                     s.fill,
@@ -172,13 +207,44 @@ export function StoryViewer(props: Props) {
                     },
                   ]}
                 />
+                {item.uploadStatus === "uploading" && (
+                  <View
+                    style={[
+                      s.uploadFill,
+                      {
+                        width: `${Math.max(0, Math.min(100, Math.round((item.uploadProgress ?? 0) * 100)))}%`,
+                      },
+                    ]}
+                  />
+                )}
               </View>
             ))}
           </View>
           <View style={s.header}>
             <Avatar uri={group.avatar} name={group.name} size={38} />
-            <Text style={s.name}>{group.name}</Text>
-            {(active.name === "You" || active.ownerId === "self") && (
+            <View style={s.owner}>
+              <Text style={[s.name, s.ownerName]} numberOfLines={1}>
+                {group.name}
+              </Text>
+              {ownStory && (
+                <View style={s.statsRow}>
+                  {posted && <Text style={s.statsText}>Posted {posted}</Text>}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${viewCount} ${viewCount === 1 ? "viewer" : "viewers"}. Open viewer list.`}
+                    hitSlop={8}
+                    onPress={() => setViewersOpen(true)}
+                    style={s.statsButton}
+                  >
+                    <Ionicons name="eye-outline" size={13} color="#FFFFFFCC" />
+                    <Text style={s.statsText}>
+                      {viewCount} {viewCount === 1 ? "view" : "views"}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+            {ownStory && (
               <IconButton
                 name="trash-outline"
                 label="Delete your story"
@@ -211,9 +277,87 @@ export function StoryViewer(props: Props) {
             move(event.nativeEvent.actionName === "decrement" ? -1 : 1)
           }
         />
-        <View style={s.bottom} pointerEvents="none">
-          {!!active.caption && <Text style={s.caption}>{active.caption}</Text>}
+        <View style={s.bottom} pointerEvents="box-none">
+          {active.uploadStatus === "uploading" && (
+            <View style={s.uploadState}>
+              <ActivityIndicator size="small" color="white" />
+              <Text style={s.uploadText}>
+                Uploading {uploadPercent ?? 0}% · local copy
+              </Text>
+            </View>
+          )}
+          {active.uploadStatus === "failed" && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry story upload"
+              onPress={() => props.onRetryUpload(active.id)}
+              style={s.retry}
+            >
+              <Ionicons name="refresh" size={16} color="white" />
+              <Text style={s.uploadText}>
+                Upload failed · Tap to retry
+              </Text>
+            </Pressable>
+          )}
+          {!!active.caption && (
+            <Text style={s.caption} pointerEvents="none">
+              {active.caption}
+            </Text>
+          )}
         </View>
+        {viewersOpen && ownStory && (
+          <View style={s.viewersLayer}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close viewers"
+              onPress={() => setViewersOpen(false)}
+              style={s.viewersScrim}
+            />
+            <View style={s.viewersSheet} accessibilityViewIsModal>
+              <View style={s.viewersHeader}>
+                <Text style={s.viewersTitle}>Viewers</Text>
+                <Text style={s.viewersCount}>{viewCount}</Text>
+                <IconButton
+                  name="close"
+                  label="Close viewers"
+                  color="white"
+                  onPress={() => setViewersOpen(false)}
+                />
+              </View>
+              <ScrollView
+                style={s.viewersList}
+                contentContainerStyle={s.viewersListContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {viewers === undefined ? (
+                  <ActivityIndicator color="white" style={s.viewersLoading} />
+                ) : viewers.length === 0 ? (
+                  <Text style={s.viewersEmpty}>
+                    No one has viewed this story yet.
+                  </Text>
+                ) : (
+                  viewers.map((view) => (
+                    <View key={view.id} style={s.viewerRow}>
+                      <Avatar
+                        uri={view.avatar ?? ""}
+                        name={view.name}
+                        size={36}
+                      />
+                      <View style={s.viewerCopy}>
+                        <Text style={s.viewerName} numberOfLines={1}>
+                          {view.name}
+                        </Text>
+                        <Text style={s.viewerTime}>
+                          {chatTimeLabel(view.seenAt) ?? "Viewed"}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

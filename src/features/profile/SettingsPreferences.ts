@@ -11,7 +11,11 @@ export type SettingsProfile = Pick<
   "name" | "avatar" | "sound" | "previews" | "systemNotifications"
 > &
   Partial<Pick<Preferences, "bio" | "username" | "haptics">>;
-export type ProfileChangeOptions = { remote?: boolean };
+export type ProfileChangeOptions = {
+  remote?: boolean;
+  /** The picker's real format, so the upload does not claim a PNG is a JPEG. */
+  avatar?: { mimeType?: string; filename?: string };
+};
 export type ProfileChangeHandler = (
   profile: SettingsProfile,
   options?: ProfileChangeOptions,
@@ -27,6 +31,24 @@ export const DEFAULT_PREFERENCES: Preferences = {
   previews: true,
   systemNotifications: true,
 };
+
+/** Turns an upload/profile failure into a next step, not a generic shrug. */
+function avatarSaveReason(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("FILE_TOO_LARGE"))
+    return "That photo is larger than 25 MiB. Choose a smaller one.";
+  if (message.includes("INVALID_MIME"))
+    return "That image format is not supported. Choose a JPEG, PNG or WebP photo.";
+  if (message.includes("AUTH_REQUIRED"))
+    return "Your session expired. Sign in again and choose the photo.";
+  if (message.includes("USERNAME_TAKEN"))
+    return "Your username is already in use. Update it in Edit profile, then try the photo again.";
+  if (message.includes("INVALID_USERNAME") || message.includes("PROFILE_NOT_READY"))
+    return "Finish setting up your profile name and username, then try the photo again.";
+  if (message.includes("UnableToUpload") || message.includes("Upload failed"))
+    return "The photo could not reach the server. Check your connection and try again.";
+  return "We could not save your choice. Check your connection and try again.";
+}
 
 export function useSettingsPreferences(
   onProfileChange?: ProfileChangeHandler,
@@ -128,39 +150,44 @@ export function useSettingsPreferences(
   async function pickAvatar() {
     if (!ready || picking) return;
     setPicking(true);
+    let opened = false;
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "Photo access needed",
-          "Allow photo library access in your device settings to choose a profile photo.",
-        );
-        return;
-      }
+      // The Android/iOS system photo picker grants access to the chosen item;
+      // an extra media-library permission prompt is unnecessary and can fail
+      // on Android's selected-photos mode.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+        quality: 0.8,
+        allowsMultipleSelection: false,
       });
-      if (!result.canceled && result.assets[0]?.uri) {
-        setAvatarFailed(false);
-        const previousAvatar = current.current.avatar;
-        await persist({ avatar: result.assets[0].uri });
-        try {
-          await onProfileChange?.({ ...current.current });
-        } catch (error) {
-          // The local pick is only useful once the profile photo reaches the
-          // server; restore the previous avatar before showing the failure.
-          await persist({ avatar: previousAvatar }).catch(() => {});
-          throw error;
-        }
+      if (result.canceled || !result.assets[0]?.uri) return;
+      opened = true;
+      const asset = result.assets[0];
+      setAvatarFailed(false);
+      const previousAvatar = current.current.avatar;
+      await persist({ avatar: asset.uri });
+      try {
+        await onProfileChange?.(
+          { ...current.current },
+          {
+            avatar: {
+              mimeType: asset.mimeType,
+              filename: asset.fileName ?? undefined,
+            },
+          },
+        );
+      } catch (error) {
+        // The local pick is only useful once the profile photo reaches the
+        // server; restore the previous avatar before showing the failure.
+        await persist({ avatar: previousAvatar }).catch(() => {});
+        throw error;
       }
-    } catch {
+    } catch (error) {
       Alert.alert(
-        "Photo could not be saved",
-        "We could not open the photo library or save your choice. Please try again.",
+        opened ? "Photo could not be saved" : "Could not open photos",
+        opened
+          ? avatarSaveReason(error)
+          : "The photo library could not be opened. Please try again.",
       );
     } finally {
       setPicking(false);

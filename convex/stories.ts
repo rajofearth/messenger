@@ -115,6 +115,51 @@ export const create = mutation({
   },
 });
 
+/**
+ * The owner-only view list for one story. Everyone else gets a forbidden error
+ * rather than a count, so a viewer cannot probe another person's audience.
+ */
+export const views = query({
+  args: { storyId: v.id("stories") },
+  handler: async (ctx, args) => {
+    const actor = await requireUser(ctx);
+    const row = await ctx.db.get(args.storyId);
+    // A cached story can outlive its server row by a moment. Treat that as an
+    // empty audience instead of failing the viewer overlay; other accounts
+    // still get a forbidden error.
+    if (!row) return [];
+    if (row.ownerId !== actor.userId) {
+      throw new ConvexError("STORY_FORBIDDEN");
+    }
+    if (row.expiresAt <= Date.now()) return [];
+    const seen = await ctx.db
+      .query("storyViews")
+      .withIndex("by_story_user", (q) => q.eq("storyId", args.storyId))
+      .take(200);
+    const viewers = await Promise.all(
+      seen
+        .filter((view) => view.userId !== actor.userId)
+        .map(async (view) => {
+          const user = await ctx.db.get(view.userId);
+          const profile = await ctx.db
+            .query("profiles")
+            .withIndex("by_userId", (q) => q.eq("userId", view.userId))
+            .unique();
+          return {
+            id: view.userId.toString(),
+            name: profile?.name || user?.name || "Messenger user",
+            avatar:
+              (profile?.avatarStorageId
+                ? await ctx.storage.getUrl(profile.avatarStorageId)
+                : user?.image) ?? undefined,
+            seenAt: view.seenAt,
+          };
+        }),
+    );
+    return viewers.sort((a, b) => b.seenAt - a.seenAt);
+  },
+});
+
 export const markSeen = mutation({
   args: { storyId: v.id("stories") },
   handler: async (ctx, args) => {

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -10,12 +9,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import * as ImagePicker from "expo-image-picker";
-import { requestRecordingPermissionsAsync } from "expo-audio";
 import type { Story } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette } from "../../ui/theme";
+import { StoryPicker } from "./StoryPicker";
+import type { PickedStoryMedia } from "./storyPickerModel";
 import { StoryMedia } from "./StoryMedia";
 import { styles as s } from "./Stories.styles";
 
@@ -26,21 +23,13 @@ type Props = {
   onShare: (story: Story) => void;
   onClose: () => void;
 };
-type Source = "library" | "photo" | "video";
-
 export function StoryEditor(props: Props) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [index, setIndex] = useState(0);
-  const [picking, setPicking] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
-  const busy = useRef(false);
   const sharing = useRef(false);
-  const mounted = useRef(true);
-  const request = useRef(0);
   const draft = drafts[index];
-  const colors = palette(props.dark);
   useEffect(() => {
-    mounted.current = true;
     const show = Keyboard.addListener("keyboardDidShow", () =>
       setKeyboard(true),
     );
@@ -48,85 +37,20 @@ export function StoryEditor(props: Props) {
       setKeyboard(false),
     );
     return () => {
-      mounted.current = false;
-      request.current += 1;
       show.remove();
       hide.remove();
     };
   }, []);
 
-  async function pick(source: Source) {
-    if (busy.current) return;
-    busy.current = true;
-    setPicking(true);
-    const token = ++request.current;
-    const valid = () => mounted.current && request.current === token;
-    try {
-      const camera = source !== "library";
-      const permission = camera
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!valid()) return;
-      if (!permission.granted) {
-        Alert.alert(
-          "Permission needed",
-          `Allow ${camera ? "camera" : "photo library"} access in device settings to add a story.`,
-        );
-        return;
-      }
-      if (source === "video") {
-        // Request access only. Do not enable recording audio mode for playback.
-        const microphone = await requestRecordingPermissionsAsync();
-        if (!valid()) return;
-        if (!microphone.granted) {
-          Alert.alert(
-            "Microphone permission needed",
-            "Allow microphone access in device settings to record a video with sound.",
-          );
-          return;
-        }
-      }
-      const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes:
-          source === "photo"
-            ? ["images"]
-            : source === "video"
-              ? ["videos"]
-              : ["images", "videos"],
-        allowsEditing: false,
-        quality: 0.85,
-        ...(camera
-          ? { videoMaxDuration: 60 }
-          : { allowsMultipleSelection: true, orderedSelection: true }),
-      };
-      const result = camera
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
-      if (!valid() || result.canceled) return;
-      setDrafts(
-        result.assets
-          .filter((asset) => !!asset.uri)
-          .map((asset) => ({
-            uri: asset.uri,
-            video: asset.type === "video",
-            caption: "",
-          })),
-      );
-      setIndex(0);
-    } catch (error) {
-      if (valid())
-        Alert.alert(
-          "Couldn't open media",
-          error instanceof Error
-            ? error.message
-            : "Please try again on a device with a camera or photo library.",
-        );
-    } finally {
-      if (valid()) {
-        busy.current = false;
-        setPicking(false);
-      }
-    }
+  function handlePicked(media: PickedStoryMedia[]) {
+    setDrafts(
+      media.map((asset) => ({
+        uri: asset.uri,
+        video: asset.video,
+        caption: "",
+      })),
+    );
+    setIndex(0);
   }
 
   function share() {
@@ -151,42 +75,11 @@ export function StoryEditor(props: Props) {
 
   if (!draft)
     return (
-      <View style={[s.sheetWrap, { backgroundColor: colors.bg }]}>
-        <SafeAreaView
-          edges={["bottom", "left", "right"]}
-          style={[s.sheet, { backgroundColor: colors.bg }]}
-        >
-          <View style={s.header}>
-            <Text style={[s.sheetTitle, { color: colors.fg }]}>Add story</Text>
-            <IconButton
-              name="close"
-              label="Cancel story"
-              color={colors.fg}
-              onPress={props.onClose}
-            />
-          </View>
-          {(
-            [
-              ["library", "images-outline", "Photos and videos"],
-              ["photo", "camera-outline", "Take photo"],
-              ["video", "videocam-outline", "Record video"],
-            ] as const
-          ).map(([source, icon, label]) => (
-            <Pressable
-              key={source}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: picking }}
-              disabled={picking}
-              onPress={() => void pick(source)}
-              style={[s.choice, { opacity: picking ? 0.5 : 1 }]}
-            >
-              <Ionicons name={icon} size={24} color={colors.coralInk} />
-              <Text style={[s.choiceText, { color: colors.fg }]}>{label}</Text>
-            </Pressable>
-          ))}
-          {picking && <Text style={{ color: colors.fg }}>Opening media…</Text>}
-        </SafeAreaView>
-      </View>
+      <StoryPicker
+        dark={props.dark}
+        onPicked={handlePicked}
+        onClose={props.onClose}
+      />
     );
 
   return (

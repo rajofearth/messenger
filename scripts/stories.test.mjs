@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupStories } from "../src/domain/stories.ts";
+import { groupStories, markOwnStories, mergeStoryUploads } from "../src/domain/stories.ts";
 
 const story = (id, values = {}) => ({
   id,
@@ -120,4 +120,36 @@ test("deleting an item or an entire owner leaves valid groups", () => {
     ),
     ["ada.jpg"],
   );
+});
+
+test("the account's server stories join the pinned self group", () => {
+  const items = [
+    story("mine", { ownerId: "account", name: "Yash" }),
+    story("theirs", { ownerId: "friend" }),
+  ];
+  const marked = markOwnStories(items, "account");
+  assert.equal(marked[0].ownerId, "self");
+  assert.equal(marked[0].name, "You");
+  assert.equal(items[0].ownerId, "account");
+  assert.equal(marked[1], items[1]);
+  assert.equal(markOwnStories(items, "someone-else"), items);
+  assert.deepEqual(
+    groupStories(marked).map((group) => group.id),
+    ["self", "friend"],
+  );
+});
+
+test("local uploads are shown until the server returns the same story", () => {
+  const server = [story("a")];
+  const pending = [
+    story("local-1", { ownerId: "self", name: "You" }),
+    story("local-2", { ownerId: "self", name: "You" }),
+  ];
+  assert.deepEqual(mergeStoryUploads(server, pending), [...server, ...pending]);
+  const confirmed = [story("a"), story("local-1")];
+  assert.deepEqual(mergeStoryUploads(confirmed, pending), [
+    ...confirmed,
+    pending[1],
+  ]);
+  assert.equal(mergeStoryUploads(server, []), server);
 });

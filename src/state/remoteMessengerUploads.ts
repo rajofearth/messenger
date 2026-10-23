@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message, Story } from "../domain/data";
@@ -15,7 +14,7 @@ export type SendAttachment = (args: {
 type CreateStory = (args: {
   storageId: Id<"_storage">;
   caption: string;
-}) => Promise<unknown>;
+}) => Promise<Id<"stories">>;
 
 export function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -33,10 +32,12 @@ export async function sendAttachmentMessage({
   chatId,
   message,
   sendAttachment,
+  onProgress,
 }: {
   chatId: string;
   message: Message;
   sendAttachment: SendAttachment;
+  onProgress?: (progress: number) => void;
 }) {
   if (!message.uri || !message.kind) throw new Error("MISSING_ATTACHMENT");
   const storageId = await uploadLocalFile(
@@ -51,6 +52,7 @@ export async function sendAttachmentMessage({
       width: message.width,
       height: message.height,
       durationMs: message.duration ? message.duration * 1000 : undefined,
+      onProgress,
     },
   );
   await sendAttachment({
@@ -62,25 +64,30 @@ export async function sendAttachmentMessage({
   });
 }
 
-export async function uploadAndCreateStory(story: Story, createStory: CreateStory) {
-  if (!story.image) return;
-  try {
-    const storageId = await uploadLocalFile(
-      convexClient,
-      api.files.generateUploadUrl,
-      api.files.finalizeUpload,
-      {
-        uri: story.image,
-        kind: "story",
-        mimeType: story.video ? "video/mp4" : "image/jpeg",
-        filename: `story-${story.id}`,
-      },
-    );
-    await createStory({
-      storageId,
-      caption: story.caption,
-    });
-  } catch (error) {
-    Alert.alert("Story not shared", attachmentErrorMessage(error));
-  }
+/**
+ * Uploads one story and returns the confirmed story id. The caller owns the
+ * pending row, so a failure can be retried without making the user pick again.
+ */
+export async function uploadAndCreateStory(
+  story: Story,
+  createStory: CreateStory,
+  onProgress?: (progress: number) => void,
+) {
+  if (!story.image) throw new Error("MISSING_ATTACHMENT");
+  const storageId = await uploadLocalFile(
+    convexClient,
+    api.files.generateUploadUrl,
+    api.files.finalizeUpload,
+    {
+      uri: story.image,
+      kind: "story",
+      mimeType: story.video ? "video/mp4" : "image/jpeg",
+      filename: `story-${story.id}`,
+      onProgress,
+    },
+  );
+  return await createStory({
+    storageId,
+    caption: story.caption,
+  });
 }

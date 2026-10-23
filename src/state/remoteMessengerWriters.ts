@@ -16,6 +16,12 @@ export type MarkLocalMessageStatus = (args: {
   status: MessageStatus;
 }) => void;
 
+export type MarkLocalMessageProgress = (args: {
+  chatId: string;
+  messageId: string;
+  progress: number;
+}) => void;
+
 type Args = {
   setMessages: Dispatch<SetStateAction<Record<string, Message[]>>>;
   setCachedChats: Dispatch<SetStateAction<Chat[]>>;
@@ -102,7 +108,12 @@ export function createRemoteWriters({
     const thread = messagesRef.current[chatId] || [];
     const message = thread.find((item) => item.id === messageId);
     if (!message) return;
-    const next = { ...message, status };
+    const next = {
+      ...message,
+      status,
+      // A retry starts its upload from zero again.
+      ...(status === "sending" && message.kind ? { uploadProgress: 0 } : {}),
+    };
     updateMessages((current) => ({
       ...current,
       [chatId]: (current[chatId] || []).map((item) =>
@@ -130,11 +141,33 @@ export function createRemoteWriters({
     );
   }
 
+  /**
+   * Updates only the upload fraction of a local attachment bubble. The inbox
+   * preview and the read marker are unaffected until the send is confirmed.
+   */
+  function markLocalMessageProgress({
+    chatId,
+    messageId,
+    progress,
+  }: {
+    chatId: string;
+    messageId: string;
+    progress: number;
+  }) {
+    updateMessages((current) => ({
+      ...current,
+      [chatId]: (current[chatId] || []).map((item) =>
+        item.id === messageId ? { ...item, uploadProgress: progress } : item,
+      ),
+    }));
+  }
+
   return {
     updateMessages,
     updateChats,
     appendLocal,
     markLocalMessageStatus,
+    markLocalMessageProgress,
   };
 }
 

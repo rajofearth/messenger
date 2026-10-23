@@ -3,9 +3,11 @@
  * exists and where to get it.
  *
  * Only the endpoint is configured; everything about the document is validated
- * in `src/domain/updates.ts`. The URL is baked into the bundle at build time
- * (`EXPO_PUBLIC_UPDATE_FEED_URL`), so a build without it simply has no update
- * check at all instead of pointing at a placeholder server.
+ * in `src/domain/updates.ts`. The URL is baked into the bundle at build time:
+ * production uses `EXPO_PUBLIC_UPDATE_FEED_URL`; a development build uses
+ * `EXPO_PUBLIC_DEV_UPDATE_FEED_URL` so the two channels can never cross. A
+ * build without a feed simply has no update check instead of pointing at a
+ * placeholder server.
  *
  * The installed version code goes in the query string, so a current app gets a
  * 20-byte `{"upToDate":true}` instead of someone else's download URL.
@@ -28,7 +30,12 @@ function feedUrl(value: string | undefined): string | null {
   return trimmed;
 }
 
-export const updateFeedUrl = feedUrl(process.env.EXPO_PUBLIC_UPDATE_FEED_URL);
+const configuredFeedUrl =
+  process.env.EXPO_PUBLIC_APP_VARIANT === "dev"
+    ? process.env.EXPO_PUBLIC_DEV_UPDATE_FEED_URL
+    : process.env.EXPO_PUBLIC_UPDATE_FEED_URL;
+
+export const updateFeedUrl = feedUrl(configuredFeedUrl);
 export const isUpdateFeedConfigured = updateFeedUrl !== null;
 
 export async function fetchUpdateFeed(installedVersionCode: number): Promise<FeedCheck> {

@@ -466,6 +466,7 @@ function MessengerApp() {
           index={storyIndex}
           avatar={messenger.profile.avatar}
           dark={messenger.dark}
+          selfId={messenger.selfId}
           adding={addingStory}
           onClose={() => {
             setStoryIndex(null);
@@ -473,6 +474,7 @@ function MessengerApp() {
           }}
           onSeen={messenger.markStorySeen}
           onDelete={messenger.deleteStory}
+          onRetryUpload={messenger.retryStory}
           onShare={messenger.shareStory}
         />
         <UpdatePrompt

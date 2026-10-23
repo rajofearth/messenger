@@ -18,12 +18,22 @@
   "scripts": {
     "android": "npm run android:build",
     "android:prebuild": "expo prebuild --platform android --no-install",
-    "android:build": "node scripts/android.mjs build",
-    "android:install": "node scripts/android.mjs install",
+    "android:build": "node scripts/android.mjs build --variant production",
+    "android:install": "node scripts/android.mjs install --variant production",
+    "android:dev:build": "node scripts/android.mjs build --variant dev",
+    "android:dev:install": "node scripts/android.mjs install --variant dev",
+    "dev:ship": "node scripts/dev-release.mjs",
+    "dev:publish": "node scripts/dev-release.mjs --no-build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/mediaAlbums.test.mjs scripts/conversation.test.mjs scripts/manifest.test.mjs scripts/update-manifest.test.mjs src/features/auth/authErrors.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs src/features/calls/CallScreenCamera.test.mjs src/data/cache.test.mjs src/data/appearance.test.mjs src/data/store.test.mjs src/domain/updates.test.mjs src/domain/threadMerge.test.mjs src/domain/time.test.mjs src/ui/theme.test.mjs src/notifications/payloads.test.mjs modules/keyboard-media/KeyboardMediaInput.test.cjs",
+    "test": "node --test scripts/model.test.mjs scripts/architecture.test.mjs scripts/app-config.test.mjs scripts/stories.test.mjs scripts/messageActions.test.mjs scripts/mediaAlbums.test.mjs scripts/conversation.test.mjs scripts/manifest.test.mjs scripts/update-manifest.test.mjs src/features/auth/authErrors.test.mjs src/features/contacts/ChatProfileMetadata.test.mjs src/features/conversations/conversationModel.test.mjs src/features/conversations/messageActionsLayout.test.mjs src/features/calls/CallScreenCamera.test.mjs src/features/stories/storyPickerModel.test.mjs src/data/cache.test.mjs src/data/appearance.test.mjs src/data/store.test.mjs src/domain/updates.test.mjs src/domain/threadMerge.test.mjs src/domain/time.test.mjs src/ui/theme.test.mjs src/notifications/payloads.test.mjs modules/keyboard-media/KeyboardMediaInput.test.cjs",
     "check": "npm run typecheck && expo install --check",
-    "release:check": "npm run typecheck && npm test && node scripts/release-check.mjs"
+    "release:check": "npm run typecheck && npm test && node scripts/release-check.mjs",
+    "web:dev": "vite --config tools/web-tester/vite.config.mjs",
+    "web:build": "vite build --config tools/web-tester/vite.config.mjs",
+    "web:preview": "vite preview --config tools/web-tester/vite.config.mjs",
+    "web:check": "tsc -p tools/web-tester/tsconfig.json --noEmit",
+    "web:agent": "node tools/web-tester/agent.mjs",
+    "web:control": "node tools/web-tester/control-server.mjs"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
@@ -58,7 +68,11 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.7",
+    "@vitejs/plugin-react": "^6.1.2",
     "convex": "^1.47.0",
-    "typescript": "~6.0.3"
+    "react-dom": "19.2.3",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4"
   }
 }

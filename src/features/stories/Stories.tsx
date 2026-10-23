@@ -14,7 +14,9 @@ export type StoriesProps = {
   onClose: () => void;
   onSeen: (id: string) => void;
   onDelete: (id: string) => void;
+  onRetryUpload: (id: string) => void;
   onShare: (story: Story) => void;
+  selfId?: string | null;
   adding: boolean;
 };
 
@@ -53,8 +55,10 @@ function StorySession(props: StoriesProps) {
         <StoryViewer
           groups={groupStories(props.stories)}
           initialIndex={props.index ?? 0}
+          selfId={props.selfId}
           onSeen={props.onSeen}
           onDelete={props.onDelete}
+          onRetryUpload={props.onRetryUpload}
           onClose={close}
         />
       )}

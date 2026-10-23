@@ -8,6 +8,50 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Message attachments and stories show real upload progress. A story that is
+  still uploading keeps its own segment in the viewer, plays the local copy,
+  shows the percentage, and offers a retry if it fails.
+- Story owners see when a story was posted, its view count, and an audience
+  list with each viewer's name, avatar and view time. The owner-only
+  `stories.views` query backs the list.
+- A separate `Messenger Dev` build installs beside production, uses the
+  development Convex deployment, and updates through its own feed. `npm run
+  dev:ship` publishes a `dev-<versionCode>` GitHub prerelease and writes the
+  manifest only to the development deployment.
+
+### Changed
+
+- Settings keeps account controls at the bottom, directly above Information.
+  The Android permission, call-notification and message-notification rows are
+  gone because they all opened the same system page; only the app's own
+  notification switch remains, and turning it on asks Android for permission
+  when needed.
+- Picking a profile photo no longer asks for an extra media-library permission
+  or forces a crop. The upload keeps the picker's real MIME type and filename.
+- A profile update that races profile creation now creates the profile and
+  retries once instead of failing the photo save.
+- Expo configuration now goes through `app.config.js`, which returns `app.json`
+  unchanged unless `APP_VARIANT=dev`. The dev branch only changes the installed
+  identity and feed, so production builds keep the same name, package, icons
+  and update URL.
+- `npm run android:build` now regenerates the generated Android project when
+  the package, version or variant changes, and preserves the debug signing key
+  across that regeneration.
+
+### Fixed
+
+- Profile photo uploads report the actual cause (size, format, session,
+  username or connection) instead of a generic "Photo could not be saved".
+  The local pick is still restored when the upload fails.
+
+The local gate build is 14,384,754 bytes (13.72 MiB), 8,208 bytes (+0.06%)
+above the published v0.1.1 APK. The growth is the new JavaScript for upload
+progress, the story viewer audience sheet and the profile upload helpers; the
+native library set, resources and locales are unchanged. It remains 2.28 MiB
+below the 16 MiB gate. See `docs/PERFORMANCE.md`.
+
 ## [0.1.1] - 2026-10-22
 
 ### Fixed

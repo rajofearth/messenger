@@ -16,7 +16,9 @@ The standing bias is smaller and faster: when two designs are close, pick the
 one that ships fewer bytes and starts faster.
 
 Expo uses Continuous Native Generation: change native configuration through
-`app.json` plugins, never in the generated `android/` files.
+`app.json` plugins, never in the generated `android/` files. `app.config.js`
+wraps `app.json` so `APP_VARIANT=dev` can build the separate development app;
+with the variable unset the production config is unchanged.
 
 ## Release rule
 
@@ -52,6 +54,26 @@ publishes. Nothing ships until all of this holds:
 
 The workflow (`.github/workflows/release.yml`) also compares the CI APK against
 the previous release, so a bloated build cannot slip out through a tag.
+
+## Development channel
+
+`npm run android:dev:build` creates `Messenger Dev`
+(`com.yashraj.messenger.dev`) beside the production app, using the development
+Convex deployment and its own update feed. `npm run dev:ship` publishes a
+GitHub prerelease tagged `dev-<versionCode>` and writes the manifest to that
+development deployment.
+
+- Never publish a dev manifest with `--prod`, and never point
+  `EXPO_PUBLIC_DEV_UPDATE_FEED_URL` at the production feed. `app.config.js` and
+  `scripts/android.mjs` refuse both; `scripts/dev-release.mjs` additionally
+  refuses a non-dev `CONVEX_DEPLOYMENT`.
+- Dev releases are prereleases. The production workflow ignores them when it
+  chooses its baseline.
+- The first dev APK is installed by hand. Later builds update through the
+  in-app updater, so keep the signing key in
+  `artifacts/messenger-dev-debug.keystore` intact.
+- A dev build does not need a production version bump or a `CHANGELOG.md`
+  release section.
 
 ## Reference documentation
 
