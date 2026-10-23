@@ -15,9 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import {
   Album,
   Asset,
-  AssetField,
   MediaType,
-  Query,
   getPermissionsAsync,
   presentPermissionsPicker,
   requestPermissionsAsync,
@@ -30,81 +28,58 @@ import type {
 import { IconButton, tap } from "../../ui/primitives";
 import { coral, onCoral, palette } from "../../ui/theme";
 import {
-  appendUniqueStoryAssets,
-  formatStoryDuration,
-  storySelectionOrder,
+  appendUniqueMediaAssets,
   toggleStorySelection,
-  STORY_PICKER_LIMIT,
-} from "./storyPickerModel";
-import type {
-  PickedStoryMedia,
-  StoryPickerFilter,
-} from "./storyPickerModel";
-import { styles as s } from "./Stories.styles";
-import { StoryPickerBody, type StoryPickerAccess } from "./StoryPickerBody";
-import { StoryAlbumSheet } from "./StoryAlbumSheet";
-import { loadStoryAlbums, type StoryAlbum } from "./storyAlbums";
-
-const PAGE_SIZE = 60;
+  MEDIA_PICKER_LIMIT,
+} from "./mediaPickerModel";
+import type { PickedMedia, MediaPickerFilter } from "./mediaPickerModel";
+import { styles as s } from "./MediaPicker.styles";
+import { MediaPickerGrid, type MediaPickerAccess } from "./MediaPickerGrid";
+import { MediaAlbumSheet } from "./MediaAlbumSheet";
+import {
+  loadMediaAlbums,
+  loadMediaAlbumCounts,
+  loadRecentMediaCount,
+  type MediaAlbum,
+} from "./mediaAlbums";
+import { MediaPickerPreview } from "./MediaPickerPreview";
+import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
+import { mediaMimeType } from "./mediaMimeType";
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
 const GRANULAR_PERMISSIONS: GranularPermission[] = ["photo", "video"];
 const MEDIA_FILTERS: MediaTypeFilter[] = ["photo", "video"];
-const FILTERS: { id: StoryPickerFilter; label: string }[] = [
+const FILTERS: { id: MediaPickerFilter; label: string }[] = [
   { id: "recents", label: "Recents" },
   { id: "photos", label: "Photos" },
   { id: "videos", label: "Videos" },
 ];
-
-type Access = StoryPickerAccess;
-
+type Access = MediaPickerAccess;
 type Props = {
   dark: boolean;
-  onPicked: (media: PickedStoryMedia[]) => void;
+  onPicked: (media: PickedMedia[]) => void;
   onClose: () => void;
   title?: string;
   permissionTitle?: string;
   permissionText?: string;
   emptyTitle?: string;
   emptyText?: string;
+  mediaMode?: "photos" | "photos-and-videos";
+  selectionLimit?: number;
 };
-
-function queryPage(
-  filter: StoryPickerFilter,
-  offset: number,
-  album?: Album,
-) {
-  const query = new Query()
-    .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
-    .limit(PAGE_SIZE)
-    .offset(offset);
-  if (album) query.album(album);
-  if (filter === "photos") {
-    query.eq(AssetField.MEDIA_TYPE, MediaType.IMAGE);
-  } else if (filter === "videos") {
-    query.eq(AssetField.MEDIA_TYPE, MediaType.VIDEO);
-  } else {
-    query.within(AssetField.MEDIA_TYPE, [MediaType.IMAGE, MediaType.VIDEO]);
-  }
-  return query.exeForMetadata();
-}
-
-/**
- * An in-app library grid, so picking a story never launches Android's
- * right-to-left system photo sheet. The local metadata query gives the grid
- * cheap thumbnails; only the selected items resolve to uploadable file URIs.
- */
-export function StoryPicker(props: Props) {
+export function MediaPicker(props: Props) {
   const colors = palette(props.dark);
+  const photosOnly = props.mediaMode === "photos";
   const { width } = useWindowDimensions();
   const tile = Math.floor((width - GRID_PADDING * 2 - GRID_GAP * 2) / 3);
   const [access, setAccess] = React.useState<Access>("checking");
   const [limited, setLimited] = React.useState(false);
   const [assets, setAssets] = React.useState<AssetMetadata[]>([]);
-  const [albums, setAlbums] = React.useState<StoryAlbum[]>([]);
+  const [albums, setAlbums] = React.useState<MediaAlbum[]>([]);
+  const [recentCount, setRecentCount] = React.useState<number>();
   const [albumId, setAlbumId] = React.useState<string | null>(null);
   const [albumOpen, setAlbumOpen] = React.useState(false);
-  const [filter, setFilter] = React.useState<StoryPickerFilter>("recents");
+  const [filter, setFilter] = React.useState<MediaPickerFilter>("recents");
   const [selection, setSelection] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
@@ -112,6 +87,7 @@ export function StoryPicker(props: Props) {
   const [error, setError] = React.useState<string | null>(null);
   const [preparing, setPreparing] = React.useState(false);
   const [cameraBusy, setCameraBusy] = React.useState(false);
+  const [preview, setPreview] = React.useState<AssetMetadata | null>(null);
   const [reloadKey, setReloadKey] = React.useState(0);
   const alive = React.useRef(true);
   const request = React.useRef(0);
@@ -119,13 +95,16 @@ export function StoryPicker(props: Props) {
   const selectedAlbum = albums.find((item) => item.id === albumId)?.album;
   const currentAlbumTitle =
     albums.find((item) => item.id === albumId)?.title || "Recents";
-  const limit = STORY_PICKER_LIMIT;
-
+  const limit = props.selectionLimit ?? MEDIA_PICKER_LIMIT;
+  const filters = photosOnly ? FILTERS.filter((item) => item.id !== "videos") : FILTERS;
+  const granularPermissions: GranularPermission[] = photosOnly
+    ? ["photo"]
+    : GRANULAR_PERMISSIONS;
   const checkAccess = React.useCallback(async (prompt: boolean) => {
     try {
-      let response = await getPermissionsAsync(false, GRANULAR_PERMISSIONS);
+      let response = await getPermissionsAsync(false, granularPermissions);
       if (!response.granted && prompt) {
-        response = await requestPermissionsAsync(false, GRANULAR_PERMISSIONS);
+        response = await requestPermissionsAsync(false, granularPermissions);
       }
       if (!alive.current) return;
       if (response.granted) {
@@ -139,7 +118,6 @@ export function StoryPicker(props: Props) {
       if (alive.current) setAccess("denied");
     }
   }, []);
-
   React.useEffect(() => {
     alive.current = true;
     void checkAccess(true);
@@ -148,18 +126,28 @@ export function StoryPicker(props: Props) {
       request.current += 1;
     };
   }, [checkAccess]);
-
   React.useEffect(() => {
     if (access !== "ready") return;
-    void loadStoryAlbums()
-      .then((items) => {
-        if (alive.current) setAlbums(items);
+    void Promise.all([loadMediaAlbums(), loadRecentMediaCount()])
+      .then(([items, count]) => {
+        if (!alive.current) return;
+        setAlbums(items);
+        setRecentCount(count);
+        void loadMediaAlbumCounts(items)
+          .then((counts) => {
+            if (!alive.current) return;
+            setAlbums((current) =>
+              current.map((album) => ({ ...album, count: counts.get(album.id) })),
+            );
+          })
+          .catch(() => {});
       })
       .catch(() => {
-        if (alive.current) setAlbums([]);
+        if (!alive.current) return;
+        setAlbums([]);
+        setRecentCount(undefined);
       });
   }, [access, reloadKey]);
-
   React.useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
@@ -169,7 +157,6 @@ export function StoryPicker(props: Props) {
     });
     return () => subscription.remove();
   }, [checkAccess]);
-
   const loadPage = React.useCallback(
     async (reset: boolean, offset: number) => {
       if (access !== "ready") return;
@@ -181,13 +168,13 @@ export function StoryPicker(props: Props) {
         setLoadingMore(true);
       }
       try {
-         const page = await queryPage(filter, offset, selectedAlbum);
+         const page = await queryMediaPage(filter, offset, selectedAlbum, photosOnly);
         if (token !== request.current) return;
-        setAssets((current) => {
-          if (reset) return page;
-          return appendUniqueStoryAssets(current, page);
-        });
-        setHasMore(page.length === PAGE_SIZE);
+         setAssets((current) => {
+           if (reset) return page;
+           return appendUniqueMediaAssets(current, page);
+         });
+         setHasMore(page.length === MEDIA_PAGE_SIZE);
       } catch (cause) {
         if (token !== request.current) return;
         setError(
@@ -202,12 +189,11 @@ export function StoryPicker(props: Props) {
         }
       }
     },
-     [access, filter, selectedAlbum],
+    [access, filter, photosOnly, selectedAlbum],
   );
 
   React.useEffect(() => {
     if (access !== "ready") return;
-    setAssets([]);
     setHasMore(true);
     void loadPage(true, 0);
   }, [access, filter, reloadKey, loadPage]);
@@ -233,7 +219,7 @@ export function StoryPicker(props: Props) {
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ["images", "videos"],
+        mediaTypes: photosOnly ? ["images"] : ["images", "videos"],
         allowsEditing: false,
         quality: 0.85,
         videoMaxDuration: 60,
@@ -245,6 +231,7 @@ export function StoryPicker(props: Props) {
           uri: asset.uri,
          video: asset.type === "video",
            filename: asset.fileName ?? undefined,
+           mimeType: asset.mimeType ?? undefined,
            width: asset.width,
            height: asset.height,
            duration: asset.duration ? asset.duration / 1000 : undefined,
@@ -263,7 +250,7 @@ export function StoryPicker(props: Props) {
 
   async function manageAccess() {
     try {
-      await presentPermissionsPicker(MEDIA_FILTERS);
+      await presentPermissionsPicker(photosOnly ? ["photo"] : MEDIA_FILTERS);
       await checkAccess(false);
       if (alive.current) setReloadKey((value) => value + 1);
     } catch {
@@ -275,8 +262,8 @@ export function StoryPicker(props: Props) {
     const selected = selection.includes(id);
     if (!selected && selection.length >= limit) {
       Alert.alert(
-        "Up to 10 items",
-        "Remove one item before adding another to this story.",
+        `Up to ${limit} item${limit === 1 ? "" : "s"}`,
+        `Remove one item before adding another${limit === 1 ? "" : " to this selection"}.`,
       );
       return;
     }
@@ -298,6 +285,7 @@ export function StoryPicker(props: Props) {
               uri: info.uri,
               video: info.mediaType === MediaType.VIDEO,
               filename: info.filename,
+              mimeType: mediaMimeType(info.filename, info.mediaType === MediaType.VIDEO),
               width: info.width,
               height: info.height,
               duration: info.duration ? info.duration / 1000 : undefined,
@@ -393,7 +381,7 @@ export function StoryPicker(props: Props) {
           <Ionicons name="chevron-down" size={18} color={colors.muted} />
         </Pressable>
         <View style={s.pickerFilters}>
-          {FILTERS.map((item) => {
+          {filters.map((item) => {
             const active = filter === item.id;
             return (
               <Pressable
@@ -422,7 +410,7 @@ export function StoryPicker(props: Props) {
             );
           })}
         </View>
-        <StoryPickerBody
+        <MediaPickerGrid
           access={access}
           colors={colors}
           assets={assets}
@@ -435,6 +423,7 @@ export function StoryPicker(props: Props) {
           onOpenCamera={() => void openCamera()}
           onRetry={() => void loadPage(true, 0)}
           onToggle={toggle}
+          onPreview={setPreview}
           onLoadMore={loadMore}
           copy={{
             permissionTitle: props.permissionTitle ?? "Choose from your photos",
@@ -477,9 +466,10 @@ export function StoryPicker(props: Props) {
         </SafeAreaView>
       )}
       {albumOpen && (
-        <StoryAlbumSheet
+        <MediaAlbumSheet
           colors={colors}
           albums={albums}
+          recentCount={recentCount}
           selectedId={albumId}
           onSelect={(id) => {
             setAlbumId(id);
@@ -487,6 +477,20 @@ export function StoryPicker(props: Props) {
           }}
           onClose={() => setAlbumOpen(false)}
         />
+      )}
+      {preview && (
+        <View style={s.albumOverlay}>
+          <MediaPickerPreview
+            asset={preview}
+            colors={colors}
+            selected={selection.includes(preview.id)}
+            onClose={() => setPreview(null)}
+            onToggle={() => {
+              toggle(preview.id);
+              setPreview(null);
+            }}
+          />
+        </View>
       )}
     </View>
   );

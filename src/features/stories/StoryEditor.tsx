@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Story } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { StoryPicker } from "./StoryPicker";
-import type { PickedStoryMedia } from "./storyPickerModel";
+import { MediaPicker } from "../media/MediaPicker";
+import type { PickedMedia } from "../media/mediaPickerModel";
 import { StoryMedia } from "./StoryMedia";
 import { styles as s } from "./Stories.styles";
 
@@ -42,7 +42,7 @@ export function StoryEditor(props: Props) {
     };
   }, []);
 
-  function handlePicked(media: PickedStoryMedia[]) {
+  function handlePicked(media: PickedMedia[]) {
     setDrafts(
       media.map((asset) => ({
         uri: asset.uri,
@@ -75,7 +75,7 @@ export function StoryEditor(props: Props) {
 
   if (!draft)
     return (
-      <StoryPicker
+      <MediaPicker
         dark={props.dark}
         onPicked={handlePicked}
         onClose={props.onClose}

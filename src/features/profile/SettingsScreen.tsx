@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
+  Modal,
   Pressable,
   ScrollView,
   Switch,
@@ -25,6 +26,7 @@ import { coral, type ThemePreference } from "../../ui/theme";
 import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
 import AccountSection from "./AccountSection";
+import { MediaPicker } from "../media/MediaPicker";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -52,6 +54,7 @@ export default function SettingsScreen({
 }: SettingsScreenProps) {
   const settings = useSettingsPreferences(onProfileChange);
   const [page, setPage] = useState<"profile" | "settings">("profile");
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   useEffect(() => {
     if (page !== "settings") return;
     const subscription = BackHandler.addEventListener(
@@ -71,7 +74,6 @@ export default function SettingsScreen({
     avatarFailed,
     setAvatarFailed,
     toggle,
-    pickAvatar,
     editProfile,
   } = settings;
   const colors = settingsColors(dark);
@@ -178,7 +180,7 @@ export default function SettingsScreen({
                 accessibilityLabel="Change profile photo"
                 accessibilityRole="button"
                 disabled={!ready || picking}
-                onPress={() => void pickAvatar()}
+                onPress={() => setAvatarPickerOpen(true)}
                 style={styles.avatarWrap}
               >
                 {avatarFailed ? (
@@ -404,7 +406,32 @@ export default function SettingsScreen({
           </>
         )}
       </ScrollView>
-      <SettingsDialogs settings={settings} colors={colors} />
+        <SettingsDialogs
+          settings={settings}
+          colors={colors}
+          onOpenAvatarPicker={() => setAvatarPickerOpen(true)}
+        />
+        <Modal
+          visible={avatarPickerOpen}
+          animationType="slide"
+          onRequestClose={() => setAvatarPickerOpen(false)}
+        >
+          <MediaPicker
+            dark={dark}
+            title="Profile photo"
+            mediaMode="photos"
+            selectionLimit={1}
+            permissionTitle="Choose a profile photo"
+            permissionText="Allow Messenger to see your photos so you can choose a profile photo."
+            emptyTitle="No photos yet"
+            emptyText="Take a photo to use it as your profile picture."
+            onPicked={(media) => {
+              setAvatarPickerOpen(false);
+              void settings.savePickedAvatar(media);
+            }}
+            onClose={() => setAvatarPickerOpen(false)}
+          />
+        </Modal>
     </View>
   );
 }

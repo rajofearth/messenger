@@ -5,18 +5,19 @@ import { Image } from "expo-image";
 import type { AssetMetadata } from "expo-media-library";
 import { IconButton } from "../../ui/primitives";
 import type { Colors } from "../../ui/theme";
-import type { StoryAlbum } from "./storyAlbums";
-import { styles as s } from "./Stories.styles";
+import type { MediaAlbum } from "./mediaAlbums";
+import { styles as s } from "./MediaPicker.styles";
 
 type Props = {
   colors: Colors;
-  albums: Array<Omit<StoryAlbum, "album">>;
+  albums: Array<Omit<MediaAlbum, "album">>;
+  recentCount?: number;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onClose: () => void;
 };
 
-export function StoryAlbumSheet(props: Props) {
+export function MediaAlbumSheet(props: Props) {
   return (
     <View style={s.albumOverlay}>
       <Pressable
@@ -42,6 +43,7 @@ export function StoryAlbumSheet(props: Props) {
           <AlbumRow
             colors={props.colors}
             title="Recents"
+            count={props.recentCount}
             selected={props.selectedId === null}
             onPress={() => props.onSelect(null)}
           />
@@ -51,6 +53,7 @@ export function StoryAlbumSheet(props: Props) {
               colors={props.colors}
               title={item.title}
               cover={item.cover}
+              count={item.count}
               selected={item.id === props.selectedId}
               onPress={() => props.onSelect(item.id)}
             />
@@ -65,12 +68,14 @@ function AlbumRow({
   colors,
   title,
   cover,
+  count,
   selected,
   onPress,
 }: {
   colors: Colors;
   title: string;
   cover?: AssetMetadata | null;
+  count?: number;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -82,7 +87,15 @@ function AlbumRow({
       style={[s.albumRow, selected && { backgroundColor: colors.tint }]}
     >
       {cover ? (
-        <Image source={{ uri: cover.id }} contentFit="cover" style={s.albumCover} />
+        <Image
+          source={{ uri: cover.id, width: cover.width, height: cover.height }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          priority="high"
+          allowDownscaling
+          decodeFormat="rgb"
+          style={s.albumCover}
+        />
       ) : (
         <View style={[s.albumIcon, { backgroundColor: colors.line }]}>
           <Ionicons name="images-outline" size={24} color={colors.coralInk} />
@@ -91,6 +104,11 @@ function AlbumRow({
       <Text style={[s.albumRowTitle, { color: colors.fg }]} numberOfLines={1}>
         {title}
       </Text>
+      {count !== undefined && (
+        <Text style={[s.albumRowCount, { color: colors.muted }]}>
+          {count}
+        </Text>
+      )}
       {selected && <Ionicons name="checkmark" size={22} color={colors.coralInk} />}
     </Pressable>
   );

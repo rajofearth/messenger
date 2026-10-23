@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  appendUniqueStoryAssets,
-  formatStoryDuration,
-  storySelectionOrder,
+  appendUniqueMediaAssets,
+  formatMediaDuration,
+  mediaSelectionOrder,
   toggleStorySelection,
-} from "./storyPickerModel.ts";
+} from "./mediaPickerModel.ts";
 
 test("story selection keeps the tap order and removes in place", () => {
   const first = toggleStorySelection([], "a");
@@ -13,9 +13,9 @@ test("story selection keeps the tap order and removes in place", () => {
   const third = toggleStorySelection(second, "c");
   assert.deepEqual(third, ["a", "b", "c"]);
   assert.deepEqual(toggleStorySelection(third, "b"), ["a", "c"]);
-  assert.equal(storySelectionOrder(third, "a"), 1);
-  assert.equal(storySelectionOrder(third, "c"), 3);
-  assert.equal(storySelectionOrder(third, "missing"), 0);
+  assert.equal(mediaSelectionOrder(third, "a"), 1);
+  assert.equal(mediaSelectionOrder(third, "c"), 3);
+  assert.equal(mediaSelectionOrder(third, "missing"), 0);
 });
 
 test("story selection stops at the limit without reordering", () => {
@@ -25,17 +25,17 @@ test("story selection stops at the limit without reordering", () => {
 });
 
 test("story video duration formats as minutes and seconds", () => {
-  assert.equal(formatStoryDuration(null), "");
-  assert.equal(formatStoryDuration(0), "");
-  assert.equal(formatStoryDuration(5_000), "0:05");
-  assert.equal(formatStoryDuration(65_000), "1:05");
-  assert.equal(formatStoryDuration(3_600_000), "60:00");
+  assert.equal(formatMediaDuration(null), "");
+  assert.equal(formatMediaDuration(0), "");
+  assert.equal(formatMediaDuration(5_000), "0:05");
+  assert.equal(formatMediaDuration(65_000), "1:05");
+  assert.equal(formatMediaDuration(3_600_000), "60:00");
 });
 
 test("story media pages do not repeat an id", () => {
   const current = [{ id: "a" }, { id: "b" }];
   const next = [{ id: "b" }, { id: "c" }, { id: "c" }];
-  assert.deepEqual(appendUniqueStoryAssets(current, next), [
+  assert.deepEqual(appendUniqueMediaAssets(current, next), [
     { id: "a" },
     { id: "b" },
     { id: "c" },

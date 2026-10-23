@@ -20,11 +20,13 @@ import type { useSettingsPreferences } from "./SettingsPreferences";
 type SettingsDialogsProps = {
   settings: ReturnType<typeof useSettingsPreferences>;
   colors: SettingsColors;
+  onOpenAvatarPicker?: () => void;
 };
 
 export default function SettingsDialogs({
   settings,
   colors,
+  onOpenAvatarPicker,
 }: SettingsDialogsProps) {
   const {
     sheet,
@@ -132,7 +134,9 @@ export default function SettingsDialogs({
                   accessibilityRole="button"
                   accessibilityLabel="Change profile photo"
                   disabled={busy}
-                  onPress={() => void pickAvatar()}
+                   onPress={() =>
+                     onOpenAvatarPicker ? onOpenAvatarPicker() : void pickAvatar()
+                   }
                   style={[
                     styles.edit,
                     {

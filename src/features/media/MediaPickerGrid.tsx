@@ -13,15 +13,15 @@ import type { AssetMetadata } from "expo-media-library";
 import type { Colors } from "../../ui/theme";
 import { coral } from "../../ui/theme";
 import {
-  formatStoryDuration,
-  storySelectionOrder,
-} from "./storyPickerModel";
-import { styles as s } from "./Stories.styles";
+  formatMediaDuration,
+  mediaSelectionOrder,
+} from "./mediaPickerModel";
+import { styles as s } from "./MediaPicker.styles";
 
-export type StoryPickerAccess = "checking" | "ready" | "denied";
+export type MediaPickerAccess = "checking" | "ready" | "denied";
 
 type Props = {
-  access: StoryPickerAccess;
+  access: MediaPickerAccess;
   colors: Colors;
   assets: AssetMetadata[];
   tile: number;
@@ -33,6 +33,7 @@ type Props = {
   onOpenCamera: () => void;
   onRetry: () => void;
   onToggle: (id: string) => void;
+  onPreview: (asset: AssetMetadata) => void;
   onLoadMore: () => void;
   copy: {
     permissionTitle: string;
@@ -42,8 +43,8 @@ type Props = {
   };
 };
 
-export function StoryPickerBody(props: Props) {
-  if (props.access === "checking" || props.loading) {
+export function MediaPickerGrid(props: Props) {
+  if (props.access === "checking" || (props.loading && !props.assets.length)) {
     return (
       <View style={s.pickerCenter}>
         <ActivityIndicator size="large" color={coral} />
@@ -119,29 +120,46 @@ export function StoryPickerBody(props: Props) {
       </View>
     );
   }
+  const items = [
+    { kind: "camera" as const, id: "__camera__" },
+    ...props.assets.map((asset) => ({ kind: "asset" as const, asset })),
+  ];
   return (
     <FlatList
-      data={props.assets}
-      keyExtractor={(item) => item.id}
+      data={items}
+      keyExtractor={(item) => item.kind === "camera" ? item.id : item.asset.id}
       numColumns={3}
       style={s.flex}
       contentContainerStyle={s.pickerGrid}
       columnWrapperStyle={s.pickerRow}
       ItemSeparatorComponent={GridGap}
       renderItem={({ item }) => {
-        const order = storySelectionOrder(props.selection, item.id);
+        if (item.kind === "camera") {
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open camera"
+              onPress={props.onOpenCamera}
+              style={[
+                s.pickerCameraCard,
+                {
+                  width: props.tile,
+                  height: props.tile,
+                  backgroundColor: props.colors.line,
+                },
+              ]}
+            >
+              <Ionicons name="camera" size={32} color={props.colors.fg} />
+              <Text style={[s.pickerCameraText, { color: props.colors.fg }]}>Camera</Text>
+            </Pressable>
+          );
+        }
+        const asset = item.asset;
+        const order = mediaSelectionOrder(props.selection, asset.id);
         const selected = order > 0;
-        const duration = formatStoryDuration(item.duration);
+        const duration = formatMediaDuration(asset.duration);
         return (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              item.mediaType === MediaType.VIDEO
-                ? `Video${duration ? `, ${duration}` : ""}`
-                : "Photo"
-            }
-            accessibilityState={{ selected }}
-            onPress={() => props.onToggle(item.id)}
+          <View
             style={[
               s.pickerTile,
               {
@@ -151,19 +169,43 @@ export function StoryPickerBody(props: Props) {
               },
             ]}
           >
-            <Image
-              source={{ uri: item.id }}
-              recyclingKey={item.id}
-              contentFit="cover"
-              transition={120}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                asset.mediaType === MediaType.VIDEO
+                  ? `Preview video${duration ? `, ${duration}` : ""}`
+                  : "Preview photo"
+              }
+              onPress={() => props.onPreview(asset)}
               style={s.flex}
-            />
-            <View
+            >
+              <Image
+                source={{
+                  uri: asset.id,
+                  width: asset.width,
+                  height: asset.height,
+                }}
+                recyclingKey={asset.id}
+                contentFit="cover"
+                transition={0}
+                cachePolicy="memory-disk"
+                priority="low"
+                allowDownscaling
+                decodeFormat="rgb"
+                style={s.flex}
+              />
+            </Pressable>
+            <Pressable
+              accessibilityRole="checkbox"
+              accessibilityLabel={selected ? "Deselect media" : "Select media"}
+              accessibilityState={{ checked: selected }}
+              onPress={() => props.onToggle(asset.id)}
+              hitSlop={8}
               style={[s.pickerBadge, selected && s.pickerBadgeSelected]}
             >
               {selected && <Text style={s.pickerBadgeText}>{order}</Text>}
-            </View>
-            {item.mediaType === MediaType.VIDEO && (
+            </Pressable>
+            {asset.mediaType === MediaType.VIDEO && (
               <View style={s.pickerVideoBadge}>
                 <Ionicons name="play" size={10} color="white" />
                 {!!duration && (
@@ -171,7 +213,7 @@ export function StoryPickerBody(props: Props) {
                 )}
               </View>
             )}
-          </Pressable>
+          </View>
         );
       }}
       onEndReached={props.onLoadMore}
@@ -181,24 +223,6 @@ export function StoryPickerBody(props: Props) {
       windowSize={7}
       removeClippedSubviews
       showsVerticalScrollIndicator={false}
-      ListHeaderComponent={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open camera"
-          onPress={props.onOpenCamera}
-          style={[
-            s.pickerCameraCard,
-            {
-              width: props.tile,
-              height: props.tile,
-              backgroundColor: props.colors.line,
-            },
-          ]}
-        >
-          <Ionicons name="camera" size={32} color={props.colors.fg} />
-          <Text style={[s.pickerCameraText, { color: props.colors.fg }]}>Camera</Text>
-        </Pressable>
-      }
       ListFooterComponent={
         props.loadingMore ? (
           <ActivityIndicator color={coral} style={s.pickerFooterSpinner} />

@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { setHapticsEnabled } from "../../ui/primitives";
 import { messengerRepository } from "../../data/messengerRepository";
 import type { SettingsRecord } from "../../data/records";
+import type { PickedMedia } from "../media/mediaPickerModel";
 
 type Preferences = SettingsRecord;
 export type SettingsProfile = Pick<
@@ -164,24 +165,7 @@ export function useSettingsPreferences(
       opened = true;
       const asset = result.assets[0];
       setAvatarFailed(false);
-      const previousAvatar = current.current.avatar;
-      await persist({ avatar: asset.uri });
-      try {
-        await onProfileChange?.(
-          { ...current.current },
-          {
-            avatar: {
-              mimeType: asset.mimeType,
-              filename: asset.fileName ?? undefined,
-            },
-          },
-        );
-      } catch (error) {
-        // The local pick is only useful once the profile photo reaches the
-        // server; restore the previous avatar before showing the failure.
-        await persist({ avatar: previousAvatar }).catch(() => {});
-        throw error;
-      }
+      await saveAvatarAsset(asset.uri, asset.mimeType, asset.fileName ?? undefined);
     } catch (error) {
       Alert.alert(
         opened ? "Photo could not be saved" : "Could not open photos",
@@ -189,6 +173,38 @@ export function useSettingsPreferences(
           ? avatarSaveReason(error)
           : "The photo library could not be opened. Please try again.",
       );
+    } finally {
+      setPicking(false);
+    }
+  }
+
+  async function saveAvatarAsset(
+    uri: string,
+    mimeType?: string,
+    filename?: string,
+  ) {
+    const previousAvatar = current.current.avatar;
+    await persist({ avatar: uri });
+    try {
+      await onProfileChange?.(
+        { ...current.current },
+        { avatar: { mimeType, filename } },
+      );
+    } catch (error) {
+      await persist({ avatar: previousAvatar }).catch(() => {});
+      throw error;
+    }
+  }
+
+  async function savePickedAvatar(media: PickedMedia[]) {
+    const asset = media[0];
+    if (!ready || picking || !asset || asset.video) return;
+    setPicking(true);
+    try {
+      setAvatarFailed(false);
+      await saveAvatarAsset(asset.uri, asset.mimeType ?? "image/jpeg", asset.filename);
+    } catch (error) {
+      Alert.alert("Photo could not be saved", avatarSaveReason(error));
     } finally {
       setPicking(false);
     }
@@ -256,6 +272,7 @@ export function useSettingsPreferences(
     setAvatarFailed,
     toggle,
     pickAvatar,
+    savePickedAvatar,
     editProfile,
     saveProfile,
   };

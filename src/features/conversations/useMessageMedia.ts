@@ -9,7 +9,7 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 import type { Message } from "../../domain/data";
-import type { PickedStoryMedia } from "../stories/storyPickerModel";
+import type { PickedMedia } from "../media/mediaPickerModel";
 import type { KeyboardMedia } from "../../ui/KeyboardMediaInput";
 import { saveKeyboardMedia } from "../../services/keyboardMedia";
 
@@ -50,7 +50,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
     setPickerOpen(false);
   }
 
-  function pickMedia(items: PickedStoryMedia[]) {
+  function pickMedia(items: PickedMedia[]) {
     if (busy.current || active.current || !items.length) return;
     const albumId =
       items.length > 1
@@ -61,6 +61,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
         kind: item.video ? "video" : "image",
         uri: item.uri,
         filename: item.filename,
+        mimeType: item.mimeType,
         albumId,
         width: item.width,
         height: item.height,

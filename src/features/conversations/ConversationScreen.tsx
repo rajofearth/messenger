@@ -33,7 +33,7 @@ import { groupMediaMessages, type MediaRow } from "../../domain/mediaAlbums";
 import { daySeparatorLabel, localDayKey } from "../../domain/time";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
-import { StoryPicker } from "../stories/StoryPicker";
+import { MediaPicker } from "../media/MediaPicker";
 import { styles as s } from "./ConversationScreen.styles";
 
 export type ConversationScreenProps = {
@@ -407,7 +407,7 @@ export default function ConversationScreen({
         animationType="slide"
         onRequestClose={media.closePicker}
       >
-        <StoryPicker
+        <MediaPicker
           dark={dark}
           title="Share media"
           permissionTitle="Choose media to share"

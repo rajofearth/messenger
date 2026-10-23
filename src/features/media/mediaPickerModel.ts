@@ -1,14 +1,15 @@
 /** Story picker rules that do not depend on the native media library. */
 
-export const STORY_PICKER_LIMIT = 10;
+export const MEDIA_PICKER_LIMIT = 10;
 
-export type StoryPickerFilter = "recents" | "photos" | "videos";
+export type MediaPickerFilter = "recents" | "photos" | "videos";
 
 /** The part of a picked asset the editor and uploader need. */
-export type PickedStoryMedia = {
+export type PickedMedia = {
   uri: string;
   video: boolean;
   filename?: string;
+  mimeType?: string;
   width?: number;
   height?: number;
   duration?: number;
@@ -22,7 +23,7 @@ export type PickedStoryMedia = {
 export function toggleStorySelection(
   selected: readonly string[],
   id: string,
-  limit = STORY_PICKER_LIMIT,
+  limit = MEDIA_PICKER_LIMIT,
 ): string[] {
   if (selected.includes(id)) return selected.filter((item) => item !== id);
   if (selected.length >= limit) return [...selected];
@@ -30,7 +31,7 @@ export function toggleStorySelection(
 }
 
 /** The 1-based badge number for an asset, or 0 when it is not selected. */
-export function storySelectionOrder(
+export function mediaSelectionOrder(
   selected: readonly string[],
   id: string,
 ): number {
@@ -39,7 +40,7 @@ export function storySelectionOrder(
 }
 
 /** Video lengths use the same m:ss shape as the rest of the app. */
-export function formatStoryDuration(durationMs: number | null | undefined) {
+export function formatMediaDuration(durationMs: number | null | undefined) {
   if (!durationMs || durationMs <= 0) return "";
   const totalSeconds = Math.round(durationMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -48,7 +49,7 @@ export function formatStoryDuration(durationMs: number | null | undefined) {
 }
 
 /** Appends a page without letting media-store offset drift create duplicates. */
-export function appendUniqueStoryAssets<T extends { id: string }>(
+export function appendUniqueMediaAssets<T extends { id: string }>(
   current: readonly T[],
   next: readonly T[],
 ): T[] {
