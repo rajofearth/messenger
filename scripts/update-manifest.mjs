@@ -26,6 +26,11 @@ import { releaseProblem } from "../convex/lib/manifest.ts";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const NOTES_LIMIT = 1000;
 
+/** Converts shell-friendly escaped line breaks into the characters the prompt renders. */
+export function normalizeReleaseNotes(notes) {
+  return notes.replace(/\r\n?/g, "\n").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n");
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -265,7 +270,7 @@ export function main(argv) {
     versionCode,
     minVersionCode: options.minVersionCode,
     mandatory: options.mandatory,
-    notes: notes.trim(),
+    notes: normalizeReleaseNotes(notes).trim(),
   });
   const problem = releaseProblem(manifest);
   if (problem) {

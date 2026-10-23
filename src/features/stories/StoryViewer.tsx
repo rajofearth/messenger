@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   PanResponder,
   Pressable,
@@ -278,6 +279,23 @@ export function StoryViewer(props: Props) {
           }
         />
         <View style={s.bottom} pointerEvents="box-none">
+          {ownStory && (
+            <View style={s.storyActions}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Open story activity" onPress={() => setViewersOpen(true)} style={s.storyAction}>
+                <Ionicons name="people-outline" size={25} color="white" />
+                <Text style={s.storyActionCount}>{viewCount}</Text>
+                <Text style={s.storyActionLabel}>Activity</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Add story to highlights" onPress={() => Alert.alert("Highlights", "Highlight management will be available soon.")} style={s.storyAction}>
+                <Ionicons name="star-outline" size={25} color="white" />
+                <Text style={s.storyActionLabel}>Highlight</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete your story" onPress={() => props.onDelete(active.id)} style={s.storyAction}>
+                <Ionicons name="trash-outline" size={25} color="white" />
+                <Text style={s.storyActionLabel}>Delete</Text>
+              </Pressable>
+            </View>
+          )}
           {active.uploadStatus === "uploading" && (
             <View style={s.uploadState}>
               <ActivityIndicator size="small" color="white" />

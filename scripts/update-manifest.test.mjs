@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildManifest,
+  normalizeReleaseNotes,
   parseArgs,
   releaseNotes,
 } from "./update-manifest.mjs";
@@ -25,6 +26,27 @@ test("release notes come out as plain text for the prompt", () => {
   assert.ok(!notes.includes("**"), notes);
   assert.ok(!notes.includes("`"), notes);
   assert.ok(notes.length <= 1000);
+});
+
+test("escaped line breaks in release arguments become manifest line breaks", () => {
+  const supplied = String.raw`First paragraph.\n\n• One change.\n• Two changes.`;
+  const expected = "First paragraph.\n\n• One change.\n• Two changes.";
+
+  assert.equal(normalizeReleaseNotes(supplied), expected);
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      path.join(root, "scripts", "update-manifest.mjs"),
+      packagePath,
+      "--url",
+      "https://example.com/app.apk",
+      "--notes",
+      supplied,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(JSON.parse(output).notes, expected);
 });
 
 test("headings, links and reference definitions do not reach the prompt", () => {

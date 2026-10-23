@@ -14,7 +14,7 @@ import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { releaseProblem } from "../convex/lib/manifest.ts";
-import { buildManifest } from "./update-manifest.mjs";
+import { buildManifest, normalizeReleaseNotes } from "./update-manifest.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -167,7 +167,9 @@ const tag = `dev-${metadata.versionCode}`;
 const assetName = `messenger-dev-${metadata.versionName}-arm64-v8a.apk`;
 const apkUrl = `https://github.com/${repo}/releases/download/${tag}/${assetName}`;
 const subject = run("git", ["log", "-1", "--pretty=%s"], { capture: true }).trim();
-const notes = (notesArgument ?? `Development build ${metadata.versionName}.\n\n${subject}`)
+const notes = normalizeReleaseNotes(
+  notesArgument ?? `Development build ${metadata.versionName}.\n\n${subject}`,
+)
   .trim()
   .slice(0, 1000);
 if (!notes) throw new Error("the dev release notes are empty");

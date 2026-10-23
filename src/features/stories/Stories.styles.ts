@@ -64,6 +64,27 @@ export const styles = StyleSheet.create({
   navigation: { flex: 1, flexDirection: "row" },
   next: { flex: 2 },
   bottom: { padding: 24, gap: 14 },
+  storyActions: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-around",
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#FFFFFF33",
+  },
+  storyAction: { alignItems: "center", gap: 4, minWidth: 76 },
+  storyActionCount: {
+    position: "absolute",
+    top: 3,
+    color: "#4CB5FF",
+    fontFamily: "DMSans_700Bold",
+    fontSize: 12,
+  },
+  storyActionLabel: {
+    color: "white",
+    fontFamily: "DMSans_500Medium",
+    fontSize: 12,
+  },
   uploadState: {
     flexDirection: "row",
     alignItems: "center",

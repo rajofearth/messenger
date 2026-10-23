@@ -78,6 +78,11 @@ function boundedText(value: unknown, max: number): string | null {
   return value;
 }
 
+/** Keep older feeds with shell-escaped notes readable in the update prompt. */
+function normalizeNotes(notes: string): string {
+  return notes.replace(/\r\n?/g, "\n").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n");
+}
+
 export function parseUpdateManifest(value: unknown): UpdateManifest | null {
   if (!isRecord(value)) return null;
   const versionCode = toInteger(value.versionCode);
@@ -108,7 +113,7 @@ export function parseUpdateManifest(value: unknown): UpdateManifest | null {
     apkBytes,
     minVersionCode,
     mandatory: value.mandatory === true,
-    notes,
+    notes: normalizeNotes(notes),
   };
 }
 

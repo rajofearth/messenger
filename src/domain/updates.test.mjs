@@ -39,6 +39,14 @@ test("a published manifest parses into the fields the updater uses", () => {
   });
 });
 
+test("legacy escaped line breaks are normalized before the prompt sees notes", () => {
+  const parsed = parseUpdateManifest(
+    manifest({ notes: String.raw`First paragraph.\n\n• One change.\n• Two changes.` }),
+  );
+  assert.ok(parsed);
+  assert.equal(parsed.notes, "First paragraph.\n\n• One change.\n• Two changes.");
+});
+
 test("quoted numbers and omitted optional fields are accepted", () => {
   const parsed = parseUpdateManifest({
     versionCode: "12",

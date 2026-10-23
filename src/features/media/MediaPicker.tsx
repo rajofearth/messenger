@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as ImagePicker from "expo-image-picker";
+import { Camera } from "expo-camera";
 import {
   Album,
   Asset,
@@ -42,6 +42,7 @@ import {
   type MediaAlbum,
 } from "./mediaAlbums";
 import { MediaPickerPreview } from "./MediaPickerPreview";
+import { MediaCamera } from "./MediaCamera";
 import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
 import { mediaMimeType } from "./mediaMimeType";
 const GRID_GAP = 4;
@@ -86,6 +87,7 @@ export function MediaPicker(props: Props) {
   const [error, setError] = React.useState<string | null>(null);
   const [preparing, setPreparing] = React.useState(false);
   const [cameraBusy, setCameraBusy] = React.useState(false);
+  const [cameraOpen, setCameraOpen] = React.useState(false);
   const [preview, setPreview] = React.useState<AssetMetadata | null>(null);
   const [reloadKey, setReloadKey] = React.useState(0);
   const alive = React.useRef(true);
@@ -194,7 +196,7 @@ export function MediaPicker(props: Props) {
     camera.current = true;
     setCameraBusy(true);
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      const permission = await Camera.requestCameraPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
           "Camera permission needed",
@@ -209,25 +211,14 @@ export function MediaPicker(props: Props) {
         );
         return;
       }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: photosOnly ? ["images"] : ["images", "videos"],
-        allowsEditing: false,
-        quality: 0.85,
-        videoMaxDuration: 60,
-      });
-      if (result.canceled) return;
-      const media = result.assets
-        .filter((asset) => !!asset.uri)
-        .map((asset) => ({
-          uri: asset.uri,
-         video: asset.type === "video",
-           filename: asset.fileName ?? undefined,
-           mimeType: asset.mimeType ?? undefined,
-           width: asset.width,
-           height: asset.height,
-           duration: asset.duration ? asset.duration / 1000 : undefined,
-        }));
-      if (media.length) props.onPicked(media);
+      if (!photosOnly) {
+        const microphone = await Camera.requestMicrophonePermissionsAsync();
+        if (!microphone.granted) {
+          Alert.alert("Microphone permission needed", "Allow microphone access to record videos.");
+          return;
+        }
+      }
+      if (alive.current) setCameraOpen(true);
     } catch (cause) {
       Alert.alert(
         "Couldn't open the camera",
@@ -472,13 +463,23 @@ export function MediaPicker(props: Props) {
       {preview && (
         <View style={s.albumOverlay}>
           <MediaPickerPreview
-            asset={preview}
+            assets={assets}
+            initialIndex={Math.max(0, assets.findIndex((asset) => asset.id === preview.id))}
             colors={colors}
-            selected={selection.includes(preview.id)}
+            selection={selection}
             onClose={() => setPreview(null)}
-            onToggle={() => {
-              toggle(preview.id);
-              setPreview(null);
+            onToggle={toggle}
+          />
+        </View>
+      )}
+      {cameraOpen && (
+        <View style={s.cameraOverlay}>
+          <MediaCamera
+            photosOnly={photosOnly}
+            onClose={() => setCameraOpen(false)}
+            onCaptured={(media) => {
+              setCameraOpen(false);
+              props.onPicked([media]);
             }}
           />
         </View>
