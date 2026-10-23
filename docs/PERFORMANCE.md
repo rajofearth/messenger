@@ -252,6 +252,21 @@ The cost of this choice is that each row is measured on first render. The benefi
 - `recyclingKey={message.id}` (in `MessageBubble.tsx`, `MediaAlbum.tsx`, `AlbumViewer.tsx` and `ChatProfileShared.tsx`) tells `expo-image` that a recycled view now shows a different image, so the view and its decode can be reused instead of holding a second image while the old one is still mounted.
 - `cachePolicy="memory-disk"` is set on the two media grid callers (`MediaAlbum.tsx` and `ChatProfileShared.tsx`); other `expo-image` callers use the default policy. The memory tier makes scrolling back over already-seen media cheap, and the disk tier keeps the memory tier from having to hold everything.
 
+The device media picker uses a stricter path than the conversation media grids.
+`src/features/media/MediaPickerThumbnail.tsx` asks the Android-only
+`modules/media-thumbnails` Expo module for a `ContentResolver.loadThumbnail`
+JPEG capped at 384 pixels. The result is cached in the app cache and reused by
+the JavaScript single-flight cache across picker openings, so the grid and album
+sheet never decode the original camera file while scrolling. Full asset URIs
+are resolved only after selection or when the user opens the preview. The
+preview shows the cached thumbnail first, then swaps in the full asset; video
+playback is not auto-started, and the native controls are confined to the
+safe-area-bounded media stage rather than overlapping the action footer.
+
+This is structural protection, not an on-device frame-time measurement. A
+physical Android run is still required to confirm the exact scroll frame rate
+and the close path on the target phone.
+
 ### Remote media is downloaded once
 
 Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Images keep the sender's aspect ratio; no server-side resize is performed, and `expo-image` decodes at the displayed size.

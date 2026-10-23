@@ -7,7 +7,6 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
 import { MediaType } from "expo-media-library";
 import type { AssetMetadata } from "expo-media-library";
 import type { Colors } from "../../ui/theme";
@@ -17,6 +16,7 @@ import {
   mediaSelectionOrder,
 } from "./mediaPickerModel";
 import { styles as s } from "./MediaPicker.styles";
+import { MediaPickerThumbnail, mediaPickerThumbnailStyles } from "./MediaPickerThumbnail";
 
 export type MediaPickerAccess = "checking" | "ready" | "denied";
 
@@ -179,20 +179,11 @@ export function MediaPickerGrid(props: Props) {
               onPress={() => props.onPreview(asset)}
               style={s.flex}
             >
-              <Image
-                source={{
-                  uri: asset.id,
-                  width: asset.width,
-                  height: asset.height,
-                }}
-                recyclingKey={asset.id}
-                contentFit="cover"
-                transition={0}
-                cachePolicy="memory-disk"
-                priority="low"
-                allowDownscaling
-                decodeFormat="rgb"
-                style={s.flex}
+              <MediaPickerThumbnail
+                asset={asset}
+                displaySize={props.tile}
+                placeholderColor={props.colors.line}
+                style={mediaPickerThumbnailStyles.fill}
               />
             </Pressable>
             <Pressable

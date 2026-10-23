@@ -258,15 +258,10 @@ export const styles = StyleSheet.create({
     backgroundColor: "#101512",
   },
   previewHeader: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 2,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingVertical: 8,
   },
   previewTitle: {
     flex: 1,
@@ -279,13 +274,21 @@ export const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
   },
-  previewFooter: {
+  previewStage: {
+    flex: 1,
+    minHeight: 0,
+    justifyContent: "center",
+  },
+  previewLoading: {
     position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: 24,
+    alignSelf: "center",
+  },
+  previewFooter: {
     flexDirection: "row",
     gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   previewAction: {
     flex: 1,

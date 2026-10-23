@@ -1,12 +1,13 @@
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
 import type { AssetMetadata } from "expo-media-library";
 import { IconButton } from "../../ui/primitives";
 import type { Colors } from "../../ui/theme";
+import { filterNonEmptyAlbums } from "./mediaPickerModel";
 import type { MediaAlbum } from "./mediaAlbums";
 import { styles as s } from "./MediaPicker.styles";
+import { MediaPickerThumbnail } from "./MediaPickerThumbnail";
 
 type Props = {
   colors: Colors;
@@ -47,7 +48,7 @@ export function MediaAlbumSheet(props: Props) {
             selected={props.selectedId === null}
             onPress={() => props.onSelect(null)}
           />
-          {props.albums.map((item) => (
+          {filterNonEmptyAlbums(props.albums).map((item) => (
             <AlbumRow
               key={item.id}
               colors={props.colors}
@@ -87,13 +88,11 @@ function AlbumRow({
       style={[s.albumRow, selected && { backgroundColor: colors.tint }]}
     >
       {cover ? (
-        <Image
-          source={{ uri: cover.id, width: cover.width, height: cover.height }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          priority="high"
-          allowDownscaling
-          decodeFormat="rgb"
+        <MediaPickerThumbnail
+          asset={cover}
+          displaySize={52}
+          placeholderColor={colors.line}
+          priority="normal"
           style={s.albumCover}
         />
       ) : (

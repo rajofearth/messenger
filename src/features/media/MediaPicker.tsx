@@ -38,7 +38,6 @@ import { MediaPickerGrid, type MediaPickerAccess } from "./MediaPickerGrid";
 import { MediaAlbumSheet } from "./MediaAlbumSheet";
 import {
   loadMediaAlbums,
-  loadMediaAlbumCounts,
   loadRecentMediaCount,
   type MediaAlbum,
 } from "./mediaAlbums";
@@ -133,14 +132,6 @@ export function MediaPicker(props: Props) {
         if (!alive.current) return;
         setAlbums(items);
         setRecentCount(count);
-        void loadMediaAlbumCounts(items)
-          .then((counts) => {
-            if (!alive.current) return;
-            setAlbums((current) =>
-              current.map((album) => ({ ...album, count: counts.get(album.id) })),
-            );
-          })
-          .catch(() => {});
       })
       .catch(() => {
         if (!alive.current) return;

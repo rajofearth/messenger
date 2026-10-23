@@ -62,3 +62,18 @@ export function appendUniqueMediaAssets<T extends { id: string }>(
   }
   return [...current, ...appended];
 }
+
+/** Album rows are useful only when the media store says they contain media. */
+export function filterNonEmptyAlbums<T extends { count?: number }>(
+  albums: readonly T[],
+): T[] {
+  return albums.filter((album) => album.count !== undefined && album.count > 0);
+}
+
+/** Keeps native thumbnail files small while preserving enough detail for a tile. */
+export function thumbnailSizeForDisplay(
+  displaySize: number,
+  pixelRatio: number,
+): number {
+  return Math.max(128, Math.min(384, Math.ceil(displaySize * pixelRatio)));
+}

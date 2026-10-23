@@ -4,10 +4,14 @@ import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Asset, MediaType } from "expo-media-library";
 import type { AssetMetadata } from "expo-media-library";
+import { NavigationBar } from "expo-navigation-bar";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { Colors } from "../../ui/theme";
 import { coral } from "../../ui/theme";
 import { IconButton } from "../../ui/primitives";
 import { styles as s } from "./MediaPicker.styles";
+import { getMediaThumbnail } from "../../services/mediaThumbnails";
 
 type Props = {
   asset: AssetMetadata;
@@ -18,28 +22,36 @@ type Props = {
 };
 
 export function MediaPickerPreview(props: Props) {
-  const [uri, setUri] = React.useState(props.asset.id);
-  const [loading, setLoading] = React.useState(true);
+  const [thumbnailUri, setThumbnailUri] = React.useState<string | null>(null);
+  const [uri, setUri] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    setLoading(true);
+    setThumbnailUri(null);
+    setUri(null);
+    void getMediaThumbnail(props.asset.id, 384).then((next) => {
+      if (alive) setThumbnailUri(next);
+    });
     void new Asset(props.asset.id)
       .getUri()
       .then((next) => {
         if (alive) setUri(next);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
+      .catch(() => {});
     return () => {
       alive = false;
     };
   }, [props.asset.id]);
 
+  const loading = !uri;
   return (
-    <View style={s.preview} accessibilityViewIsModal>
+    <SafeAreaView
+      edges={["top", "bottom", "left", "right"]}
+      style={s.preview}
+      accessibilityViewIsModal
+    >
+      <StatusBar style="light" />
+      <NavigationBar style="dark" />
       <View style={s.previewHeader}>
         <IconButton
           name="close"
@@ -52,24 +64,27 @@ export function MediaPickerPreview(props: Props) {
         </Text>
         <View style={{ width: 44 }} />
       </View>
-      {props.asset.mediaType === MediaType.VIDEO ? (
-        <PreviewVideo uri={uri} />
-      ) : (
-        <Image
-          source={{ uri, width: props.asset.width, height: props.asset.height }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          allowDownscaling
-          style={s.previewMedia}
-        />
-      )}
-      {loading && (
-        <ActivityIndicator
-          size="large"
-          color={coral}
-          style={{ position: "absolute", alignSelf: "center", top: "50%" }}
-        />
-      )}
+      <View style={s.previewStage}>
+        {props.asset.mediaType === MediaType.VIDEO && uri ? (
+          <PreviewVideo uri={uri} />
+        ) : props.asset.mediaType === MediaType.VIDEO && thumbnailUri ? (
+          <Image
+            source={{ uri: thumbnailUri }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            style={s.previewMedia}
+          />
+        ) : thumbnailUri ? (
+          <Image
+            source={{ uri: uri ?? thumbnailUri }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            allowDownscaling
+            style={s.previewMedia}
+          />
+        ) : null}
+        {loading && <ActivityIndicator size="large" color={coral} style={s.previewLoading} />}
+      </View>
       <View style={s.previewFooter}>
         <Pressable
           accessibilityRole="button"
@@ -89,7 +104,7 @@ export function MediaPickerPreview(props: Props) {
           </Text>
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -98,17 +113,23 @@ function PreviewVideo({ uri }: { uri: string }) {
     video.loop = true;
     video.muted = true;
   });
-  React.useEffect(() => {
-    player.play();
-    return () => player.pause();
-  }, [player]);
   return (
     <VideoView
       player={player}
       style={s.previewMedia}
       contentFit="contain"
       nativeControls
-      surfaceType="textureView"
+      surfaceType="surfaceView"
+      fullscreenOptions={{ enable: false }}
+      buttonOptions={{
+        showNext: false,
+        showPrevious: false,
+        showSettings: false,
+        showSeekForward: true,
+        showSeekBackward: true,
+        showPlayPause: true,
+        showBottomBar: true,
+      }}
     />
   );
 }
