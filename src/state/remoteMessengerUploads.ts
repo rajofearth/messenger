@@ -14,6 +14,7 @@ export type SendAttachment = (args: {
 type CreateStory = (args: {
   storageId: Id<"_storage">;
   caption: string;
+  crop?: "fit" | "fill";
 }) => Promise<Id<"stories">>;
 
 export function attachmentErrorMessage(error: unknown) {
@@ -89,5 +90,6 @@ export async function uploadAndCreateStory(
   return await createStory({
     storageId,
     caption: story.caption,
+    crop: story.crop,
   });
 }

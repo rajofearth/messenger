@@ -8,6 +8,11 @@ export type StoryGroup = {
   seen: boolean;
 };
 
+/** Pending local stories are status cards, not playable/viewable stories. */
+export function isStoryReady(story: Story) {
+  return story.uploadStatus !== "uploading" && story.uploadStatus !== "failed";
+}
+
 /**
  * Own stories come back from the server with the account id, but the ring and
  * viewer group by "self" so they stay pinned to the current profile.

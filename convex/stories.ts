@@ -28,6 +28,7 @@ const story = (ctx: QueryCtx | MutationCtx, row: {
   storageId: Id<"_storage">;
   mimeType: string;
   caption: string;
+  crop?: "fit" | "fill";
   createdAt: number;
   expiresAt: number;
 }, seen: boolean, name: string, avatar: string | undefined) =>
@@ -39,6 +40,7 @@ const story = (ctx: QueryCtx | MutationCtx, row: {
     image: url,
     video: row.mimeType.startsWith("video/"),
     caption: row.caption,
+    crop: row.crop,
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     seen,
@@ -93,6 +95,7 @@ export const create = mutation({
   args: {
     storageId: v.id("_storage"),
     caption: v.string(),
+    crop: v.optional(v.union(v.literal("fit"), v.literal("fill"))),
   },
   handler: async (ctx, args) => {
     const actor = await requireUser(ctx);
@@ -109,6 +112,7 @@ export const create = mutation({
       storageId: args.storageId,
       mimeType: file.mimeType,
       caption: args.caption.trim(),
+      crop: args.crop,
       createdAt: now,
       expiresAt: now + 24 * 60 * 60 * 1000,
     });

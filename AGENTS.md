@@ -75,6 +75,42 @@ development deployment.
 - A dev build does not need a production version bump or a `CHANGELOG.md`
   release section.
 
+### Agent delivery default
+
+When an agent completes a user-visible app change, the default delivery target
+is the **development release**, not a local APK. After the focused checks pass,
+the agent should commit the intended source and documentation changes, push the
+containing branch, and publish the development APK so an already-installed
+`Messenger Dev` can update through its in-app updater. Do this in the same task;
+do not leave the user to sideload a locally built APK.
+
+Use this order:
+
+1. Run `npm run check` and `npm test`.
+2. Review `git status`, `git diff --check` and the staged diff; commit only the
+   intended files with a concise conventional message.
+3. Push the commit to its remote branch. This repository currently has no
+   separate `development` branch; use the branch that contains the change
+   (normally `master` for direct integration work).
+4. Run `npm run dev:ship -- --notes "<what changed and what was checked>"`.
+   This builds the dev variant, runs the dev APK gate, creates or replaces the
+   GitHub `dev-<versionCode>` prerelease, uploads the APK and publishes the
+   manifest only to the development Convex deployment.
+5. Verify the returned GitHub release, the APK digest/size and
+   `GET <dev-feed>/updates/manifest?versionCode=0` before reporting completion.
+
+If the APK was already built from the exact pushed commit, use
+`npm run dev:publish -- --notes "..."` instead, then perform the same
+verification. The installed phone must already have one dev APK installed with
+the preserved `artifacts/messenger-dev-debug.keystore`; the first install is
+still manual, but later builds must arrive through the updater.
+
+Production releases remain explicit: never turn a development task into a
+production tag or production-feed publish. If `gh` authentication, the dev
+Convex deployment, or the development feed configuration is missing, report the
+specific blocker and ask for that setup rather than claiming the release was
+delivered.
+
 ## Reference documentation
 
 Prefer live documentation over memory. Both projects publish LLM-oriented

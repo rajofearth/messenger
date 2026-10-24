@@ -14,6 +14,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { StoryGroup } from "../../domain/stories";
 import type { Story } from "../../domain/data";
 import { chatTimeLabel } from "../../domain/time";
+import { isStoryReady } from "../../domain/stories";
 import { useStoryViewers } from "../../state/useStoryViewers";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { StoryMedia } from "./StoryMedia";
@@ -63,6 +64,7 @@ export function StoryViewer(props: Props) {
       (!!props.selfId && active.ownerId === props.selfId));
   const localOnly =
     active?.uploadStatus === "uploading" || active?.uploadStatus === "failed";
+  const ready = !!active && isStoryReady(active);
   const viewers = useStoryViewers(
     ownStory && active && !localOnly ? active.id : null,
   );
@@ -158,7 +160,7 @@ export function StoryViewer(props: Props) {
     else if (!active) latest.current.props.onClose();
   }, [active?.id, ownStory]);
   useEffect(() => {
-    if (!active || active.video || paused) return;
+    if (!active || active.video || paused || !isStoryReady(active)) return;
     let last = Date.now();
     const timer = setInterval(() => {
       const now = Date.now();
@@ -190,9 +192,12 @@ export function StoryViewer(props: Props) {
           key={active.id}
           uri={active.image}
           video={active.video}
-          paused={paused}
+          crop={active.crop}
+          paused={paused || !ready}
           onProgress={(value) => setProgress({ id: active.id, value })}
-          onEnd={() => moveRef.current(1)}
+          onEnd={() => {
+            if (ready) moveRef.current(1);
+          }}
         />
         <LinearGradient
           colors={["#00000099", "transparent", "#000000AA"]}
@@ -233,7 +238,7 @@ export function StoryViewer(props: Props) {
               <Text style={[s.name, s.ownerName]} numberOfLines={1}>
                 {group.name}
               </Text>
-              {ownStory && (
+              {ownStory && ready && (
                 <View style={s.statsRow}>
                   {posted && <Text style={s.statsText}>Posted {posted}</Text>}
                   <Pressable
@@ -293,7 +298,7 @@ export function StoryViewer(props: Props) {
               {active.caption}
             </Text>
           )}
-          {ownStory && (
+          {ownStory && ready && (
               <View style={s.storyActions}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Open story activity" onPress={() => {
                   setViewersOpen(true);
@@ -312,7 +317,7 @@ export function StoryViewer(props: Props) {
             <View style={s.uploadState}>
               <ActivityIndicator size="small" color="white" />
               <Text style={s.uploadText}>
-                Uploading {uploadPercent ?? 0}% · local copy
+                Uploading {uploadPercent ?? 0}% · this story will appear when it finishes
               </Text>
             </View>
           )}
@@ -330,7 +335,7 @@ export function StoryViewer(props: Props) {
             </Pressable>
           )}
         </View>
-        {viewersOpen && ownStory && (
+         {viewersOpen && ownStory && ready && (
           <View style={s.viewersLayer}>
             <Pressable
               accessibilityRole="button"

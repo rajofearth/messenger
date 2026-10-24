@@ -102,6 +102,7 @@ export function mapStory(item: {
   image: string | null;
   video: boolean;
   caption: string;
+  crop?: "fit" | "fill";
   seen: boolean;
   createdAt?: number;
   expiresAt?: number;
@@ -114,6 +115,7 @@ export function mapStory(item: {
     image: item.image || "",
     video: item.video,
     caption: item.caption,
+    crop: item.crop,
     seen: item.seen,
     createdAt: item.createdAt,
     expiresAt: item.expiresAt,

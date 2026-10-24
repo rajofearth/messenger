@@ -71,6 +71,23 @@ The dev app is named `Messenger Dev`, uses package `com.yashraj.messenger.dev`, 
 
 The dev channel is intentionally local: it needs `gh` authentication and the development Convex deployment, and it is not part of the production release workflow.
 
+### Agent-delivered development updates
+
+Agents working on user-visible app changes should deliver a tested development
+release by default. They commit and push the source first, then run
+`npm run dev:ship -- --notes "..."`; the command builds the dev APK, runs the
+APK gate, uploads a GitHub prerelease and updates only the development feed.
+The already-installed `Messenger Dev` app can then download the update from its
+normal in-app updater. `npm run dev:publish -- --notes "..."` is the equivalent
+when `artifacts/messenger-dev.apk` was already built from the exact pushed commit.
+
+This is separate from production: agents must not create a `vX.Y.Z` production
+tag or publish the production feed for ordinary development/testing work. The
+first development APK still needs one manual installation with the preserved
+development signing key; subsequent development builds are intended to arrive
+through the updater. If the agent lacks `gh` authentication or the development
+Convex configuration, the release is blocked and that setup must be provided.
+
 ### Web tester for a second user
 
 `tools/web-tester/` is a local-only browser client for testing a second account against the phone. It uses the same Convex deployment and the same password auth as the app, so no backend test bypass is involved. It supports direct chats, groups, text and media attachments, replies, reactions, and read state.

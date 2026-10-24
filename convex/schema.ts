@@ -110,6 +110,7 @@ export default defineSchema({
     storageId: v.id("_storage"),
     mimeType: v.string(),
     caption: v.string(),
+    crop: v.optional(v.union(v.literal("fit"), v.literal("fill"))),
     createdAt: v.number(),
     expiresAt: v.number(),
   }).index("by_expiresAt", ["expiresAt"]),

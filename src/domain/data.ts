@@ -69,6 +69,8 @@ export type Story = {
   seen: boolean;
   caption: string;
   video?: boolean;
+  /** Non-destructive framing choice made before publishing. */
+  crop?: "fit" | "fill";
   ownerId?: string;
   /** Unix milliseconds; used for the "Posted" time in the viewer. */
   createdAt?: number;

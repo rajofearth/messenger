@@ -1,71 +1,48 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState } from "react";
+import { Keyboard } from "react-native";
 import type { Story } from "../../domain/data";
-import { Avatar, IconButton } from "../../ui/primitives";
 import { MediaPicker } from "../media/MediaPicker";
 import type { PickedMedia } from "../media/mediaPickerModel";
-import { StoryMedia } from "./StoryMedia";
-import { styles as s } from "./Stories.styles";
+import { StoryDraftReview } from "./StoryDraftReview";
+import {
+  appendDrafts,
+  type StoryDraft,
+} from "./storyComposerModel";
 
-type Draft = { uri: string; video: boolean; caption: string };
 type Props = {
   avatar: string;
   dark: boolean;
   onShare: (story: Story) => void;
   onClose: () => void;
 };
-export function StoryEditor(props: Props) {
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [index, setIndex] = useState(0);
-  const [keyboard, setKeyboard] = useState(false);
-  const sharing = useRef(false);
-  const draft = drafts[index];
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () =>
-      setKeyboard(true),
-    );
-    const hide = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboard(false),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
-  function handlePicked(media: PickedMedia[]) {
-    setDrafts(
-      media.map((asset) => ({
-        uri: asset.uri,
-        video: asset.video,
-        caption: "",
-      })),
-    );
-    setIndex(0);
+export function StoryEditor(props: Props) {
+  const [drafts, setDrafts] = useState<StoryDraft[]>([]);
+  const [index, setIndex] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(true);
+
+  function addMedia(media: PickedMedia[]) {
+    setDrafts((current) => {
+      const next = appendDrafts(current, media, Date.now().toString(36));
+      setIndex(current.length ? current.length : 0);
+      return next;
+    });
+    setPickerOpen(false);
   }
 
-  function share() {
-    if (!drafts.length || sharing.current) return;
-    sharing.current = true;
+  function publish() {
+    if (!drafts.length) return;
     Keyboard.dismiss();
     const batch = Date.now().toString(36);
-    drafts.forEach((item, i) =>
+    drafts.forEach((item, itemIndex) =>
       props.onShare({
-        id: `story-${batch}-${i}-${Math.random().toString(36).slice(2, 11)}`,
+        id: `story-${batch}-${itemIndex}-${Math.random().toString(36).slice(2, 11)}`,
         ownerId: "self",
         name: "You",
         avatar: props.avatar,
         image: item.uri,
         video: item.video,
+        crop: item.crop,
         caption: item.caption.trim(),
         seen: false,
       }),
@@ -73,96 +50,28 @@ export function StoryEditor(props: Props) {
     props.onClose();
   }
 
-  if (!draft)
+  if (pickerOpen || !drafts.length) {
     return (
       <MediaPicker
         dark={props.dark}
-        onPicked={handlePicked}
+        onPicked={addMedia}
         onClose={props.onClose}
       />
     );
+  }
 
   return (
-    <SafeAreaView style={s.viewer}>
-      <KeyboardAvoidingView
-        style={s.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <StoryMedia
-          key={`${index}-${draft.uri}`}
-          uri={draft.uri}
-          video={draft.video}
-          preview
-          paused={keyboard}
-        />
-        <View style={s.top}>
-          <View style={s.header}>
-            <Avatar uri={props.avatar} size={38} />
-            <Text style={s.name}>
-              You · {index + 1} / {drafts.length}
-            </Text>
-            <IconButton
-              name="close"
-              label="Cancel story"
-              color="white"
-              onPress={props.onClose}
-            />
-          </View>
-        </View>
-        <Pressable
-          style={s.flex}
-          accessibilityLabel="Dismiss keyboard"
-          onPress={Keyboard.dismiss}
-        />
-        <View style={s.bottom}>
-          {drafts.length > 1 && (
-            <View style={s.header}>
-              <IconButton
-                name="chevron-back"
-                label="Previous selected asset"
-                color="white"
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setIndex(Math.max(0, index - 1));
-                }}
-              />
-              <Text style={s.name}>Caption each photo or video</Text>
-              <IconButton
-                name="chevron-forward"
-                label="Next selected asset"
-                color="white"
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setIndex(Math.min(drafts.length - 1, index + 1));
-                }}
-              />
-            </View>
-          )}
-          <TextInput
-            accessibilityLabel={`Story caption ${index + 1}`}
-            placeholder="Add a caption"
-            placeholderTextColor="#FFFFFFAA"
-            value={draft.caption}
-            onChangeText={(caption) =>
-              setDrafts((items) =>
-                items.map((item, i) =>
-                  i === index ? { ...item, caption } : item,
-                ),
-              )
-            }
-            style={s.captionInput}
-            maxLength={180}
-            multiline
-          />
-          <Pressable accessibilityRole="button" onPress={share} style={s.share}>
-            <Text style={s.shareText}>
-              {drafts.length > 1
-                ? `Share ${drafts.length} stories`
-                : "Share story"}
-            </Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <StoryDraftReview
+      drafts={drafts}
+      index={index}
+      onIndex={setIndex}
+      onDrafts={(next) => {
+        setDrafts(next);
+        if (!next.length) setPickerOpen(true);
+      }}
+      onAddMedia={() => setPickerOpen(true)}
+      onPublish={publish}
+      onClose={() => setPickerOpen(true)}
+    />
   );
 }

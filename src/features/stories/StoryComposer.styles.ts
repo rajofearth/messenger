@@ -1,0 +1,30 @@
+import { StyleSheet } from "react-native";
+import { coral, onCoral } from "../../ui/theme";
+
+export const styles = StyleSheet.create({
+  composerScrim: { ...StyleSheet.absoluteFill, backgroundColor: "#00000022" },
+  composerTop: { position: "absolute", top: 12, left: 16, right: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  composerRoundButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#00000066" },
+  composerTitle: { flex: 1, color: "white", fontFamily: "DMSans_700Bold", fontSize: 18 },
+  composerCount: { color: "#FFFFFFCC", fontFamily: "DMSans_500Medium", fontSize: 13 },
+  composerTools: { position: "absolute", top: 72, right: 14, gap: 10 },
+  composerTool: { minWidth: 58, alignItems: "center", gap: 3, paddingVertical: 8, borderRadius: 16, backgroundColor: "#00000066" },
+  composerToolText: { color: "white", fontFamily: "DMSans_500Medium", fontSize: 11 },
+  composerBottom: { position: "absolute", left: 16, right: 16, bottom: 12, gap: 10 },
+  composerReorderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  composerSmallButton: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "#00000066" },
+  composerDisabled: { opacity: 0.35 },
+  composerHint: { color: "#FFFFFFCC", fontFamily: "DMSans_500Medium", fontSize: 12 },
+  composerActionsRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  composerAddButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, minHeight: 50, borderRadius: 18, backgroundColor: "#00000088" },
+  composerAddText: { color: "white", fontFamily: "DMSans_700Bold", fontSize: 13 },
+  composerThumbs: { gap: 8, paddingVertical: 2 },
+  composerThumb: { width: 52, height: 68, borderRadius: 10, overflow: "hidden", borderWidth: 2, borderColor: "transparent", backgroundColor: "#222" },
+  composerThumbActive: { borderColor: coral },
+  composerThumbImage: { width: "100%", height: "100%" },
+  composerVideoIcon: { position: "absolute", top: 25, left: 18 },
+  composerThumbNumber: { position: "absolute", left: 4, bottom: 3, color: "white", fontFamily: "DMSans_700Bold", fontSize: 11, textShadowColor: "#000", textShadowRadius: 3 },
+  share: { backgroundColor: coral, paddingHorizontal: 20, paddingVertical: 16, borderRadius: 18, alignItems: "center", flex: 1 },
+  shareText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 15 },
+  captionInput: { fontFamily: "DMSans_400Regular", color: "white", fontSize: 16, padding: 16, maxHeight: 140, borderRadius: 20, backgroundColor: "#FFFFFF22", borderWidth: 1, borderColor: "#FFFFFF44" },
+});

@@ -9,6 +9,7 @@ type Props = {
   video?: boolean;
   paused?: boolean;
   preview?: boolean;
+  crop?: "fit" | "fill";
   onProgress?: (progress: number) => void;
   onEnd?: () => void;
 };
@@ -50,7 +51,7 @@ function StoryVideo(props: Props) {
       <VideoView
         player={player}
         style={s.image}
-        contentFit="contain"
+        contentFit={props.crop === "fill" ? "cover" : "contain"}
         nativeControls={false}
         surfaceType="textureView"
       />
@@ -67,6 +68,6 @@ export function StoryMedia(props: Props) {
   return props.video ? (
     <StoryVideo {...props} />
   ) : (
-    <Image source={{ uri: props.uri }} style={s.image} contentFit="contain" />
+    <Image source={{ uri: props.uri }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />
   );
 }

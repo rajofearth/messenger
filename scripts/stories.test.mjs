@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupStories, markOwnStories, mergeStoryUploads } from "../src/domain/stories.ts";
+import { groupStories, isStoryReady, markOwnStories, mergeStoryUploads } from "../src/domain/stories.ts";
 
 const story = (id, values = {}) => ({
   id,
@@ -152,4 +152,12 @@ test("local uploads are shown until the server returns the same story", () => {
     pending[1],
   ]);
   assert.equal(mergeStoryUploads(server, []), server);
+});
+
+test("pending story uploads are status cards, not playable stories", () => {
+  const base = story("pending");
+  assert.equal(isStoryReady({ ...base, uploadStatus: "uploading" }), false);
+  assert.equal(isStoryReady({ ...base, uploadStatus: "failed" }), false);
+  assert.equal(isStoryReady({ ...base, uploadStatus: "uploaded" }), true);
+  assert.equal(isStoryReady(base), true);
 });
