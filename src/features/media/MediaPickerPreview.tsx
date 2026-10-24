@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Asset, MediaType } from "expo-media-library";
@@ -7,9 +7,7 @@ import type { AssetMetadata } from "expo-media-library";
 import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Colors } from "../../ui/theme";
-import { coral } from "../../ui/theme";
 import { IconButton } from "../../ui/primitives";
 import { getMediaThumbnail } from "../../services/mediaThumbnails";
 import { trackDevEvent } from "../../services/devTelemetry";
@@ -144,7 +142,7 @@ function PreviewPage({
       {asset.mediaType === MediaType.VIDEO && active && (uri ?? asset.id) ? (
         <PreviewVideo uri={uri ?? asset.id} />
       ) : thumbnailUri ? (
-        <Image source={{ uri: uri ?? (Platform.OS === "android" ? asset.id : thumbnailUri) }} contentFit="contain" cachePolicy="memory-disk" allowDownscaling style={s.previewMedia} />
+        <Image source={{ uri: asset.mediaType === MediaType.VIDEO ? thumbnailUri : uri ?? (Platform.OS === "android" ? asset.id : thumbnailUri) }} contentFit="contain" cachePolicy="memory-disk" allowDownscaling style={s.previewMedia} />
       ) : null}
       <Pressable
         accessibilityRole="checkbox"
@@ -160,8 +158,8 @@ function PreviewPage({
 }
 
 function PreviewVideo({ uri }: { uri: string }) {
-  const [playing, setPlaying] = React.useState(true);
-  const [muted, setMuted] = React.useState(false);
+  const startedAt = React.useRef(Date.now());
+  const firstFrameRecorded = React.useRef(false);
   const player = useVideoPlayer(uri, (video) => {
     video.loop = true;
     video.muted = false;
@@ -169,28 +167,25 @@ function PreviewVideo({ uri }: { uri: string }) {
     video.play();
   });
 
-  React.useEffect(() => {
-    const playingChange = player.addListener("playingChange", ({ isPlaying }) => setPlaying(isPlaying));
-    const mutedChange = player.addListener("mutedChange", ({ muted: nextMuted }) => setMuted(nextMuted));
-    player.play();
-    return () => {
-      playingChange.remove();
-      mutedChange.remove();
-      player.pause();
-    };
-  }, [player]);
-
+  // useVideoPlayer owns release (which also stops playback). A later effect
+  // cleanup must not call methods on the already-released native shared object.
   return (
     <View style={s.previewVideoSurface}>
-      <VideoView player={player} style={s.previewMedia} contentFit="contain" nativeControls={false} surfaceType="surfaceView" />
-      <View style={s.previewVideoControls}>
-        <Pressable accessibilityRole="button" accessibilityLabel={playing ? "Pause video" : "Play video"} onPress={() => playing ? player.pause() : player.play()} style={s.previewVideoButton}>
-          <Ionicons name={playing ? "pause" : "play"} size={20} color="white" />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={muted ? "Unmute video" : "Mute video"} onPress={() => { player.muted = !muted; }} style={s.previewVideoButton}>
-          <Ionicons name={muted ? "volume-mute" : "volume-high"} size={20} color="white" />
-        </Pressable>
-      </View>
+      <VideoView
+        player={player}
+        style={s.previewMedia}
+        contentFit="contain"
+        nativeControls
+        requiresLinearPlayback={false}
+        fullscreenOptions={{ enable: false }}
+        buttonOptions={{ showBottomBar: true, showSeekForward: false, showSeekBackward: false, showSettings: false }}
+        surfaceType="surfaceView"
+        onFirstFrameRender={() => {
+          if (firstFrameRecorded.current) return;
+          firstFrameRecorded.current = true;
+          trackDevEvent("media_preview_video_first_frame", { durationMs: Date.now() - startedAt.current, video: true });
+        }}
+      />
     </View>
   );
 }

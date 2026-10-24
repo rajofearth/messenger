@@ -78,6 +78,13 @@ export const styles = StyleSheet.create({
     fontFamily: "DMSans_500Medium",
     fontSize: 12,
   },
+  saveFeedback: {
+    color: "#FFFFFFCC",
+    fontFamily: "DMSans_400Regular",
+    fontSize: 11,
+    textAlign: "center",
+    maxWidth: 170,
+  },
   uploadState: {
     flexDirection: "row",
     alignItems: "center",

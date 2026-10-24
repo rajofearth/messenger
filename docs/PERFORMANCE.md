@@ -23,6 +23,14 @@ story viewers then added 8,208 bytes to the local gate build, for 14,384,754
 bytes (13.72 MiB), still 2.28 MiB below the gate. The stage table and the
 per-entry breakdown are under "Measured APK size".
 
+The 2026-10-24 media regression **development** APK
+`0.1.1-dev.20261024.124711` is **14,418,602 bytes (13.75 MiB)**, up **4,624 bytes**
+from dev release `dev-1792814710` (14,413,978 bytes). The focused changes add
+verified gallery-export checks, inline save status, first-video-frame telemetry
+and a compact update prompt; native dependencies and ABIs are unchanged. The
+APK passed all 11 slim-build checks and remains below the 16 MiB budget. This is
+a local build measurement, not a claim that device acceptance has passed.
+
 ### Build configuration in `app.json`
 
 The `expo-build-properties` plugin sets these under `android`:
@@ -259,9 +267,12 @@ JPEG capped at 384 pixels. The result is cached in the app cache and reused by
 the JavaScript single-flight cache across picker openings, so the grid and album
 sheet never decode the original camera file while scrolling. Full asset URIs
 are resolved only after selection or when the user opens the preview. The
-preview shows the cached thumbnail first, then swaps in the full asset; video
-playback is not auto-started, and the native controls are confined to the
-safe-area-bounded media stage rather than overlapping the action footer.
+photo preview resolves the full asset after the thumbnail. Only the active
+carousel page mounts a video player; it autoplays with audio and exposes native
+elapsed/total time and scrubbing inside the safe-area-bounded media stage, away
+from the action footer. Inactive videos use JPEG posters, not video URIs in the
+image decoder. Expo's `useVideoPlayer` owns player release; there is no separate
+pause-on-unmount callback that could run after the native object was released.
 
 This is structural protection, not an on-device frame-time measurement. A
 physical Android run is still required to confirm the exact scroll frame rate
@@ -278,6 +289,20 @@ contents. Events are batched into the development Convex deployment's
 when the app backgrounds. Production builds do not enqueue or send these
 events. The `devTelemetry.listRecent` query makes the latest session data
 available from the development Convex dashboard after a device test.
+
+`media_preview_video_first_frame` measures the first rendered frame, separately
+from thumbnail URI resolution. Gallery exports record `gallery_save_verified`
+only after checking the public Android file's byte count, media dimensions and
+album membership; failures record a bounded stage/error code, never an exception
+message or path. Story saves also record `story_save_completed` or
+`story_save_failed` with elapsed time. These are diagnostics, not native crash
+capture, and the in-memory queue can lose events when a process crashes.
+
+The local regression harness executes the installed Expo shared-object lifecycle
+and catches a pause-after-release on video unmount. Gallery and update-prompt
+tests mock native APIs; they do not establish visibility in a manufacturer's
+Gallery or visual fit on hardware. Use [the device checklist](MEDIA_TESTING.md)
+before calling those runtime behaviours verified.
 
 ### Remote media is downloaded once
 

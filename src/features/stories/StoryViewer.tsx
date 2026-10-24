@@ -17,6 +17,7 @@ import { chatTimeLabel } from "../../domain/time";
 import { useStoryViewers } from "../../state/useStoryViewers";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { StoryMedia } from "./StoryMedia";
+import { StorySaveAction } from "./StorySaveAction";
 import { styles as s } from "./Stories.styles";
 import { trackDevEvent } from "../../services/devTelemetry";
 
@@ -27,7 +28,7 @@ type Props = {
   onSeen: (id: string) => void;
   onDelete: (id: string) => void;
   onRetryUpload: (id: string) => void;
-  onSave: (story: Story) => void;
+  onSave: (story: Story) => Promise<boolean>;
   onClose: () => void;
 };
 
@@ -66,11 +67,12 @@ export function StoryViewer(props: Props) {
     ownStory && active && !localOnly ? active.id : null,
   );
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [held, setHeld] = useState(false);
   const [background, setBackground] = useState(
     AppState.currentState !== "active",
   );
-  const paused = held || background || viewersOpen;
+  const paused = held || background || viewersOpen || saving;
   const [progress, setProgress] = useState({ id: active?.id, value: 0 });
   const elapsed = useRef(0);
   const latest = useRef({ props, ownerIndex, itemIndex, active, paused });
@@ -90,6 +92,7 @@ export function StoryViewer(props: Props) {
       itemIndex: item,
     });
     setViewersOpen(false);
+    setSaving(false);
   }
   function move(direction: number, ownerOnly = false) {
     const current = latest.current;
@@ -150,6 +153,7 @@ export function StoryViewer(props: Props) {
     elapsed.current = 0;
     setProgress({ id: active?.id, value: 0 });
     setViewersOpen(false);
+    setSaving(false);
     if (active && !ownStory) latest.current.props.onSeen(active.id);
     else if (!active) latest.current.props.onClose();
   }, [active?.id, ownStory]);
@@ -298,13 +302,10 @@ export function StoryViewer(props: Props) {
                   <Ionicons name="eye-outline" size={25} color="white" />
                   <Text style={s.storyActionLabel}>{viewCount} {viewCount === 1 ? "view" : "views"}</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Save story to device" onPress={() => {
+                <StorySaveAction key={active.id} onBusyChange={setSaving} onSave={() => {
                   trackDevEvent("story_save_requested", { video: !!active.video });
-                  props.onSave(active);
-                }} style={s.storyAction}>
-                  <Ionicons name="download-outline" size={25} color="white" />
-                  <Text style={s.storyActionLabel}>Save</Text>
-                </Pressable>
+                  return props.onSave(active);
+                }} />
               </View>
             )}
           {active.uploadStatus === "uploading" && (

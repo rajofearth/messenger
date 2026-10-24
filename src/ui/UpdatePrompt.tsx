@@ -7,16 +7,18 @@
  * or hand a verified file to Android's installer.
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatBytes } from "../domain/updates";
 import type { AppUpdater } from "../state/useAppUpdater";
@@ -35,6 +37,11 @@ export default function UpdatePrompt({
   const colors = palette(dark);
   const { manifest, progress, download, dismissible } = updates;
   const showing = visible && updates.promptVisible;
+  const [notesExpanded, setNotesExpanded] = useState(false);
+
+  useEffect(() => {
+    setNotesExpanded(false);
+  }, [showing, manifest?.versionCode]);
 
   // A forced update has no way back: Android's back gesture must not hide the
   // only screen that can install it. The modal's onRequestClose is the usual
@@ -199,30 +206,50 @@ export default function UpdatePrompt({
         if (dismissible) updates.dismiss();
       }}
     >
-      <View style={s.overlay}>
+      <SafeAreaView style={s.overlay}>
         <View
           accessibilityViewIsModal
           style={[s.card, { backgroundColor: colors.card }]}
         >
-          <View style={[s.symbol, { backgroundColor: colors.tint }]}>
-            <Ionicons name="cloud-download-outline" size={28} color={colors.fg} />
-          </View>
-          <Text style={[s.title, { color: colors.fg }]}>{title}</Text>
-          <Text style={[s.body, { color: colors.muted }]}>
-            {updates.forced
-              ? `Version ${manifest.versionName} is required. This version of Messenger can no longer connect, so the update must be installed to keep using the app${installed ? ` (you are on ${installed})` : ""}.`
-              : installed
-                ? `Version ${manifest.versionName} is available. You are on ${installed}.`
-                : `Version ${manifest.versionName} is available.`}
-          </Text>
-          {manifest.notes ? (
+          <ScrollView style={s.content} contentContainerStyle={s.contentContainer}>
+            <View style={s.header}>
+              <View style={[s.symbol, { backgroundColor: colors.tint }]}>
+                <Ionicons name="cloud-download-outline" size={22} color={colors.fg} />
+              </View>
+              <Text style={[s.title, { color: colors.fg }]}>{title}</Text>
+            </View>
             <Text style={[s.body, { color: colors.muted }]}>
-              {manifest.notes}
+              Version {manifest.versionName} · {size}
             </Text>
-          ) : null}
-          {actions()}
+            {updates.forced ? (
+              <Text style={[s.hint, { color: colors.muted }]}>
+                Install this update to keep using Messenger. Your chats and settings stay in place.
+              </Text>
+            ) : null}
+            {manifest.notes ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="What's new"
+                  accessibilityState={{ expanded: notesExpanded }}
+                  onPress={() => setNotesExpanded((expanded) => !expanded)}
+                  style={s.notesToggle}
+                >
+                  <Text style={[s.notesLabel, { color: colors.fg }]}>What's new</Text>
+                  <Ionicons name={notesExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                </Pressable>
+                {notesExpanded ? (
+                  <ScrollView nestedScrollEnabled style={s.notes}>
+                    {installed ? <Text style={[s.hint, { color: colors.muted }]}>Installed: {installed}</Text> : null}
+                    <Text style={[s.body, { color: colors.muted }]}>{manifest.notes}</Text>
+                  </ScrollView>
+                ) : null}
+              </>
+            ) : null}
+            {actions()}
+          </ScrollView>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -232,36 +259,42 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(16,25,20,0.55)",
     justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
   card: {
-    borderRadius: 28,
-    padding: 24,
+    borderRadius: 22,
     width: "100%",
-    maxWidth: 480,
+    maxWidth: 400,
+    maxHeight: "100%",
     alignSelf: "center",
+    overflow: "hidden",
   },
+  content: { flexGrow: 0, flexShrink: 1 },
+  contentContainer: { padding: 20 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   symbol: {
-    width: 58,
-    height: 58,
-    borderRadius: 21,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 18,
   },
   title: {
+    flex: 1,
     fontFamily: "DMSans_700Bold",
-    fontSize: 22,
-    letterSpacing: -0.6,
-    marginBottom: 8,
+    fontSize: 20,
+    letterSpacing: -0.4,
   },
   body: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 12,
+    lineHeight: 20,
+    marginBottom: 10,
   },
+  notesToggle: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  notesLabel: { fontFamily: "DMSans_500Medium", fontSize: 13 },
+  notes: { maxHeight: 180, marginBottom: 8 },
   hint: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
@@ -291,7 +324,7 @@ const s = StyleSheet.create({
   primary: {
     backgroundColor: coral,
     borderRadius: 16,
-    minHeight: 50,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 6,
@@ -301,9 +334,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    borderWidth: 1,
-    minHeight: 46,
-    marginTop: 10,
+    minHeight: 40,
+    marginTop: 4,
   },
   secondaryText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
 });

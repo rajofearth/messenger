@@ -1,6 +1,8 @@
 import { Directory, File, Paths } from "expo-file-system";
-import { Album, Asset, requestPermissionsAsync } from "expo-media-library";
+import { Album, Asset, MediaType, requestPermissionsAsync } from "expo-media-library";
+import { Platform } from "react-native";
 import type { Message, Story } from "../domain/data";
+import { trackDevEvent } from "./devTelemetry";
 
 const FOLDER = "messenger-media";
 const ALBUM = "Messenger";
@@ -84,18 +86,49 @@ export async function prefetchStories(stories: Story[], limit = 8) {
 }
 
 /**
- * Copies a downloaded file into the Messenger album. Permission is requested
- * only when the user has opted into gallery visibility.
+ * Publishes into the public Messenger album, then verifies the MediaStore row,
+ * album membership and complete public file before reporting success.
  */
 export async function saveMediaToGallery(uri: string) {
-  if (!uri.startsWith("file://")) return false;
-  const permission = await requestPermissionsAsync(true, ["photo", "video"]);
-  if (!permission.granted) return false;
-  const album = await Album.get(ALBUM);
-  const asset = await Asset.create(uri);
-  if (album) await album.add(asset);
-  else await Album.create(ALBUM, [asset]);
-  return true;
+  function failed(errorCode: string) {
+    trackDevEvent("gallery_save_failed", { errorCode });
+    return false;
+  }
+  if (!uri.startsWith("file://")) return failed("not_local");
+  let stage = "source_read_failed";
+  try {
+    const source = new File(uri);
+    if (!source.exists || source.size <= 0) return failed("source_unavailable");
+    const bytes = source.size;
+    stage = "permission_request_failed";
+    const permission = await requestPermissionsAsync(true, ["photo", "video"]);
+    if (!permission.granted) return failed("permission_denied");
+    stage = "album_lookup_failed";
+    const existing = await Album.get(ALBUM);
+    // Export straight to the destination when it exists, rather than creating
+    // a default-library asset and moving it via album.add's native list API.
+    stage = "asset_create_failed";
+    const asset = await Asset.create(uri, existing ?? undefined);
+    stage = "album_create_failed";
+    const album = existing ?? await Album.create(ALBUM, [asset], true);
+    stage = "asset_verify_failed";
+    const [info, albums] = await Promise.all([asset.getInfo(), asset.getAlbums()]);
+    if (!albums.some((item) => item.id === album.id)) return failed("album_unverified");
+    if (![MediaType.IMAGE, MediaType.VIDEO].includes(info.mediaType) || !(info.width > 0 && info.height > 0)) {
+      return failed("media_unrecognized");
+    }
+    if (Platform.OS === "android") {
+      if (!info.uri.startsWith("file://") || info.uri === uri ||
+          [Paths.document.uri, Paths.cache.uri].some((root) => info.uri.startsWith(root)) ||
+          /\/Android\/(?:data|obb)\//i.test(info.uri)) return failed("not_public");
+      const published = new File(info.uri);
+      if (!published.exists || published.size !== bytes) return failed("copy_incomplete");
+    }
+    trackDevEvent("gallery_save_verified", { bytes, video: info.mediaType === MediaType.VIDEO });
+    return true;
+  } catch {
+    return failed(stage);
+  }
 }
 
 export async function saveStoryToGallery(input: {
@@ -103,11 +136,22 @@ export async function saveStoryToGallery(input: {
   uri: string;
   video: boolean;
 }) {
-  const localUri = await cacheRemoteMedia({
-    id: `story-save-${input.id}`,
-    uri: input.uri,
-    mimeType: input.video ? "video/mp4" : "image/jpeg",
-    kind: "story",
+  const startedAt = Date.now();
+  let saved = false;
+  try {
+    const localUri = await cacheRemoteMedia({
+      id: `story-save-${input.id}`,
+      uri: input.uri,
+      mimeType: input.video ? "video/mp4" : "image/jpeg",
+      kind: "story",
+    });
+    saved = localUri ? await saveMediaToGallery(localUri) : false;
+  } catch {
+    trackDevEvent("gallery_save_failed", { errorCode: "cache_failed" });
+  }
+  trackDevEvent(saved ? "story_save_completed" : "story_save_failed", {
+    durationMs: Date.now() - startedAt,
+    video: input.video,
   });
-  return localUri ? saveMediaToGallery(localUri) : false;
+  return saved;
 }
