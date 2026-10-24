@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import type { ImageStyle } from "react-native";
 import type { AssetMetadata } from "expo-media-library";
 import { getMediaThumbnail } from "../../services/mediaThumbnails";
+import { trackDevEvent } from "../../services/devTelemetry";
 import { thumbnailSizeForDisplay } from "./mediaPickerModel";
 
 type Props = {
@@ -21,9 +22,13 @@ export function MediaPickerThumbnail(props: Props) {
 
   React.useEffect(() => {
     let alive = true;
+    const startedAt = Date.now();
     setUri(null);
     void getMediaThumbnail(props.asset.id, size).then((next) => {
-      if (alive) setUri(next);
+      if (alive) {
+        setUri(next);
+        trackDevEvent("media_thumbnail_loaded", { durationMs: Date.now() - startedAt });
+      }
     });
     return () => {
       alive = false;

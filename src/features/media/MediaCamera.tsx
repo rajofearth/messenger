@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { PickedMedia } from "./mediaPickerModel";
 import { styles as s } from "./MediaPicker.styles";
+import { trackDevEvent } from "../../services/devTelemetry";
 
 type Props = {
   photosOnly: boolean;
@@ -21,11 +22,25 @@ export function MediaCamera(props: Props) {
   const [flash, setFlash] = React.useState<"off" | "on">("off");
   const [mode, setMode] = React.useState<"picture" | "video">("picture");
   const [recording, setRecording] = React.useState(false);
+  const [recordingSeconds, setRecordingSeconds] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (!recording) {
+      setRecordingSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setRecordingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+    return () => clearInterval(timer);
+  }, [recording]);
+
   async function capture() {
     if (!camera.current || !ready || busy) return;
+    const startedAt = Date.now();
     setError(null);
     try {
       if (mode === "picture") {
@@ -35,6 +50,9 @@ export function MediaCamera(props: Props) {
           skipProcessing: false,
         });
         if (picture.uri) {
+          trackDevEvent("camera_photo_captured", {
+            durationMs: Date.now() - startedAt,
+          });
           props.onCaptured({
             uri: picture.uri,
             video: false,
@@ -51,6 +69,9 @@ export function MediaCamera(props: Props) {
           maxFileSize: 25 * 1024 * 1024,
         });
         if (result?.uri) {
+          trackDevEvent("camera_video_recorded", {
+            durationMs: recordingSeconds * 1000,
+          });
           props.onCaptured({
             uri: result.uri,
             video: true,
@@ -78,16 +99,20 @@ export function MediaCamera(props: Props) {
   return (
     <View style={s.cameraRoot}>
       <StatusBar style="light" hidden />
-      <CameraView
+        <CameraView
         ref={camera}
         style={s.cameraView}
         facing={facing}
         flash={flash}
         mode={mode}
         mute={false}
+        enableTorch={flash === "on" && facing === "back"}
         videoQuality="720p"
         animateShutter
-        onCameraReady={() => setReady(true)}
+        onCameraReady={() => {
+          setReady(true);
+          trackDevEvent("camera_ready");
+        }}
         onMountError={(event) => setError(event.message)}
       />
       <SafeAreaView edges={["top", "bottom", "left", "right"]} style={s.cameraChrome}>
@@ -97,7 +122,10 @@ export function MediaCamera(props: Props) {
           </Pressable>
           <Text style={s.cameraModeTitle}>{mode === "video" ? "Video" : "Photo"}</Text>
           <View style={s.cameraTopActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Toggle flash" onPress={() => setFlash((current) => current === "off" ? "on" : "off")} style={s.cameraIconButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Toggle flash" onPress={() => {
+              setFlash((current) => current === "off" ? "on" : "off");
+              trackDevEvent("camera_torch_toggle", { video: mode === "video" });
+            }} style={s.cameraIconButton}>
               <Ionicons name={flash === "on" ? "flash" : "flash-off"} size={22} color="white" />
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Switch camera" onPress={() => setFacing((current) => current === "back" ? "front" : "back")} style={s.cameraIconButton}>
@@ -106,7 +134,12 @@ export function MediaCamera(props: Props) {
           </View>
         </View>
         <View style={s.cameraBottomBar}>
-          {error ? <Text style={s.cameraError}>{error}</Text> : <Text style={s.cameraHint}>{recording ? "Tap to stop" : "Tap to capture"}</Text>}
+          {error ? <Text style={s.cameraError}>{error}</Text> : recording ? (
+            <View style={s.cameraRecordingStatus}>
+              <View style={s.cameraRecordingDot} />
+              <Text style={s.cameraRecordingText}>{String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}</Text>
+            </View>
+          ) : <Text style={s.cameraHint}>Tap to capture</Text>}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={recording ? "Stop recording" : mode === "video" ? "Start video recording" : "Take photo"}
@@ -114,7 +147,7 @@ export function MediaCamera(props: Props) {
             onPress={() => void capture()}
             style={[s.cameraShutter, mode === "video" && s.cameraShutterVideo, recording && s.cameraShutterRecording]}
           >
-            {busy && !recording ? <ActivityIndicator color="white" /> : <View style={s.cameraShutterInner} />}
+            {busy && !recording ? <ActivityIndicator color="white" /> : <View style={[s.cameraShutterInner, recording && s.cameraShutterRecordingInner]} />}
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Switch photo or video mode" onPress={toggleMode} style={s.cameraModeSwitch}>
             <Text style={s.cameraModeSwitchText}>{props.photosOnly ? "Photo" : mode === "picture" ? "Video" : "Photo"}</Text>

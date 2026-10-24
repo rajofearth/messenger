@@ -118,4 +118,20 @@ export default defineSchema({
     userId: v.id("users"),
     seenAt: v.number(),
   }).index("by_story_user", ["storyId", "userId"]),
+  devTelemetry: defineTable({
+    userId: v.id("users"),
+    sessionId: v.string(),
+    event: v.string(),
+    occurredAt: v.number(),
+    durationMs: v.optional(v.number()),
+    bytes: v.optional(v.number()),
+    count: v.optional(v.number()),
+    index: v.optional(v.number()),
+    total: v.optional(v.number()),
+    video: v.optional(v.boolean()),
+    jsHeapUsedBytes: v.optional(v.number()),
+    errorCode: v.optional(v.string()),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_occurredAt", ["occurredAt"]),
 });

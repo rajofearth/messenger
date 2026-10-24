@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   AppState,
   PanResponder,
   Pressable,
@@ -13,11 +12,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { StoryGroup } from "../../domain/stories";
+import type { Story } from "../../domain/data";
 import { chatTimeLabel } from "../../domain/time";
 import { useStoryViewers } from "../../state/useStoryViewers";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { StoryMedia } from "./StoryMedia";
 import { styles as s } from "./Stories.styles";
+import { trackDevEvent } from "../../services/devTelemetry";
 
 type Props = {
   groups: StoryGroup[];
@@ -26,6 +27,7 @@ type Props = {
   onSeen: (id: string) => void;
   onDelete: (id: string) => void;
   onRetryUpload: (id: string) => void;
+  onSave: (story: Story) => void;
   onClose: () => void;
 };
 
@@ -234,7 +236,10 @@ export function StoryViewer(props: Props) {
                     accessibilityRole="button"
                     accessibilityLabel={`${viewCount} ${viewCount === 1 ? "viewer" : "viewers"}. Open viewer list.`}
                     hitSlop={8}
-                    onPress={() => setViewersOpen(true)}
+                     onPress={() => {
+                       setViewersOpen(true);
+                       trackDevEvent("story_viewers_open", { count: viewCount });
+                     }}
                     style={s.statsButton}
                   >
                     <Ionicons name="eye-outline" size={13} color="#FFFFFFCC" />
@@ -279,23 +284,29 @@ export function StoryViewer(props: Props) {
           }
         />
         <View style={s.bottom} pointerEvents="box-none">
-          {ownStory && (
-            <View style={s.storyActions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Open story activity" onPress={() => setViewersOpen(true)} style={s.storyAction}>
-                <Ionicons name="people-outline" size={25} color="white" />
-                <Text style={s.storyActionCount}>{viewCount}</Text>
-                <Text style={s.storyActionLabel}>Activity</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Add story to highlights" onPress={() => Alert.alert("Highlights", "Highlight management will be available soon.")} style={s.storyAction}>
-                <Ionicons name="star-outline" size={25} color="white" />
-                <Text style={s.storyActionLabel}>Highlight</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Delete your story" onPress={() => props.onDelete(active.id)} style={s.storyAction}>
-                <Ionicons name="trash-outline" size={25} color="white" />
-                <Text style={s.storyActionLabel}>Delete</Text>
-              </Pressable>
-            </View>
+          {!!active.caption && (
+            <Text style={s.caption} pointerEvents="none">
+              {active.caption}
+            </Text>
           )}
+          {ownStory && (
+              <View style={s.storyActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Open story activity" onPress={() => {
+                  setViewersOpen(true);
+                  trackDevEvent("story_viewers_open", { count: viewCount });
+                }} style={s.storyAction}>
+                  <Ionicons name="eye-outline" size={25} color="white" />
+                  <Text style={s.storyActionLabel}>{viewCount} {viewCount === 1 ? "view" : "views"}</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="Save story to device" onPress={() => {
+                  trackDevEvent("story_save_requested", { video: !!active.video });
+                  props.onSave(active);
+                }} style={s.storyAction}>
+                  <Ionicons name="download-outline" size={25} color="white" />
+                  <Text style={s.storyActionLabel}>Save</Text>
+                </Pressable>
+              </View>
+            )}
           {active.uploadStatus === "uploading" && (
             <View style={s.uploadState}>
               <ActivityIndicator size="small" color="white" />
@@ -316,11 +327,6 @@ export function StoryViewer(props: Props) {
                 Upload failed · Tap to retry
               </Text>
             </Pressable>
-          )}
-          {!!active.caption && (
-            <Text style={s.caption} pointerEvents="none">
-              {active.caption}
-            </Text>
           )}
         </View>
         {viewersOpen && ownStory && (
@@ -350,9 +356,11 @@ export function StoryViewer(props: Props) {
                 {viewers === undefined ? (
                   <ActivityIndicator color="white" style={s.viewersLoading} />
                 ) : viewers.length === 0 ? (
-                  <Text style={s.viewersEmpty}>
-                    No one has viewed this story yet.
-                  </Text>
+                  <View style={s.viewersEmptyState}>
+                    <Ionicons name="eye-outline" size={34} color="#FFFFFF88" />
+                    <Text style={s.viewersEmptyTitle}>0 views yet</Text>
+                    <Text style={s.viewersEmpty}>Viewers will appear here after they watch this story.</Text>
+                  </View>
                 ) : (
                   viewers.map((view) => (
                     <View key={view.id} style={s.viewerRow}>

@@ -86,6 +86,33 @@ export const styles = StyleSheet.create({
   },
   cameraShutterVideo: { borderColor: coral },
   cameraShutterRecording: { backgroundColor: coral },
+  cameraShutterRecordingInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "white",
+  },
+  cameraRecordingStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#00000099",
+  },
+  cameraRecordingDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: "#FF4D4D",
+  },
+  cameraRecordingText: {
+    color: "white",
+    fontFamily: "DMSans_700Bold",
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+  },
   cameraShutterInner: {
     width: 60,
     height: 60,
@@ -387,6 +414,11 @@ export const styles = StyleSheet.create({
   previewSelectBadgeSelected: {
     borderColor: coral,
     backgroundColor: coral,
+  },
+  previewSelectBadgeText: {
+    color: onCoral,
+    fontFamily: "DMSans_700Bold",
+    fontSize: 18,
   },
   previewVideoSurface: { flex: 1 },
   previewVideoControls: {

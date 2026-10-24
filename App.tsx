@@ -474,7 +474,7 @@ function MessengerApp() {
           }}
           onSeen={messenger.markStorySeen}
           onDelete={messenger.deleteStory}
-          onRetryUpload={messenger.retryStory}
+           onRetryUpload={messenger.retryStory}
           onShare={messenger.shareStory}
         />
         <UpdatePrompt

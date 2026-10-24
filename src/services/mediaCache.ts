@@ -97,3 +97,17 @@ export async function saveMediaToGallery(uri: string) {
   else await Album.create(ALBUM, [asset]);
   return true;
 }
+
+export async function saveStoryToGallery(input: {
+  id: string;
+  uri: string;
+  video: boolean;
+}) {
+  const localUri = await cacheRemoteMedia({
+    id: `story-save-${input.id}`,
+    uri: input.uri,
+    mimeType: input.video ? "video/mp4" : "image/jpeg",
+    kind: "story",
+  });
+  return localUri ? saveMediaToGallery(localUri) : false;
+}

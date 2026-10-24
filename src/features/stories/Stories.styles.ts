@@ -73,13 +73,6 @@ export const styles = StyleSheet.create({
     borderTopColor: "#FFFFFF33",
   },
   storyAction: { alignItems: "center", gap: 4, minWidth: 76 },
-  storyActionCount: {
-    position: "absolute",
-    top: 3,
-    color: "#4CB5FF",
-    fontFamily: "DMSans_700Bold",
-    fontSize: 12,
-  },
   storyActionLabel: {
     color: "white",
     fontFamily: "DMSans_500Medium",
@@ -156,6 +149,18 @@ export const styles = StyleSheet.create({
     color: "#FFFFFFAA",
     fontSize: 14,
     paddingVertical: 16,
+    textAlign: "center",
+  },
+  viewersEmptyState: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+  },
+  viewersEmptyTitle: {
+    color: "white",
+    fontFamily: "DMSans_700Bold",
+    fontSize: 16,
   },
   viewerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   viewerCopy: { flex: 1 },

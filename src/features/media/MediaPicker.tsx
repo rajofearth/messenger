@@ -45,6 +45,7 @@ import { MediaPickerPreview } from "./MediaPickerPreview";
 import { MediaCamera } from "./MediaCamera";
 import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
 import { mediaMimeType } from "./mediaMimeType";
+import { trackDevEvent } from "../../services/devTelemetry";
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
 const GRANULAR_PERMISSIONS: GranularPermission[] = ["photo", "video"];
@@ -194,6 +195,7 @@ export function MediaPicker(props: Props) {
   async function openCamera() {
     if (camera.current) return;
     camera.current = true;
+    const startedAt = Date.now();
     setCameraBusy(true);
     try {
       const permission = await Camera.requestCameraPermissionsAsync();
@@ -218,7 +220,10 @@ export function MediaPicker(props: Props) {
           return;
         }
       }
-      if (alive.current) setCameraOpen(true);
+      if (alive.current) {
+        setCameraOpen(true);
+        trackDevEvent("camera_open", { durationMs: Date.now() - startedAt });
+      }
     } catch (cause) {
       Alert.alert(
         "Couldn't open the camera",

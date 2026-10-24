@@ -267,6 +267,18 @@ This is structural protection, not an on-device frame-time measurement. A
 physical Android run is still required to confirm the exact scroll frame rate
 and the close path on the target phone.
 
+### Development telemetry
+
+Development APKs collect only coarse interaction and timing events through
+`src/services/devTelemetry.ts`. The queue records event names, timestamps,
+durations, counts, media kind, coarse JS heap usage when the runtime exposes it,
+and error codes; it never records media URIs, captions, filenames or image/video
+contents. Events are batched into the development Convex deployment's
+`devTelemetry` table and flushed after 25 events, after a short idle delay, or
+when the app backgrounds. Production builds do not enqueue or send these
+events. The `devTelemetry.listRecent` query makes the latest session data
+available from the development Convex dashboard after a device test.
+
 ### Remote media is downloaded once
 
 Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Images keep the sender's aspect ratio; no server-side resize is performed, and `expo-image` decodes at the displayed size.

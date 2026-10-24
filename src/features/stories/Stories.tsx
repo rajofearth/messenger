@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Modal } from "react-native";
+import { Alert, Modal } from "react-native";
 import type { Story } from "../../domain/data";
 import { groupStories } from "../../domain/stories";
+import { saveStoryToGallery } from "../../services/mediaCache";
 import { StoryViewer } from "./StoryViewer";
 import { StoryEditor } from "./StoryEditor";
 
@@ -36,6 +37,11 @@ function StorySession(props: StoriesProps) {
     setClosed(true);
     props.onClose();
   }
+  function saveStory(story: Story) {
+    void saveStoryToGallery({ id: story.id, uri: story.image, video: !!story.video })
+      .then((saved) => Alert.alert(saved ? "Story saved" : "Not saved", saved ? "The story is in your Messenger album." : "The story could not be saved."))
+      .catch(() => Alert.alert("Not saved", "The story could not be saved."));
+  }
   if (closed) return null;
   return (
     <Modal
@@ -58,7 +64,8 @@ function StorySession(props: StoriesProps) {
           selfId={props.selfId}
           onSeen={props.onSeen}
           onDelete={props.onDelete}
-          onRetryUpload={props.onRetryUpload}
+           onRetryUpload={props.onRetryUpload}
+           onSave={saveStory}
           onClose={close}
         />
       )}
