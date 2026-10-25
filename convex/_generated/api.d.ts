@@ -17,6 +17,7 @@ import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_manifest from "../lib/manifest.js";
+import type * as lib_retention from "../lib/retention.js";
 import type * as preferences from "../preferences.js";
 import type * as profiles from "../profiles.js";
 import type * as releases from "../releases.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/identity": typeof lib_identity;
   "lib/manifest": typeof lib_manifest;
+  "lib/retention": typeof lib_retention;
   preferences: typeof preferences;
   profiles: typeof profiles;
   releases: typeof releases;

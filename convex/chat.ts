@@ -3,6 +3,11 @@ import { components } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { requireUser, normalizeUsername } from "./lib/identity";
+import {
+  addMessageRef,
+  removeMessageRef,
+  shouldDeleteBlob,
+} from "./lib/retention";
 
 const messageArgs = {
   conversationId: v.string(),
@@ -416,6 +421,10 @@ export const sendAttachment = mutation({
         fallbackText: file.filename,
       },
     });
+    // The blob now belongs to this message; another send of the same upload
+    // adds its own id instead of replacing this one.
+    const refs = addMessageRef(file.messageRefs, message.id);
+    if (refs !== undefined) await ctx.db.patch(file._id, { messageRefs: refs });
     return await messageView(ctx, message, actor.subjectId);
   },
 });
@@ -491,6 +500,20 @@ export const forwardMessage = mutation({
           },
         },
       );
+      // The forwarded message points at the same blob. Record it before the
+      // original can be deleted for everyone, or the bytes would go early.
+      const shared = await ctx.db
+        .query("files")
+        .withIndex("by_storageId", (q) =>
+          q.eq("storageId", attachment.storageKey as Id<"_storage">),
+        )
+        .unique();
+      if (shared) {
+        const refs = addMessageRef(shared.messageRefs, forwarded.id);
+        if (refs !== undefined) {
+          await ctx.db.patch(shared._id, { messageRefs: refs });
+        }
+      }
       return await messageView(ctx, forwarded, actor.subjectId);
     }
     if (text?.type !== "text" || !text.text.trim()) {
@@ -554,6 +577,27 @@ export const deleteOwnMessage = mutation({
       messageId: args.messageId,
       expectedRevision: args.expectedRevision,
     });
+    // Delete-for-everyone is the only delete that may reclaim a blob. A blob can
+    // still be shared by a forward or a second send of the same upload, so drop
+    // this message id and keep the bytes while any reference remains.
+    for (const key of new Set(result.attachmentStorageKeys)) {
+      const row = await ctx.db
+        .query("files")
+        .withIndex("by_storageId", (q) =>
+          q.eq("storageId", key as Id<"_storage">),
+        )
+        .unique();
+      // A missing row, or a legacy row whose refs are unknown, is not proof the
+      // blob is unused.
+      if (!row || row.messageRefs === undefined) continue;
+      const next = removeMessageRef(row.messageRefs, result.message.id);
+      if (shouldDeleteBlob(next)) {
+        await ctx.db.delete(row._id);
+        await ctx.storage.delete(row.storageId);
+      } else {
+        await ctx.db.patch(row._id, { messageRefs: next });
+      }
+    }
     return await messageView(ctx, result.message, actor.subjectId);
   },
 });
@@ -561,6 +605,10 @@ export const deleteOwnMessage = mutation({
 export const deleteForMe = mutation({
   args: { conversationId: v.string(), messageId: v.string() },
   handler: async (ctx, args) => {
+    // This only hides one message for one user. "Clear chat" and "delete chat"
+    // work the same way, through `clearedThrough`/`hiddenAt` preferences, so
+    // none of them may delete a shared blob: the other members of the
+    // conversation still reference the same messages and would lose their media.
     const actor = await member(ctx, args.conversationId);
     const existing = await ctx.db
       .query("messageDeletes")

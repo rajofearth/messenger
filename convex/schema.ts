@@ -101,6 +101,11 @@ export default defineSchema({
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     durationMs: v.optional(v.number()),
+    /**
+     * Message ids that currently reference this blob. Undefined means a
+     * pre-migration row, so deletion leaves the blob alone.
+     */
+    messageRefs: v.optional(v.array(v.string())),
     createdAt: v.number(),
   })
     .index("by_storageId", ["storageId"])

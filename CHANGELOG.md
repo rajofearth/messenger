@@ -26,6 +26,10 @@ and this project adheres to
   development Convex deployment, and updates through its own feed. `npm run
   dev:ship` publishes a `dev-<versionCode>` GitHub prerelease and writes the
   manifest only to the development deployment.
+- Deleting a message for everyone now deletes its Convex storage object once no
+  live message references it. A daily orphan sweep removes uploads that never
+  became a message and blobs no row protects; rows created before reference
+  tracking are left alone.
 
 ### Changed
 
@@ -52,6 +56,12 @@ and this project adheres to
   bytes (12.55 MiB), 1,263,131 bytes below the previous development APK and
   3.45 MiB under the 16 MiB budget. The build keeps `mapping-<version>.txt` so
   an obfuscated stack trace can be read; see `docs/PERFORMANCE.md`.
+- The release APK now carries only the Ionicons glyphs the app uses and only
+  the xxxhdpi launcher and splash rasters. The font falls from 389,724 to
+  26,980 bytes raw (210,672 to 15,850 stored), the density prune removes 20
+  files, and the stacked build is 12,702,235 bytes (12.11 MiB), 458,828 bytes
+  below the R8 build and 3.89 MiB under the 16 MiB gate. `npm test` fails if a
+  new glyph name is not in the subset.
 
 ### Fixed
 
@@ -64,12 +74,16 @@ and this project adheres to
 - Profile photo uploads report the actual cause (size, format, session,
   username or connection) instead of a generic "Photo could not be saved".
   The local pick is still restored when the upload fails.
+- Signing out now deletes `messenger-media`, `message-media`, the avatar cache
+  and the cached update APK, so the next account on the same installation
+  cannot inherit the previous account's files.
 
-The local gate build is 14,384,754 bytes (13.72 MiB), 8,208 bytes (+0.06%)
-above the published v0.1.1 APK. The growth is the new JavaScript for upload
-progress, the story viewer audience sheet and the profile upload helpers; the
-native library set, resources and locales are unchanged. It remains 2.28 MiB
-below the 16 MiB gate. See `docs/PERFORMANCE.md`.
+The stacked A2/A3/C3 local gate build is 12,702,235 bytes (12.11 MiB),
+458,828 bytes (-3.5%) below the 13,161,063-byte R8 build and 3.89 MiB below
+the 16 MiB gate. The Ionicons subset accounts for 194,822 stored bytes; the
+density prune removes 20 launcher/splash files (274,709 bytes on disk).
+`npm run release:check` passed all 11 checks with no warnings. See
+`docs/PERFORMANCE.md`.
 
 ## [0.1.1] - 2026-10-22
 

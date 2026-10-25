@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { messengerRepository } from "../../data/messengerRepository";
+import { clearLocalAccountFiles } from "../../services/accountCleanup";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 
 type Dialog = "password" | "devices" | null;
@@ -127,6 +128,7 @@ export default function AccountSection({
                 );
               } finally {
                 await messengerRepository.clearAccountData().catch(() => {});
+                await clearLocalAccountFiles().catch(() => {});
               }
             })();
           },

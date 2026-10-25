@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { pruneExtraDensities } from "./prune-densities.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -266,6 +267,10 @@ if (action === "install") {
     path.join(android, "local.properties"),
     `sdk.dir=${sdk.replaceAll("\\", "/").replaceAll(":", "\\:")}\n`,
   );
+  // Runs on both paths: a fresh prebuild writes five densities, and a reused
+  // android/ tree is already pruned, so this is a no-op the second time.
+  const pruned = pruneExtraDensities(android);
+  console.log(`Pruned ${pruned.files} launcher/splash files (${pruned.bytes} B)`);
   run(
     "cmd.exe",
     [

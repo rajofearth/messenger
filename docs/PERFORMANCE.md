@@ -4,6 +4,12 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
+The current stacked build (A2 Ionicons subset, A3 density prune and C3
+deletion) is **12,702,235 bytes (12.11 MiB)**, 3.89 MiB below the 16 MiB gate
+and 2.89 MiB below the 15 MiB shipping line. `npm run release:check` passed all
+11 checks with no warnings. The per-change numbers are under "Measured APK
+size"; the historical narrative follows.
+
 Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,376,582 bytes
 (13.71 MiB) in v0.1.1** — 67.0% smaller, in nine measured stages. R8
 minification and resource shrinking took the APK to 35,628,346 bytes
@@ -55,10 +61,33 @@ Measured with real release APKs of this branch (arm64-v8a only, as the release w
 | Previous development APK `dev-1792832501` | 14,424,194 | 13.76 | - |
 | Same source, R8 optimiser off | 14,474,042 | 13.80 | +49,848 |
 | Same source, R8 optimiser on (shipping) | 13,161,063 | 12.55 | -1,312,979 |
+| A2/A3/C3 stacked build | 12,702,235 | 12.11 | -458,828 |
 
 The optimiser alone removes 1,312,979 bytes (9.07%) from the same JavaScript bundle and resources: the bundle is byte-identical in both APKs, and the difference is dex size (7.93 MiB in one dex versus 11.90 MiB in two). The integrated build is 1,263,131 bytes (8.76%) smaller than the previous development APK, 3.45 MiB under the 16 MiB budget and 2.45 MiB under the 15 MiB shipping line. `npm run release:check` passed all 11 checks with no warnings on the final APK. The release workflow now keeps `mapping-<version>.txt` beside the APK (release asset and workflow artifact), and the dev release script uploads it too, so an obfuscated stack trace can be read.
 
 The development build `dev-1792920281` was installed on the user's Android device and the user confirmed on 2026-10-25 that the app works: every screen, media path, auth flow, notification and the in-app updater behaved correctly. That is the device acceptance for the R8 build and the updater changes; the individual fault-injection cases in the PR checklist were not separately scripted.
+
+### A2/A3: Ionicons subset and density prune
+
+`scripts/subset-icon-font.mjs` rewrites the Ionicons font that `@expo/vector-icons`
+ships, keeping only the glyph names discovered in `App.tsx`, `src/` and `app/`.
+The scan is deliberately over-inclusive: every string literal that matches a
+name in the shipped glyph map is kept. `scripts/check-icon-glyphs.mjs` re-runs
+the same scan in `npm test` and fails if a new name is not in the subset, so a
+new icon cannot silently render as an empty square. The font falls from
+389,724 B to 26,980 B raw, and from 210,672 B to 15,850 B stored in the APK:
+**-194,822 bytes**. The current subset carries 96 glyphs.
+
+`scripts/prune-densities.mjs` runs from `scripts/android.mjs` before Gradle. It
+deletes only `ic_launcher`, `ic_launcher_round`, `ic_launcher_foreground`,
+`ic_launcher_monochrome` and `splashscreen_logo` rasters below `xxxhdpi`; it
+never touches `drawable-nodpi`, `mipmap-anydpi-v26` or
+`ic_launcher_background`. On the real generated resource tree it removed **20
+files and 274,709 B**. The stacked build is 12,702,235 bytes, **458,828 bytes
+(-3.5%)** below the 13,161,063-byte R8 build; the rest of the difference is
+C3's client code and normal ZIP metadata/alignment variation. The build still
+has 17 native libraries, one dex, a 2.06 MiB JavaScript bundle stored
+uncompressed and 26 resource configurations.
 
 ### The camera barcode scanner is not bundled
 
@@ -176,6 +205,7 @@ Each figure is the same working tree, the same Expo config and the same
 | First Convex build (accounts, chat, stories, media cache and review fixes; versionCode 6) | 15,516,415 bytes (14.80 MiB) | **+549,280 bytes, +3.7%** against published v0.0.6, -64.4% overall |
 | v0.1.0 release (send/retry UX, dates and accessibility, `expo-image`, Fresco decoder trim, LogBox excluded; versionCode 7) | 14,375,470 bytes (13.71 MiB) | **-1,140,945 bytes, -7.4%** against the first Convex build, -4.0% against v0.0.6, -67.0% overall |
 | v0.1.1 release (missing-account sign-in copy and create-account shortcut; versionCode 8) | 14,376,582 bytes (13.71 MiB) local; 14,376,546 bytes published | **+1,112 bytes, +0.01%** against v0.1.0, -67.0% overall |
+| A2/A3/C3 stacked build (Ionicons subset, density prune, real deletion) | 12,702,235 bytes (12.11 MiB) | **-458,828 bytes, -3.5%** against the 13,161,063-byte R8 build, -70.8% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -233,6 +263,16 @@ native libraries, 2 dex files (11.90 MiB unpacked), a 1.96 MiB JavaScript
 bundle stored uncompressed, a 0.16 MiB `resources.arsc`, English-only
 resources, and 11 passing checks with one size warning for the increase over
 published v0.1.0.
+
+The A2/A3/C3 stacked build is 12,702,235 bytes. The font is the single
+measurable entry: 389,724 to 26,980 bytes raw, 210,672 to 15,850 bytes stored,
+so 194,822 bytes leave the APK. The density prune removes 20 files and
+274,709 bytes from the generated resource tree before packaging. C3 adds a
+small amount of client code for sign-out cleanup; the remaining few kilobytes
+are ZIP metadata and alignment differences. `npm run release:check` reports
+17 native libraries, one dex (7.93 MiB unpacked), a 2.06 MiB JavaScript bundle
+stored uncompressed, a 0.16 MiB `resources.arsc`, English-only resources, and
+11 passing checks with no warnings.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging

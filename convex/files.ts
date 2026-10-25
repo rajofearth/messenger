@@ -1,5 +1,5 @@
 import { ConvexError, v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { internalMutation, mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireUser } from "./lib/identity";
 
@@ -102,9 +102,74 @@ export const finalizeUpload = mutation({
       width: args.width,
       height: args.height,
       durationMs: args.durationMs,
+      messageRefs: [],
       createdAt: Date.now(),
     });
     return args.storageId;
+  },
+});
+
+/** Uploads that never became a message are swept once they are this old. */
+const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Reclaims storage the chat model cannot reclaim on its own: files rows whose
+ * blob is gone, message uploads that never finalised, and `_storage` objects no
+ * row protects. The grace period keeps an upload that is still in flight safe;
+ * the cron repeats, so a bounded page of objects per run is enough.
+ */
+export const sweepOrphans = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let rows = 0;
+    let blobs = 0;
+    const kept: Array<{ storageId: Id<"_storage"> }> = [];
+
+    for (const row of await ctx.db.query("files").collect()) {
+      const metadata = await ctx.db.system.get("_storage", row.storageId);
+      if (!metadata) {
+        await ctx.db.delete(row._id);
+        rows += 1;
+        continue;
+      }
+      // Avatars and stories have no message refs by design, so the unused
+      // check below must never expire them; their own flows own those blobs.
+      const isMessageUpload =
+        row.kind === "image" ||
+        row.kind === "video" ||
+        row.kind === "audio" ||
+        row.kind === "file";
+      const unused =
+        row.messageRefs !== undefined &&
+        row.messageRefs.length === 0 &&
+        now - row.createdAt > ORPHAN_GRACE_MS;
+      if (isMessageUpload && unused) {
+        await ctx.db.delete(row._id);
+        await ctx.storage.delete(row.storageId);
+        rows += 1;
+        continue;
+      }
+      kept.push(row);
+    }
+
+    const protectedIds = new Set<string>(kept.map((row) => row.storageId));
+    for (const profile of await ctx.db.query("profiles").collect()) {
+      if (profile.avatarStorageId) protectedIds.add(profile.avatarStorageId);
+    }
+    for (const story of await ctx.db.query("stories").collect()) {
+      protectedIds.add(story.storageId);
+    }
+
+    const objects = await ctx.db.system.query("_storage").take(500);
+    for (const object of objects) {
+      if (now - object._creationTime < ORPHAN_GRACE_MS) continue;
+      if (protectedIds.has(object._id)) continue;
+      await ctx.storage.delete(object._id);
+      blobs += 1;
+    }
+
+    return { rows, blobs };
   },
 });
 
