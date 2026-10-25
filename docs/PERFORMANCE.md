@@ -58,6 +58,8 @@ Measured with real release APKs of this branch (arm64-v8a only, as the release w
 
 The optimiser alone removes 1,312,979 bytes (9.07%) from the same JavaScript bundle and resources: the bundle is byte-identical in both APKs, and the difference is dex size (7.93 MiB in one dex versus 11.90 MiB in two). The integrated build is 1,263,131 bytes (8.76%) smaller than the previous development APK, 3.45 MiB under the 16 MiB budget and 2.45 MiB under the 15 MiB shipping line. `npm run release:check` passed all 11 checks with no warnings on the final APK. The release workflow now keeps `mapping-<version>.txt` beside the APK (release asset and workflow artifact), and the dev release script uploads it too, so an obfuscated stack trace can be read.
 
+The development build `dev-1792920281` was installed on the user's Android device and the user confirmed on 2026-10-25 that the app works: every screen, media path, auth flow, notification and the in-app updater behaved correctly. That is the device acceptance for the R8 build and the updater changes; the individual fault-injection cases in the PR checklist were not separately scripted.
+
 ### The camera barcode scanner is not bundled
 
 `expo-camera` links MLKit's barcode scanner by default: `libbarhopper_v3.so`
