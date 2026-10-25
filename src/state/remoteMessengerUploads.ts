@@ -3,6 +3,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Message, Story } from "../domain/data";
 import { convexClient } from "../services/convexClient";
 import { uploadLocalFile } from "../services/remoteFiles";
+import type { RemoteMessage } from "./remoteMessengerTypes";
 
 export type SendAttachment = (args: {
   conversationId: string;
@@ -10,7 +11,7 @@ export type SendAttachment = (args: {
   storageId: Id<"_storage">;
   caption?: string;
   replyToMessageId?: string;
-}) => Promise<unknown>;
+}) => Promise<RemoteMessage>;
 type CreateStory = (args: {
   storageId: Id<"_storage">;
   caption: string;
@@ -26,43 +27,74 @@ export function attachmentErrorMessage(error: unknown) {
 
 /**
  * Uploads an attachment and asks the server to send it under the same client
- * message id. Throws on failure so the caller can mark the bubble failed and
- * keep it available for a retry.
+ * message id. A message that already holds a finalized storage id skips the
+ * upload: retrying with the same id and parts is idempotent, while a second
+ * upload would change the parts and be rejected with IDEMPOTENCY_CONFLICT.
+ * Throws on failure so the caller can mark the bubble failed and keep it for a
+ * retry. Returns the server's confirmed view of the message.
  */
 export async function sendAttachmentMessage({
   chatId,
   message,
   sendAttachment,
   onProgress,
+  onUploaded,
 }: {
   chatId: string;
   message: Message;
   sendAttachment: SendAttachment;
   onProgress?: (progress: number) => void;
+  /** Called after finalize, before the send mutation, so the id can persist. */
+  onUploaded?: (storageId: string) => void | Promise<void>;
 }) {
-  if (!message.uri || !message.kind) throw new Error("MISSING_ATTACHMENT");
-  const storageId = await uploadLocalFile(
-    convexClient,
-    api.files.generateUploadUrl,
-    api.files.finalizeUpload,
-    {
-      uri: message.uri,
-      kind: message.kind,
-      mimeType: message.mimeType,
-      filename: message.filename,
-      width: message.width,
-      height: message.height,
-      durationMs: message.duration ? message.duration * 1000 : undefined,
-      onProgress,
-    },
-  );
-  await sendAttachment({
-    conversationId: chatId,
-    clientMessageId: message.id,
-    storageId,
-    caption: message.text,
-    replyToMessageId: message.replyTo?.id,
-  });
+  const { uri, kind } = message;
+  if (!uri || !kind) throw new Error("MISSING_ATTACHMENT");
+  const upload = async () => {
+    const uploaded = await uploadLocalFile(
+      convexClient,
+      api.files.generateUploadUrl,
+      api.files.finalizeUpload,
+      {
+        uri,
+        kind,
+        mimeType: message.mimeType,
+        filename: message.filename,
+        width: message.width,
+        height: message.height,
+        durationMs: message.duration ? message.duration * 1000 : undefined,
+        onProgress,
+      },
+    );
+    await onUploaded?.(uploaded);
+    return uploaded;
+  };
+  const send = (storageId: Id<"_storage">) =>
+    sendAttachment({
+      conversationId: chatId,
+      clientMessageId: message.id,
+      storageId,
+      caption: message.text,
+      replyToMessageId: message.replyTo?.id,
+    });
+
+  let storageId = message.storageId as Id<"_storage"> | undefined;
+  if (storageId) {
+    // The bytes are already finalized; only the send mutation remains.
+    onProgress?.(1);
+  } else {
+    storageId = await upload();
+  }
+  try {
+    return await send(storageId);
+  } catch (error) {
+    // A finalized blob can disappear server-side; the stored id is then
+    // rejected forever. Upload the durable copy again and retry once. Any
+    // other failure (idempotency conflict, network) must keep its error.
+    if (!message.storageId || !String(error).includes("FILE_FORBIDDEN")) {
+      throw error;
+    }
+    return await send(await upload());
+  }
 }
 
 /**

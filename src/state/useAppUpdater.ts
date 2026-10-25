@@ -81,6 +81,13 @@ export function useAppUpdater() {
   latest.current = { decision, download };
   const installedRef = useRef<AppUpdateStatus | null>(null);
   const checkingRef = useRef(false);
+  // A second tap must not hit the native single-flight guard: that path rejects
+  // with "busy" and would replace the live progress with a failure message
+  // while the first download keeps running.
+  const startingRef = useRef(false);
+  // Same guard for install: two taps in one batch would otherwise start two
+  // installer activities before the "installing" stage renders.
+  const installingRef = useRef(false);
 
   const applyStatus = useCallback((status: AppUpdateStatus) => {
     installedRef.current = status;
@@ -91,7 +98,14 @@ export function useAppUpdater() {
   const refreshInstalled = useCallback(async () => {
     if (!supported) return;
     const status = await getStatus().catch(() => null);
-    if (!status) return;
+    if (!status) {
+      // A failed status read must not leave the prompt spinning in
+      // "installing" forever; the cached package is still there to retry.
+      setDownload((current) =>
+        current.stage === "installing" ? { ...current, stage: "ready" } : current,
+      );
+      return;
+    }
     applyStatus(status);
     const pending = latest.current.decision;
     if (pending.status === "available" && status.versionCode >= pending.manifest.versionCode) {
@@ -180,7 +194,8 @@ export function useAppUpdater() {
 
   const startDownload = useCallback(async () => {
     const current = latest.current.decision;
-    if (!supported || current.status !== "available") return;
+    if (!supported || current.status !== "available" || startingRef.current) return;
+    startingRef.current = true;
     setHiddenNow(false);
     setProgress(null);
     setDownload({ ...IDLE_DOWNLOAD, stage: "downloading" });
@@ -205,6 +220,7 @@ export function useAppUpdater() {
             },
       );
     } finally {
+      startingRef.current = false;
       setProgress(null);
     }
   }, [supported]);
@@ -215,7 +231,14 @@ export function useAppUpdater() {
 
   const install = useCallback(async () => {
     const current = latest.current.download;
-    if (!supported || current.stage !== "ready" || !current.path) return;
+    if (
+      !supported ||
+      current.stage !== "ready" ||
+      !current.path ||
+      installingRef.current
+    )
+      return;
+    installingRef.current = true;
     setDownload({ ...current, stage: "installing", message: null });
     try {
       await installApk(current.path);
@@ -226,6 +249,8 @@ export function useAppUpdater() {
         message: updateErrorMessage(error),
         reused: current.reused,
       });
+    } finally {
+      installingRef.current = false;
     }
   }, [supported]);
 

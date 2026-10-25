@@ -20,6 +20,7 @@ import { useRemotePresence } from "./useRemotePresence";
 import { useRemoteServerSync } from "./useRemoteServerSync";
 import { useRemoteStories } from "./useRemoteStories";
 import { useRemoteThreadMedia } from "./useRemoteThreadMedia";
+import { useOutboxResume } from "./useOutboxResume";
 import { createRemoteContact } from "./remoteMessengerContacts";
 import { saveTrackedMedia } from "./remoteMessengerMedia";
 import { createChatPreferences } from "./remoteMessengerPreferences";
@@ -227,6 +228,8 @@ export function useRemoteMessenger() {
     updateMessages,
     updateChats,
     appendLocal,
+    updateLocalMessage,
+    confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
   } = createRemoteWriters({
@@ -239,6 +242,7 @@ export function useRemoteMessenger() {
     chatsRef,
     messagesRef,
     appendLocal,
+    confirmLocalMessage,
     markLocalMessageStatus,
     sendText: sendTextMutation,
   });
@@ -331,11 +335,14 @@ export function useRemoteMessenger() {
     chatsRef,
     messagesRef,
     appendLocal,
+    updateLocalMessage,
+    confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
     sendText: sendTextMutation,
     sendAttachment: sendAttachmentMutation,
   });
+  useOutboxResume(localReady, retryMessage);
 
   function react(messageId: string, emoji: string) {
     const chatId = selectedRef.current;

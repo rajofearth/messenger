@@ -30,6 +30,12 @@ export type Message = {
   status?: MessageStatus;
   /** Local-only upload fraction (0..1) while an attachment is on its way. */
   uploadProgress?: number;
+  /**
+   * Local-only Convex `_storage` id of a finalized upload, kept so a retry
+   * reuses the same blob instead of uploading again. The server rejects a
+   * reused client message id whose parts changed, so this must survive too.
+   */
+  storageId?: string;
 };
 
 export type Chat = {

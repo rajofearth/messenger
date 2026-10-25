@@ -10,6 +10,12 @@ and this project adheres to
 
 ### Added
 
+- Unsent text and attachments now survive a process kill. Every send is
+  recorded in a durable outbox first, an attachment is copied into app
+  documents before upload, and a finalized upload id is reused on retry so the
+  server's idempotency check still passes. Pending rows return as failed
+  bubbles on launch and retry automatically, up to three times per session;
+  tapping the bubble still retries without a limit.
 - Message attachments and stories show real upload progress. A story that is
   still uploading keeps its own segment in the viewer, plays the local copy,
   shows the percentage, and offers a retry if it fails.
@@ -39,9 +45,22 @@ and this project adheres to
 - `npm run android:build` now regenerates the generated Android project when
   the package, version or variant changes, and preserves the debug signing key
   across that regeneration.
+- Release builds now use R8's optimiser
+  (`proguard-android-optimize.txt`) instead of the template's non-optimizing
+  file, and the stale Reanimated keep rule is gone. Against the same source the
+  optimiser removes 1,312,979 bytes (9.07%); the release APK is 13,161,063
+  bytes (12.55 MiB), 1,263,131 bytes below the previous development APK and
+  3.45 MiB under the 16 MiB budget. The build keeps `mapping-<version>.txt` so
+  an obfuscated stack trace can be read; see `docs/PERFORMANCE.md`.
 
 ### Fixed
 
+- The updater now sweeps leftover `.part` fragments, deletes a corrupt cached
+  APK before reusing its name, clears the update cache after an install even
+  when the app starts offline, closes the socket when a download connection
+  fails, reports a real installer error instead of a generic one, recovers
+  from a stuck `installing` state, and ignores a second tap that would start
+  a duplicate download or installer.
 - Profile photo uploads report the actual cause (size, format, session,
   username or connection) instead of a generic "Photo could not be saved".
   The local pick is still restored when the upload fails.

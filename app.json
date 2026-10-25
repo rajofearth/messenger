@@ -61,6 +61,7 @@
       "./plugins/withEnglishOnlyResources",
       "./plugins/withGradlePerformance",
       "./plugins/withSizeTunables",
+      "./plugins/withOptimizingR8",
       "./plugins/withUpdateInstaller",
       [
         "expo-build-properties",

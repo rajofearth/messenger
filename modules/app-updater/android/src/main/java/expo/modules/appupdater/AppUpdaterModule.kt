@@ -37,6 +37,7 @@ class AppUpdaterModule : Module() {
     Events("onDownloadProgress")
 
     AsyncFunction("getStatus") {
+      sweepCache()
       val info = packageInfo(context)
       mapOf(
         "versionName" to (info.versionName ?: ""),
@@ -50,7 +51,11 @@ class AppUpdaterModule : Module() {
       try {
         requireDownloadable(url)
         requireDigest(sha256)
-        val downloader = ApkDownloader(updateDirectory(context), sha256.lowercase()) { downloaded, total ->
+        val downloader = ApkDownloader(
+          updateDirectory(context),
+          sha256.lowercase(),
+          (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0,
+        ) { downloaded, total ->
           sendEvent(
             "onDownloadProgress",
             mapOf("downloadedBytes" to downloaded, "totalBytes" to total)
@@ -89,6 +94,7 @@ class AppUpdaterModule : Module() {
         throw UpdateException(UpdateException.BUSY, "An update download is running")
       }
       val cleared = updateDirectory(context).listFiles()?.count { it.delete() } ?: 0
+      prefs(context).edit().remove(KEY_INSTALL_ATTEMPT).apply()
       mapOf("deleted" to cleared)
     }
 
@@ -103,11 +109,21 @@ class AppUpdaterModule : Module() {
         }
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, file)
-        context.startActivity(
-          Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, "application/vnd.android.package-archive")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        // Remember which build started the install. On the next launch the
+        // installed version code decides whether it succeeded, so the cached
+        // package is cleared even when that launch has no network.
+        prefs(context).edit().putLong(KEY_INSTALL_ATTEMPT, installedVersionCode(context)).apply()
+        val intent = Intent(Intent.ACTION_VIEW)
+          .setDataAndType(uri, "application/vnd.android.package-archive")
+          .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+          context.startActivity(intent)
+        } catch (error: Exception) {
+          throw UpdateException(
+            UpdateException.INSTALLER,
+            "No package installer could open the update",
+          )
+        }
         promise.resolve(mapOf("started" to true))
       } catch (error: Throwable) {
         promise.failWith(error)
@@ -135,6 +151,35 @@ class AppUpdaterModule : Module() {
       worker.shutdown()
     }
   }
+
+  /**
+   * Clears what failed downloads and a finished install leave behind.
+   *
+   * A `.part` file only exists while a download is streaming, so anything left
+   * at startup came from a process that was killed. A verified APK is kept on
+   * purpose for a retry, and is deleted once the running version code is newer
+   * than the build that started the install -- a local comparison, so it works
+   * with no network and no feed.
+   */
+  private fun sweepCache() {
+    val directory = updateDirectory(context)
+    if (!directory.isDirectory) return
+    // A live download owns everything in this directory. Touching it here
+    // would delete the streaming .part or the verified target mid-download.
+    if (activeDownload.get() != null) return
+    directory.listFiles()?.forEach { if (it.name.endsWith(PART_SUFFIX)) it.delete() }
+    val attempted = prefs(context).getLong(KEY_INSTALL_ATTEMPT, 0L)
+    if (attempted in 1L until installedVersionCode(context)) {
+      directory.listFiles()?.forEach { it.delete() }
+      prefs(context).edit().remove(KEY_INSTALL_ATTEMPT).apply()
+    }
+  }
+
+  private fun prefs(context: Context) =
+    context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+
+  private fun installedVersionCode(context: Context): Long =
+    PackageInfoCompat.getLongVersionCode(packageInfo(context))
 
   private fun Promise.failWith(error: Throwable) {
     val code = if (error is UpdateException) error.code else "ERR_APP_UPDATER"
@@ -202,5 +247,8 @@ class AppUpdaterModule : Module() {
 
   companion object {
     private val DIGEST = Regex("^[0-9a-fA-F]{64}$")
+    private const val PREFERENCES = "app-updater"
+    private const val KEY_INSTALL_ATTEMPT = "installAttemptVersionCode"
+    private const val PART_SUFFIX = ".part"
   }
 }

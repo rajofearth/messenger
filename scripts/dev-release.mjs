@@ -221,6 +221,24 @@ if (existing.status === 0) {
 const uploadPath = path.join(path.dirname(apkPath), assetName);
 copyFileSync(apkPath, uploadPath);
 run("gh", ["release", "upload", tag, uploadPath, "--clobber"]);
+// R8 rewrites the release bytecode, so an obfuscated crash report can only be
+// read with the matching mapping file. Keep it beside the bytes it describes.
+const mappingPath = path.join(
+  root,
+  "android",
+  "app",
+  "build",
+  "outputs",
+  "mapping",
+  "release",
+  "mapping.txt",
+);
+if (existsSync(mappingPath)) {
+  const mappingName = `mapping-${metadata.versionName}.txt`;
+  const mappingUpload = path.join(path.dirname(apkPath), mappingName);
+  copyFileSync(mappingPath, mappingUpload);
+  run("gh", ["release", "upload", tag, mappingUpload, "--clobber"]);
+}
 const assetNameOnRelease = assetName;
 const uploaded = run(
   "gh",

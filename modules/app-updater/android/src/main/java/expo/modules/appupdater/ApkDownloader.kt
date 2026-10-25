@@ -38,6 +38,8 @@ internal class UpdateException(val code: String, message: String) : Exception(me
 internal class ApkDownloader(
   private val directory: File,
   private val expectedSha256: String,
+  /** Development builds may use a plain-http feed; release builds may not. */
+  private val allowHttp: Boolean,
   private val onProgress: (downloaded: Long, total: Long) -> Unit,
 ) {
   private val target = File(directory, "update-${expectedSha256.take(12)}.apk")
@@ -62,12 +64,17 @@ internal class ApkDownloader(
       onProgress(target.length(), target.length())
       return target to true
     }
-    // A partial file or an older release can never be installed, and keeping
-    // them would double the cache used by the next download.
-    partial.delete()
-    directory.listFiles()?.forEach { if (it != target) it.delete() }
+    // Nothing here can be installed: a partial file, an older release, or a
+    // file whose digest no longer matches its name. Clearing the directory also
+    // removes whatever a killed process left behind before this attempt.
+    directory.listFiles()?.forEach { it.delete() }
 
-    val response = open(url)
+    val response = try {
+      open(url)
+    } catch (error: Exception) {
+      if (cancelRequested.get()) throw cancelled()
+      throw error
+    }
     val digest = MessageDigest.getInstance("SHA-256")
     var downloaded = 0L
     try {
@@ -92,8 +99,12 @@ internal class ApkDownloader(
           }
         }
       }
-    } catch (error: Exception) {
+    } catch (error: Throwable) {
+      // Catch Throwable, not Exception: a killed worker or an Error must not
+      // leave a partial file for the next launch to wonder about.
       partial.delete()
+      // A real protocol/checksum failure must keep its code even when a cancel
+      // arrives at the same moment; only an interrupted read is a cancel.
       if (cancelRequested.get() && error !is UpdateException) throw cancelled()
       throw error
     } finally {
@@ -139,7 +150,14 @@ internal class ApkDownloader(
         open.disconnect()
         throw cancelled()
       }
-      val status = open.responseCode
+      val status = try {
+        open.responseCode
+      } catch (error: Exception) {
+        // The socket exists even when the connect or the status line fails, so
+        // close it here instead of leaking it.
+        open.disconnect()
+        throw error
+      }
       if (status !in 300..399) return open
       val location = open.getHeaderField("Location")
       open.disconnect()
@@ -147,7 +165,7 @@ internal class ApkDownloader(
         throw UpdateException(UpdateException.HTTP, "The update server redirected too many times")
       }
       address = URL(address, location)
-      if (address.protocol != "https" && address.protocol != "http") {
+      if (address.protocol != "https" && !(allowHttp && address.protocol == "http")) {
         throw UpdateException(UpdateException.HTTP, "The update server redirected to ${address.protocol}://")
       }
     }

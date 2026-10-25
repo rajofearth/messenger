@@ -3,6 +3,7 @@ import type { Chat, Message, MessageStatus } from "../domain/data";
 import { messagePreview } from "../domain/messageActions";
 import { isConfirmed } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
+import { forgetOutgoing } from "../services/outbox";
 
 export type AppendLocal = (
   chat: Chat,
@@ -20,6 +21,18 @@ export type MarkLocalMessageProgress = (args: {
   chatId: string;
   messageId: string;
   progress: number;
+}) => void;
+
+export type UpdateLocalMessage = (args: {
+  chatId: string;
+  messageId: string;
+  patch: Partial<Message>;
+}) => Message | undefined;
+
+export type ConfirmLocalMessage = (args: {
+  chatId: string;
+  messageId: string;
+  confirmed: Message;
 }) => void;
 
 type Args = {
@@ -142,6 +155,86 @@ export function createRemoteWriters({
   }
 
   /**
+   * Replaces fields on an in-memory bubble without touching the confirmed
+   * cache. Used to point an attachment at its durable copy and to remember a
+   * finalized upload so a retry can reuse the same storage object.
+   */
+  function updateLocalMessage({
+    chatId,
+    messageId,
+    patch,
+  }: {
+    chatId: string;
+    messageId: string;
+    patch: Partial<Message>;
+  }) {
+    const thread = messagesRef.current[chatId] || [];
+    const message = thread.find((item) => item.id === messageId);
+    if (!message) return undefined;
+    const next = { ...message, ...patch };
+    const value = {
+      ...messagesRef.current,
+      [chatId]: thread.map((item) => (item.id === messageId ? next : item)),
+    };
+    messagesRef.current = value;
+    updateMessages(() => value);
+    return next;
+  }
+
+  /**
+   * Swaps an optimistic bubble for the server's confirmed view. The mutation
+   * result is the first point where the message has a sequence, so this is the
+   * only place a send becomes `sent`. The confirmed row is written to the
+   * thread cache; the pending bubble never was, so a kill between the two
+   * leaves the outbox row in charge of the retry.
+   */
+  function confirmLocalMessage({
+    chatId,
+    messageId,
+    confirmed,
+  }: {
+    chatId: string;
+    messageId: string;
+    confirmed: Message;
+  }) {
+    const thread = messagesRef.current[chatId] || [];
+    const index = thread.findIndex((item) => item.id === messageId);
+    if (index === -1) return;
+    const next = thread.slice();
+    next[index] = { ...confirmed, uri: confirmed.uri ?? thread[index].uri };
+    const value = { ...messagesRef.current, [chatId]: next };
+    messagesRef.current = value;
+    updateMessages(() => value);
+    void messengerRepository
+      .saveMessages(
+        chatId,
+        next.filter((item) => isConfirmed(item)),
+      )
+      .catch(() => {});
+    if (index !== thread.length - 1) return;
+    const createdAt = confirmed.createdAt
+      ? Date.parse(confirmed.createdAt)
+      : NaN;
+    updateChats((current) =>
+      current.map((item) =>
+        item.id === chatId
+          ? {
+              ...item,
+              preview: messagePreview(confirmed),
+              time: confirmed.time,
+              lastMessageAt: Number.isFinite(createdAt)
+                ? createdAt
+                : item.lastMessageAt,
+              // The server row is now the newest message, so the inbox stops
+              // showing a pending send.
+              lastMessageStatus: undefined,
+            }
+          : item,
+      ),
+    );
+  }
+
+  /**
    * Updates only the upload fraction of a local attachment bubble. The inbox
    * preview and the read marker are unaffected until the send is confirmed.
    */
@@ -166,6 +259,8 @@ export function createRemoteWriters({
     updateMessages,
     updateChats,
     appendLocal,
+    updateLocalMessage,
+    confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
   };
@@ -179,12 +274,14 @@ export function deleteLocalMessage(args: {
     next: (current: Record<string, Message[]>) => Record<string, Message[]>,
   ) => void;
 }) {
+  // A deleted bubble must not be revived by the outbox on the next launch.
+  void forgetOutgoing(args.messageId);
   args.updateMessages((current) => {
     const next = (current[args.chatId] || []).filter(
       (item) => item.id !== args.messageId,
     );
-    // Unconfirmed sends stay in memory only; a restart cannot revive a bubble
-    // whose mutation never completed.
+    // The thread cache keeps confirmed rows only; unconfirmed sends live in
+    // the outbox, and the row above stops this one from being revived.
     void messengerRepository
       .saveMessages(
         args.chatId,

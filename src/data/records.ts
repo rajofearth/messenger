@@ -20,6 +20,16 @@ export type ChatRecord = Chat;
 export type MessageRecord = Message;
 export type StoryRecord = Story;
 
+/**
+ * One outgoing message that has not been confirmed by the server yet. Kept
+ * apart from the confirmed thread cache so a kill before the echo cannot lose
+ * the bubble or its durable attachment copy.
+ */
+export type OutboxRecord = {
+  chatId: string;
+  message: MessageRecord;
+};
+
 export type CallHistoryRecord = {
   id: string;
   /** Contact snapshot taken when the call happened. */

@@ -1,10 +1,17 @@
 import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
 import { messagePreview } from "../domain/messageActions";
+import { isSendConfirmed } from "../domain/outbox";
 import { newestReadSequence } from "../domain/threadMerge";
-import { remoteUid, timeLabel } from "./remoteMessengerTypes";
+import {
+  mapMessage,
+  remoteUid,
+  timeLabel,
+  type RemoteMessage,
+} from "./remoteMessengerTypes";
 import type {
   AppendLocal,
+  ConfirmLocalMessage,
   MarkLocalMessageStatus,
 } from "./remoteMessengerWriters";
 
@@ -12,7 +19,7 @@ type SendText = (args: {
   conversationId: string;
   clientMessageId: string;
   text: string;
-}) => Promise<unknown>;
+}) => Promise<RemoteMessage>;
 
 type MarkReadThrough = (args: {
   conversationId: string;
@@ -31,12 +38,14 @@ export function createRemoteReplySender({
   chatsRef,
   messagesRef,
   appendLocal,
+  confirmLocalMessage,
   markLocalMessageStatus,
   sendText,
 }: {
   chatsRef: MutableRefObject<Chat[]>;
   messagesRef: MutableRefObject<Record<string, Message[]>>;
   appendLocal: AppendLocal;
+  confirmLocalMessage: ConfirmLocalMessage;
   markLocalMessageStatus: MarkLocalMessageStatus;
   sendText: SendText;
 }) {
@@ -71,15 +80,18 @@ export function createRemoteReplySender({
       status: "sending",
     });
     try {
-      await sendText({
+      const view = await sendText({
         conversationId: chatId,
         clientMessageId,
         text: body,
       });
-      markLocalMessageStatus({
+      // The reply is acknowledged only once the server returns a sequence; the
+      // action queue keeps retrying otherwise.
+      if (!isSendConfirmed(view)) throw new Error("SEND_UNCONFIRMED");
+      confirmLocalMessage({
         chatId,
         messageId: clientMessageId,
-        status: "sent",
+        confirmed: mapMessage(view),
       });
     } catch (error) {
       markLocalMessageStatus({

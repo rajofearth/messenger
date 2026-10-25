@@ -1,6 +1,7 @@
 import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
 import { messengerRepository } from "../data/messengerRepository";
+import { forgetChat } from "../services/outbox";
 
 type UpdateChats = (next: (current: Chat[]) => Chat[]) => void;
 type UpdateMessages = (
@@ -80,6 +81,8 @@ export function createChatPreferences({
 
   function clearChat(id: string) {
     updateMessages((current) => ({ ...current, [id]: [] }));
+    // Clearing history also drops any send the outbox would otherwise resume.
+    void forgetChat(id);
     updateChats((current) =>
       current.map((item) =>
         item.id === id
