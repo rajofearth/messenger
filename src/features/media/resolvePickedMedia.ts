@@ -1,6 +1,7 @@
 import { Asset, MediaType } from "expo-media-library";
 import type { PickedMedia } from "./mediaPickerModel";
 import { mediaMimeType } from "./mediaMimeType";
+import { cachePickedMedia } from "../../services/mediaCache";
 
 export async function resolvePickedMedia(ids: readonly string[]): Promise<PickedMedia[]> {
   const resolved = await Promise.all(
@@ -16,7 +17,7 @@ export async function resolvePickedMedia(ids: readonly string[]): Promise<Picked
           height: info.height,
           duration: info.duration ? info.duration / 1000 : undefined,
         };
-        return item;
+        return cachePickedMedia(item, `picked-${id}`);
       } catch {
         return null;
       }

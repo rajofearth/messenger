@@ -41,7 +41,8 @@ are not a physical-device acceptance run.
    thumbnail strip; the captured item must not replace the library selection.
 2. Swipe the main preview and tap thumbnails to switch media. Video review must
    autoplay with the same native duration/scrub controls as picker preview, and
-   switching pages must not flash a blank frame. Long-press and drag thumbnails
+   switching pages must not flash a blank frame; selected media should continue
+   rendering if the original gallery permission/session changes. Long-press and drag thumbnails
    to reorder them: the lifted thumbnail follows the finger, the source slot
    fades, the destination shows a dashed Drop cue, and a light haptic marks each
    new position. TalkBack's Move earlier/later actions are the accessible

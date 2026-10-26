@@ -46,6 +46,7 @@ import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
 import { resolvePickedMedia } from "./resolvePickedMedia";
 import { useMediaPickerBack } from "./useMediaPickerBack";
 import { trackDevEvent } from "../../services/devTelemetry";
+import { prepareCameraCapture } from "./prepareCameraCapture";
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
 const GRANULAR_PERMISSIONS: GranularPermission[] = ["photo", "video"];
@@ -473,23 +474,17 @@ export function MediaPicker(props: Props) {
             photosOnly={photosOnly}
             onClose={() => setCameraOpen(false)}
             onCaptured={(media) => {
-              if (!props.appendCameraCapture) {
-                setCameraOpen(false);
-                props.onPicked([media]);
-                return;
-              }
-              if (selection.length >= limit) {
-                Alert.alert(
-                  "Story is full",
-                  `You can add up to ${limit} items. Remove one before capturing another.`,
-                );
-                setCameraOpen(false);
-                return;
-              }
-              void resolvePickedMedia(selection).then((selected) => {
+              void prepareCameraCapture(media, selection, !!props.appendCameraCapture, limit).then((result) => {
                 if (!alive.current) return;
                 setCameraOpen(false);
-                props.onPicked([...selected, media]);
+                if (result.full) {
+                  Alert.alert(
+                    "Story is full",
+                    `You can add up to ${limit} items. Remove one before capturing another.`,
+                  );
+                  return;
+                }
+                props.onPicked(result.media ?? []);
               });
             }}
           />

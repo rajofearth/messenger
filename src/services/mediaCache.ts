@@ -58,6 +58,38 @@ export async function cacheRemoteMedia(input: {
   }
 }
 
+/** Copies user-selected content/file URIs into Messenger storage before review. */
+export async function cacheLocalMedia(input: {
+  id: string;
+  uri: string;
+  filename?: string;
+  mimeType?: string;
+}) {
+  if (!input.uri || /^https?:\/\//i.test(input.uri)) return input.uri;
+  const directory = mediaDirectory();
+  if (input.uri.startsWith(directory.uri)) return input.uri;
+  const extension = extensionFor(input.filename, input.mimeType);
+  const file = new File(directory, `${safeName(input.id)}.${extension}`);
+  if (file.exists && file.size > 0) return file.uri;
+  try {
+    const source = new File(input.uri);
+    if (!source.exists || source.size <= 0) return input.uri;
+    await source.copy(file, { overwrite: true });
+    return file.exists && file.size > 0 ? file.uri : input.uri;
+  } catch {
+    if (file.exists) file.delete();
+    return input.uri;
+  }
+}
+
+export async function cachePickedMedia<T extends { uri: string; filename?: string; mimeType?: string }>(
+  media: T,
+  id: string,
+) {
+  const uri = await cacheLocalMedia({ ...media, id });
+  return uri === media.uri ? media : { ...media, uri };
+}
+
 /** Downloads the visible stories, newest first, and points them at local files. */
 export async function prefetchStories(stories: Story[], limit = 8) {
   const now = Date.now();

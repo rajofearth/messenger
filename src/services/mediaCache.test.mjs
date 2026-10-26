@@ -5,10 +5,12 @@ import ts from "typescript";
 
 const sourceUri = "file:///private/documents/story.jpg";
 const publicUri = "file:///storage/emulated/0/Pictures/Messenger/story.jpg";
+const pickedUri = "content://media/external/video/media/7";
 
 function harness(options = {}) {
   const events = [];
   const calls = [];
+  const copied = new Set();
   const album = { id: "messenger", add: async () => { calls.push(["add"]); } };
   const asset = {
     id: "content://media/external/images/media/1",
@@ -20,8 +22,10 @@ function harness(options = {}) {
   };
   class File {
     constructor(uri, name) { this.uri = name ? `${uri.uri}/${name}` : uri; }
-    get exists() { return !options.missingFile && [sourceUri, publicUri].includes(this.uri); }
+    get exists() { return !options.missingFile && ([sourceUri, publicUri].includes(this.uri) || (options.localSource && this.uri === pickedUri) || copied.has(this.uri)); }
     get size() { return options.emptyFile ? 0 : options.shortCopy && this.uri === publicUri ? 10 : 100; }
+    async copy(destination) { copied.add(destination.uri); calls.push(["copy", this.uri, destination.uri]); }
+    delete() { copied.delete(this.uri); }
     static downloadFileAsync = async () => { throw new Error("Offline"); };
   }
   const modules = {
@@ -90,6 +94,13 @@ test("does not report story success after download failure", async () => {
   const app = harness();
   assert.equal(await app.saveStoryToGallery({ id: "story-1", uri: "https://example.invalid/story.jpg", video: false }), false);
   assert.equal(app.calls.length, 0);
+});
+
+test("selected content media is copied into app storage before review", async () => {
+  const app = harness({ localSource: true });
+  const uri = await app.cacheLocalMedia({ id: "picked-video", uri: pickedUri, mimeType: "video/mp4" });
+  assert.match(uri, /messenger-media\/picked-video\.mp4$/);
+  assert.deepEqual(app.calls.find(([name]) => name === "copy"), ["copy", pickedUri, uri]);
 });
 
 test("cache failures record a safe failure result rather than losing the outcome event", async () => {
