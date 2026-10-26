@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
 import CallScreenCamera from "./CallScreenCamera";
+import { useAvatarUri } from "../../ui/useAvatarUri";
 
 export type CallScreenProps = {
   name: string;
@@ -58,6 +59,11 @@ export default function CallScreen({
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const avatarUri = useAvatarUri(avatar);
+  useEffect(() => {
+    setRemoteFailed(false);
+    setAvatarFailed(false);
+  }, [avatar]);
 
   const showingVideo = cameraOn;
   const displayName = name.trim() || "Your contact";
@@ -71,9 +77,9 @@ export default function CallScreen({
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor="#161B20" />
-      {showingVideo && !remoteFailed && (
+      {showingVideo && !remoteFailed && avatarUri && (
         <Image
-          source={{ uri: avatar.replace(/w=\d+/, "w=1080") }}
+          source={{ uri: avatarUri.replace(/w=\d+/, "w=1080") }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           accessible={false}
@@ -126,9 +132,9 @@ export default function CallScreen({
             <View style={styles.audioIdentity}>
               <View style={styles.avatarHalo}>
                 <View style={styles.avatarRing}>
-                  {avatar.trim() && !avatarFailed ? (
+                  {avatarUri && !avatarFailed ? (
                     <Image
-                      source={{ uri: avatar }}
+                      source={{ uri: avatarUri }}
                       style={styles.avatar}
                       onError={() => setAvatarFailed(true)}
                       accessibilityLabel={`${displayName}'s avatar`}

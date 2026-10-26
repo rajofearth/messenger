@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { styles as s } from "./Stories.styles";
@@ -12,14 +12,34 @@ type Props = {
   controls?: boolean;
   poster?: string;
   crop?: "fit" | "fill";
+  posterPlaceholder?: boolean;
+  videoSurface?: boolean;
   onProgress?: (progress: number) => void;
   onEnd?: () => void;
 };
 
 function StoryVideo(props: Props) {
+  return (
+    <View style={s.image} pointerEvents={props.controls && props.videoSurface !== false ? "auto" : "none"}>
+      {props.poster ? (
+        <Image source={{ uri: props.poster }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />
+      ) : props.posterPlaceholder ? (
+        <View style={s.previewVideoPlaceholder}>
+          <Text style={s.previewVideoPlaceholderText}>Loading video preview…</Text>
+        </View>
+      ) : null}
+      {props.videoSurface !== false && <StoryVideoSurface key={props.uri} {...props} />}
+    </View>
+  );
+}
+
+function StoryVideoSurface(props: Props) {
   const latest = useRef(props);
-  latest.current = props;
   const [error, setError] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
+  const opacity = useRef(new Animated.Value(0)).current;
+  latest.current = props;
   const player = useVideoPlayer(props.uri, (video) => {
     video.loop = !!props.preview;
     video.muted = !props.controls && !!props.preview;
@@ -48,24 +68,34 @@ function StoryVideo(props: Props) {
     if (props.paused) player.pause();
     else player.play();
   }, [player, props.paused]);
+
+  function revealVideo() {
+    if (revealedRef.current) return;
+    revealedRef.current = true;
+    setRevealed(true);
+    Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }).start();
+  }
+
   return (
-    <View style={s.image} pointerEvents={props.controls ? "auto" : "none"}>
-      {props.poster && <Image source={{ uri: props.poster }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />}
-      <VideoView
-        player={player}
-        style={s.image}
-        contentFit={props.crop === "fill" ? "cover" : "contain"}
-        nativeControls={!!props.controls}
-        fullscreenOptions={{ enable: false }}
-        buttonOptions={{ showBottomBar: true, showSeekForward: false, showSeekBackward: false, showSettings: false }}
-        surfaceType="textureView"
-      />
+    <>
+      <Animated.View style={[s.image, { opacity }]} pointerEvents={revealed && props.controls ? "auto" : "none"}>
+        <VideoView
+          player={player}
+          style={s.image}
+          contentFit={props.crop === "fill" ? "cover" : "contain"}
+          nativeControls={!!props.controls}
+          fullscreenOptions={{ enable: false }}
+          buttonOptions={{ showBottomBar: true, showSeekForward: false, showSeekBackward: false, showSettings: false }}
+          surfaceType="textureView"
+          onFirstFrameRender={revealVideo}
+        />
+      </Animated.View>
       {error && (
         <Text style={s.mediaError}>
           Couldn't play this video. Tap to continue.
         </Text>
       )}
-    </View>
+    </>
   );
 }
 

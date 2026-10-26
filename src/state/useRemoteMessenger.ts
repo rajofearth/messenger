@@ -5,6 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message } from "../domain/data";
 import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
+import { syncAvatarReferences } from "../data/avatars";
 import { deviceIdentity } from "../services/deviceIdentity";
 import type { ThemePreference } from "../ui/theme";
 import { useThemePreference } from "./useThemePreference";
@@ -116,9 +117,34 @@ export function useRemoteMessenger() {
       name: remoteProfile.name,
       username: remoteProfile.username,
       bio: remoteProfile.bio,
-      avatar: remoteProfile.avatarUrl || current.avatar,
+      avatar: remoteProfile.avatarUrl || "",
     }));
   }, [remoteProfile, setSettings]);
+
+  useEffect(() => {
+    syncAvatarReferences(
+      "chats",
+      cachedChats.map((chat) => ({ id: chat.id, uri: chat.avatar })),
+    );
+  }, [cachedChats]);
+
+  useEffect(() => {
+    syncAvatarReferences(
+      "stories",
+      stories.map((story) => ({ id: story.id, uri: story.avatar })),
+    );
+  }, [stories]);
+
+  useEffect(() => {
+    syncAvatarReferences(
+      "history",
+      history.map((record) => ({ id: record.id, uri: record.chat.avatar })),
+    );
+  }, [history]);
+
+  useEffect(() => {
+    syncAvatarReferences("self", [{ id: "self", uri: settings.avatar }]);
+  }, [settings.avatar]);
 
   useEffect(() => {
     if (remoteProfile !== null || !localReady) return;

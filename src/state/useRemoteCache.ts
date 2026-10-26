@@ -4,6 +4,7 @@ import { messengerRepository } from "../data/messengerRepository";
 import type { SettingsRecord } from "../data/records";
 import { setHapticsEnabled } from "../ui/primitives";
 import type { ThemePreference } from "../ui/theme";
+import { cleanupStoryMedia } from "../services/mediaCache";
 import {
   DEFAULT_SETTINGS,
   type RemoteCallRecord,
@@ -106,6 +107,14 @@ export function useRemoteCache() {
     if (!localReady) return;
     void messengerRepository.saveGallerySaved(gallerySaved).catch(() => {});
   }, [gallerySaved, localReady]);
+
+  useEffect(() => {
+    if (!localReady) return;
+    const referencedUris = Object.values(messages)
+      .flat()
+      .flatMap((message) => (message.uri ? [message.uri] : []));
+    void cleanupStoryMedia(stories, referencedUris).catch(() => {});
+  }, [localReady, messages, stories]);
 
   return {
     cachedChats,

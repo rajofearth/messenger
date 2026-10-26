@@ -14,6 +14,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearAvatarCache } from "../../data/avatars";
+import { useAvatarUri } from "../../ui/useAvatarUri";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 import type { useSettingsPreferences } from "./SettingsPreferences";
 
@@ -46,11 +47,12 @@ export default function SettingsDialogs({
     setAvatarFailed,
   } = settings;
   const insets = useSafeAreaInsets();
+  const avatarUri = useAvatarUri(preferences.avatar);
   const [avatarsCleared, setAvatarsCleared] = React.useState(false);
   React.useEffect(() => {
     if (sheet !== "privacy") setAvatarsCleared(false);
   }, [sheet]);
-  /** Contact photos are cached locally for notifications; this frees that space. */
+  /** Avatar photos are shared by UI and notifications; this frees that space. */
   function clearAvatars() {
     clearAvatarCache();
     setAvatarsCleared(true);
@@ -117,13 +119,13 @@ export default function SettingsDialogs({
             {sheet === "profile" ? (
               <>
                 <View style={[styles.avatarWrap, { alignSelf: "center", marginBottom: 16 }]}>
-                  {avatarFailed ? (
+                  {!avatarUri || avatarFailed ? (
                     <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.tint }]}>
                       {icon("person-outline", 36)}
                     </View>
                   ) : (
                     <Image
-                      source={{ uri: preferences.avatar }}
+                      source={{ uri: avatarUri }}
                       style={styles.avatar}
                       accessibilityLabel="Current profile photo"
                       onError={() => setAvatarFailed(true)}

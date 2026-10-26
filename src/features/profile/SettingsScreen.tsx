@@ -27,6 +27,7 @@ import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
 import AccountSection from "./AccountSection";
 import { MediaPicker } from "../media/MediaPicker";
+import { useAvatarUri } from "../../ui/useAvatarUri";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -53,6 +54,7 @@ export default function SettingsScreen({
   updates,
 }: SettingsScreenProps) {
   const settings = useSettingsPreferences(onProfileChange);
+  const avatarUri = useAvatarUri(settings.preferences.avatar);
   const [page, setPage] = useState<"profile" | "settings">("profile");
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   useEffect(() => {
@@ -76,6 +78,7 @@ export default function SettingsScreen({
     toggle,
     editProfile,
   } = settings;
+  useEffect(() => setAvatarFailed(false), [preferences.avatar, setAvatarFailed]);
   const colors = settingsColors(dark);
   const themeNote =
     theme === "system"
@@ -183,7 +186,7 @@ export default function SettingsScreen({
                 onPress={() => setAvatarPickerOpen(true)}
                 style={styles.avatarWrap}
               >
-                {avatarFailed ? (
+                {!avatarUri || avatarFailed ? (
                   <View
                     style={[
                       styles.avatar,
@@ -195,7 +198,7 @@ export default function SettingsScreen({
                   </View>
                 ) : (
                   <Image
-                    source={{ uri: preferences.avatar }}
+                    source={{ uri: avatarUri }}
                     style={styles.avatar}
                     onError={() => setAvatarFailed(true)}
                   />
