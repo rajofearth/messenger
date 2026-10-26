@@ -8,7 +8,7 @@ export const styles = StyleSheet.create({
   flex: { flex: 1 },
   viewer: { flex: 1, backgroundColor: "#101512" },
   image: { ...StyleSheet.absoluteFill },
-  previewPage: { flex: 1, minHeight: 0, justifyContent: "center" },
+  previewPage: { flex: 1, minHeight: 0, justifyContent: "center", backgroundColor: "#101512" },
   previewVideoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#151A17" },
   previewVideoPlaceholderText: { color: "#FFFFFF99", fontFamily: "DMSans_500Medium", fontSize: 13 },
   mediaError: {

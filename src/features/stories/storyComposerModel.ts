@@ -59,6 +59,20 @@ export function moveDraftTo(
   return next;
 }
 
+export function dragTargetIndex(
+  origin: number,
+  horizontalDistance: number,
+  slotWidth: number,
+  length: number,
+) {
+  if (length <= 0) return 0;
+  const safeSlotWidth = Math.max(1, slotWidth);
+  return Math.max(
+    0,
+    Math.min(length - 1, origin + Math.round(horizontalDistance / safeSlotWidth)),
+  );
+}
+
 export function toggleDraftCrop(current: StoryDraft) {
   const crop: StoryDraft["crop"] = current.crop === "fit" ? "fill" : "fit";
   return { ...current, crop };

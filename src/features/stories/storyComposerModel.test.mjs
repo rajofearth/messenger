@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendDrafts, moveDraft, moveDraftTo, removeDraft, toggleDraftCrop } from "./storyComposerModel.ts";
+import { appendDrafts, dragTargetIndex, moveDraft, moveDraftTo, removeDraft, toggleDraftCrop } from "./storyComposerModel.ts";
 
 const media = (uri) => ({ uri, video: false });
 
@@ -21,4 +21,11 @@ test("crop is a deliberate fit/fill framing toggle", () => {
   const draft = appendDrafts([], [media("a")], "seed")[0];
   assert.equal(draft.crop, "fit");
   assert.equal(toggleDraftCrop(draft).crop, "fill");
+});
+
+test("drag targets follow slot midpoints and clamp to the strip", () => {
+  assert.equal(dragTargetIndex(1, 29, 60, 4), 1);
+  assert.equal(dragTargetIndex(1, 31, 60, 4), 2);
+  assert.equal(dragTargetIndex(1, -1000, 60, 4), 0);
+  assert.equal(dragTargetIndex(1, 1000, 60, 4), 3);
 });

@@ -39,15 +39,19 @@ are not a physical-device acceptance run.
 1. Open Add story, select at least two library items, then tap the camera and
    capture another item. The review screen must show all three in one numbered
    thumbnail strip; the captured item must not replace the library selection.
-2. Swipe the main preview and tap thumbnails to switch media. Long-press and
-   drag thumbnails to reorder them; TalkBack's Move earlier/later actions are
-   the accessible fallback. Delete removes one item, and Add media returns to
-   the picker without losing the drafts. The Share button publishes only after
-   this review step.
-3. Open Crop on a photo and choose Story 9:16, Square 1:1 or Original, then
-   Apply crop. Add a caption to each item, publish, and verify the order,
-   captions and cropped output in the resulting stories. Video items use Fit or
-   Fill framing instead of pixel crop.
+2. Swipe the main preview and tap thumbnails to switch media. Video review must
+   autoplay with the same native duration/scrub controls as picker preview, and
+   switching pages must not flash a blank frame. Long-press and drag thumbnails
+   to reorder them: the lifted thumbnail follows the finger, the source slot
+   fades, the destination shows a dashed Drop cue, and a light haptic marks each
+   new position. TalkBack's Move earlier/later actions are the accessible
+   fallback. Delete removes one item, and Add media returns to the picker
+   without losing the drafts. The Share button publishes only after this review
+   step.
+3. Open Crop on a photo and choose Story 9:16, Square 1:1 or Original. Pinch
+   to zoom, drag the photo inside the frame, then Apply crop. Add a caption to
+   each item, publish, and verify the order, captions and cropped output in the
+   resulting stories. Video items use Fit or Fill framing instead of pixel crop.
 4. Press Android Back from review and confirm it returns to the picker; press
    Back again to close the story composer. At 10 items, Add media is disabled
    and an additional capture/selection reports the limit.

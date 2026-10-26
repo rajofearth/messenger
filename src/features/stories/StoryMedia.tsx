@@ -9,6 +9,8 @@ type Props = {
   video?: boolean;
   paused?: boolean;
   preview?: boolean;
+  controls?: boolean;
+  poster?: string;
   crop?: "fit" | "fill";
   onProgress?: (progress: number) => void;
   onEnd?: () => void;
@@ -20,7 +22,7 @@ function StoryVideo(props: Props) {
   const [error, setError] = useState(false);
   const player = useVideoPlayer(props.uri, (video) => {
     video.loop = !!props.preview;
-    video.muted = !!props.preview;
+    video.muted = !props.controls && !!props.preview;
     video.audioMixingMode = "mixWithOthers";
     video.timeUpdateEventInterval = 0.05;
   });
@@ -47,12 +49,15 @@ function StoryVideo(props: Props) {
     else player.play();
   }, [player, props.paused]);
   return (
-    <View style={s.image} pointerEvents="none">
+    <View style={s.image} pointerEvents={props.controls ? "auto" : "none"}>
+      {props.poster && <Image source={{ uri: props.poster }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />}
       <VideoView
         player={player}
         style={s.image}
         contentFit={props.crop === "fill" ? "cover" : "contain"}
-        nativeControls={false}
+        nativeControls={!!props.controls}
+        fullscreenOptions={{ enable: false }}
+        buttonOptions={{ showBottomBar: true, showSeekForward: false, showSeekBackward: false, showSettings: false }}
         surfaceType="textureView"
       />
       {error && (

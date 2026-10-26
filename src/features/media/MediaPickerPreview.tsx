@@ -127,11 +127,9 @@ function PreviewPage({
         trackDevEvent("media_preview_thumbnail_loaded", { durationMs: Date.now() - startedAt, video: asset.mediaType === MediaType.VIDEO });
       }
     });
-    if (Platform.OS !== "android") {
-      void new Asset(asset.id).getUri().then((next) => {
-        if (alive) setUri(next);
-      }).catch(() => {});
-    }
+    void new Asset(asset.id).getUri().then((next) => {
+      if (alive) setUri(next);
+    }).catch(() => {});
     return () => {
       alive = false;
     };
@@ -139,8 +137,8 @@ function PreviewPage({
 
   return (
     <View style={[s.previewStage, { width }]}>
-      {asset.mediaType === MediaType.VIDEO && active && (uri ?? asset.id) ? (
-        <PreviewVideo uri={uri ?? asset.id} />
+      {asset.mediaType === MediaType.VIDEO && active && uri ? (
+        <PreviewVideo uri={uri} />
       ) : thumbnailUri ? (
         <Image source={{ uri: asset.mediaType === MediaType.VIDEO ? thumbnailUri : uri ?? (Platform.OS === "android" ? asset.id : thumbnailUri) }} contentFit="contain" cachePolicy="memory-disk" allowDownscaling style={s.previewMedia} />
       ) : null}
