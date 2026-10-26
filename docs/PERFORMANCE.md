@@ -372,6 +372,14 @@ Android notification image decoding accepts `file://` and `content://` URIs only
 
 Only the selected conversation's thread is queried (`api.chat.listMessages`, newest 100 messages). `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while `useRemoteThreadMedia` stores an opened thread and its downloaded files. Persisted messages are split per chat id, so a send writes one thread key plus the chat list, not the whole app state.
 
+### Disk caches
+
+Three libraries keep their own files outside the repository. `expo-video` uses a least-recently-used cache capped at 1 GiB by default, and `expo-image` uses Glide on Android with a 250 MiB disk cache; the image picker, document picker, camera, audio recorder and keyboard input also copy attachments into the app cache under their own folder names. Those sizes are ceilings, not reservations: the reported cache only grows as media is viewed or attached.
+
+Sign-out calls each owner's own clear rather than deleting its files: `clearVideoCacheAsync()` releases the old `ExpoVideoCache` directory and rotates to a new one, and `Image.clearMemoryCache()` plus `Image.clearDiskCache()` empty the Glide layers. `clearLocalAccountFiles()` then deletes `Paths.document/messenger-media` and `message-media`, the avatar folder, and every remaining entry directly under `Paths.cache`, while leaving `ExpoVideoCache` and `image_manager_disk_cache` to their native owners. The sweep is what removes picker and recording copies that no API enumerates.
+
+`AsyncStorage` keeps its SQLite database in app data, not cache. Deleting keys frees pages inside the file but SQLite does not shrink it, so Android's "data" figure can stay above the size of the remaining rows until reused.
+
 ## Startup and JavaScript
 
 - **Per-slice persistence.** The whole app state is never re-serialised. Each slice effect compares identity with the last value it wrote and returns early when nothing changed, and the message effect walks the per-thread map and writes only threads whose array identity changed. A send serialises one conversation and the chat list.
