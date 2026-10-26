@@ -14,6 +14,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clearAvatarCache } from "../../data/avatars";
+import { imageCacheKey } from "../../domain/imageVariants";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 import type { useSettingsPreferences } from "./SettingsPreferences";
 
@@ -46,6 +47,7 @@ export default function SettingsDialogs({
     setAvatarFailed,
   } = settings;
   const insets = useSafeAreaInsets();
+  const avatarKey = imageCacheKey(preferences.avatar);
   const [avatarsCleared, setAvatarsCleared] = React.useState(false);
   React.useEffect(() => {
     if (sheet !== "privacy") setAvatarsCleared(false);
@@ -123,8 +125,11 @@ export default function SettingsDialogs({
                     </View>
                   ) : (
                     <Image
-                      source={{ uri: preferences.avatar }}
+                      source={{ uri: preferences.avatar, cacheKey: avatarKey }}
                       style={styles.avatar}
+                      contentFit="cover"
+                      allowDownscaling
+                      recyclingKey={avatarKey ?? preferences.avatar}
                       accessibilityLabel="Current profile photo"
                       onError={() => setAvatarFailed(true)}
                     />

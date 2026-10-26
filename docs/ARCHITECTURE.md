@@ -111,9 +111,13 @@ expiry and avatar replacement keep deleting their own objects.
 - **LRU.** `max` (default 128) bounds the entry count. A `get` re-inserts the entry so eviction takes the least recently used key first.
 - **Single flight.** `load(key, loader)` returns a cached value when present, joins the in-flight promise for concurrent callers, and does not cache failures.
 
-`cacheKey` is a 32-bit FNV-1a hash in base 36, used as a stable file name for downloaded avatars.
+`cacheKey` is a 32-bit FNV-1a hash in base 36, used for stable file names and for image keys when a URL is not a Convex storage URL.
 
 The only production user of `createCache` is `src/data/avatars.ts`; persisted slices get the same ideas from `createStore` rather than from the cache module. In `avatars.ts` the cache holds up to 256 resolved local URIs and never expires in memory. Instead, each hit also checks that the file exists, and the downloads folder is pruned down to 240 files on every 25th download. `warmAvatars` downloads the first 8 conversations' avatars two at a time in the background, and `useMessageNotifications` calls it when the chat list changes. `cachedAvatarUri` is the variant that reports a local URI only if it is already cached.
+
+Avatar identity comes from `imageCacheKey` in `src/domain/imageVariants.ts`, not from the signed URL. Convex gives the chat, story and profile queries a different `/api/storage/<id>?token=...` URL for the same person, so the cache key is `storage-<id>` and the in-memory entry, downloaded file and expo-image cache entry are all shared. Other http(s) URLs fall back to `cacheKey`, and local URIs have no key. `Avatar` passes that key to `expo-image` as `source.cacheKey` and `recyclingKey`, which also joins in-flight decodes when several screens show the same person at once.
+
+The same module holds the width rules used by later message and story variants: `variantWidths` never upscales, `pickImageVariant` picks the smallest variant that covers the target, and `targetPixels` applies the 2x density cap. `src/services/imageVariants.ts` is the native side: it turns a picked avatar into a 512px WebP before upload, and can render one WebP per stored width for callers that need variants. Both transforms return no result on web, GIF or video content, and a failure leaves the original file usable.
 
 See `docs/PERFORMANCE.md` for why avatars are resolved to local files before they reach a notification.
 

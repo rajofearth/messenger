@@ -17,6 +17,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
 import CallScreenCamera from "./CallScreenCamera";
+import { Avatar } from "../../ui/primitives";
+import { imageCacheKey } from "../../domain/imageVariants";
 
 export type CallScreenProps = {
   name: string;
@@ -57,25 +59,22 @@ export default function CallScreen({
   const [frontCamera, setFrontCamera] = useState(true);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
-  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const showingVideo = cameraOn;
   const displayName = name.trim() || "Your contact";
-  const initials = displayName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("")
-    .toUpperCase();
+  const backdropUri = avatar.replace(/w=\d+/, "w=1080");
+  const backdropKey = imageCacheKey(backdropUri);
 
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor="#161B20" />
       {showingVideo && !remoteFailed && (
         <Image
-          source={{ uri: avatar.replace(/w=\d+/, "w=1080") }}
+          source={{ uri: backdropUri, cacheKey: backdropKey }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          allowDownscaling
+          recyclingKey={backdropKey ?? backdropUri}
           accessible={false}
           onError={() => setRemoteFailed(true)}
         />
@@ -126,18 +125,7 @@ export default function CallScreen({
             <View style={styles.audioIdentity}>
               <View style={styles.avatarHalo}>
                 <View style={styles.avatarRing}>
-                  {avatar.trim() && !avatarFailed ? (
-                    <Image
-                      source={{ uri: avatar }}
-                      style={styles.avatar}
-                      onError={() => setAvatarFailed(true)}
-                      accessibilityLabel={`${displayName}'s avatar`}
-                    />
-                  ) : (
-                    <View style={[styles.avatar, styles.initialsBackground]}>
-                      <Text style={styles.initials}>{initials}</Text>
-                    </View>
-                  )}
+                  <Avatar uri={avatar} name={displayName} size={140} />
                 </View>
               </View>
               <Text style={styles.audioName}>{displayName}</Text>

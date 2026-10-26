@@ -62,13 +62,6 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F28B7040",
   },
-  avatar: { width: 140, height: 140, borderRadius: 70 },
-  initialsBackground: {
-    backgroundColor: "#5A413B",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  initials: { color: "#FFE2D6", fontSize: 44, fontWeight: "500" },
   audioName: {
     color: "#FFFFFF",
     fontSize: 30,

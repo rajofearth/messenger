@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
+import { imageCacheKey } from "../domain/imageVariants";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
 let hapticsEnabled = true;
 export function setHapticsEnabled(enabled: boolean) {
@@ -77,6 +78,7 @@ export function Avatar({
   React.useEffect(() => setFailed(false), [uri]);
   const initials = avatarInitials(name);
   const fallback = !uri || failed;
+  const cacheKey = uri ? imageCacheKey(uri) : undefined;
   return (
     <View style={{ width: size, height: size }}>
       {fallback ? (
@@ -97,8 +99,11 @@ export function Avatar({
         </View>
       ) : (
         <Image
-          source={{ uri }}
+          source={{ uri, cacheKey }}
           cachePolicy="memory-disk"
+          contentFit="cover"
+          allowDownscaling
+          recyclingKey={cacheKey ?? uri}
           accessible={false}
           onError={() => setFailed(true)}
           style={{

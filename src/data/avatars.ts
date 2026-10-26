@@ -8,7 +8,8 @@
  */
 
 import { Directory, File, Paths } from "expo-file-system";
-import { cacheKey, createCache } from "./cache";
+import { createCache } from "./cache";
+import { imageCacheKey } from "../domain/imageVariants";
 
 const remote = /^https?:\/\//i;
 const local = /^(file|content|asset|data):/i;
@@ -56,10 +57,12 @@ function prune(directory: Directory) {
   }
 }
 
-async function download(uri: string): Promise<string> {
+async function download(uri: string, key: string): Promise<string> {
   const directory = folder();
   if (!directory) return "";
-  const target = new File(directory, `${cacheKey(uri)}.img`);
+  // One file per storage object: chat, story and profile queries hand out a
+  // different signed URL for the same person, and all of them land here.
+  const target = new File(directory, `${key}.img`);
   if (target.exists && target.size > 0) return target.uri;
   const file = await File.downloadFileAsync(uri, target, { idempotent: true });
   downloads += 1;
@@ -78,14 +81,15 @@ export async function localAvatarUri(
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
   if (!remote.test(uri)) return undefined;
-  const cached = resolved.get(uri);
+  const key = imageCacheKey(uri) ?? uri;
+  const cached = resolved.get(key);
   if (cached) {
     if (new File(cached).exists) return cached;
     // Android can clear the cache directory, so a stale entry is dropped
     // instead of being handed back for the rest of the session.
-    resolved.delete(uri);
+    resolved.delete(key);
   }
-  const file = await resolved.load(uri, () => download(uri)).catch(() => "");
+  const file = await resolved.load(key, () => download(uri, key)).catch(() => "");
   return file || undefined;
 }
 
@@ -107,7 +111,7 @@ export function clearAvatarCache() {
 export function cachedAvatarUri(uri: string | undefined): string | undefined {
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
-  const cached = resolved.get(uri);
+  const cached = resolved.get(imageCacheKey(uri) ?? uri);
   return cached && new File(cached).exists ? cached : undefined;
 }
 
@@ -117,10 +121,16 @@ export function cachedAvatarUri(uri: string | undefined): string | undefined {
  */
 export function warmAvatars(uris: Array<string | undefined>, limit = 12) {
   if (!supported) return;
-  const queue = [...new Set(uris.filter((uri): uri is string => !!uri && remote.test(uri)))].slice(
-    0,
-    limit,
-  );
+  const queue: string[] = [];
+  const seen = new Set<string>();
+  for (const uri of uris) {
+    if (queue.length >= limit) break;
+    if (!uri || !remote.test(uri)) continue;
+    const key = imageCacheKey(uri) ?? uri;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    queue.push(uri);
+  }
   let running = 0;
   const pump = () => {
     while (running < 2 && queue.length) {
