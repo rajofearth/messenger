@@ -2,7 +2,6 @@ import React from "react";
 import {
   ActivityIndicator,
   Alert,
-  AppState,
   Linking,
   Pressable,
   Text,
@@ -12,50 +11,32 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
-import {
-  Album,
-  Asset,
-  MediaType,
-  getPermissionsAsync,
-  presentPermissionsPicker,
-  requestPermissionsAsync,
-} from "expo-media-library";
-import type {
-  AssetMetadata,
-  GranularPermission,
-  MediaTypeFilter,
-} from "expo-media-library";
+import { Asset, MediaType } from "expo-media-library";
+import type { AssetMetadata } from "expo-media-library";
 import { IconButton, tap } from "../../ui/primitives";
 import { coral, onCoral, palette } from "../../ui/theme";
 import {
-  appendUniqueMediaAssets,
   toggleStorySelection,
   MEDIA_PICKER_LIMIT,
 } from "./mediaPickerModel";
 import type { PickedMedia, MediaPickerFilter } from "./mediaPickerModel";
 import { styles as s } from "./MediaPicker.styles";
-import { MediaPickerGrid, type MediaPickerAccess } from "./MediaPickerGrid";
+import { MediaPickerGrid } from "./MediaPickerGrid";
 import { MediaAlbumSheet } from "./MediaAlbumSheet";
-import {
-  loadMediaAlbums,
-  loadRecentMediaCount,
-  type MediaAlbum,
-} from "./mediaAlbums";
 import { MediaPickerPreview } from "./MediaPickerPreview";
 import { MediaCamera } from "./MediaCamera";
-import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
 import { mediaMimeType } from "./mediaMimeType";
 import { trackDevEvent } from "../../services/devTelemetry";
+import { useMediaPickerLibrary } from "./useMediaPickerLibrary";
+
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
-const GRANULAR_PERMISSIONS: GranularPermission[] = ["photo", "video"];
-const MEDIA_FILTERS: MediaTypeFilter[] = ["photo", "video"];
 const FILTERS: { id: MediaPickerFilter; label: string }[] = [
   { id: "recents", label: "Recents" },
   { id: "photos", label: "Photos" },
   { id: "videos", label: "Videos" },
 ];
-type Access = MediaPickerAccess;
+
 type Props = {
   dark: boolean;
   onPicked: (media: PickedMedia[]) => void;
@@ -68,129 +49,68 @@ type Props = {
   mediaMode?: "photos" | "photos-and-videos";
   selectionLimit?: number;
 };
+
 export function MediaPicker(props: Props) {
   const colors = palette(props.dark);
   const photosOnly = props.mediaMode === "photos";
   const { width } = useWindowDimensions();
   const tile = Math.floor((width - GRID_PADDING * 2 - GRID_GAP * 2) / 3);
-  const [access, setAccess] = React.useState<Access>("checking");
-  const [limited, setLimited] = React.useState(false);
-  const [assets, setAssets] = React.useState<AssetMetadata[]>([]);
-  const [albums, setAlbums] = React.useState<MediaAlbum[]>([]);
-  const [recentCount, setRecentCount] = React.useState<number>();
-  const [albumId, setAlbumId] = React.useState<string | null>(null);
+  const {
+    access,
+    limited,
+    assets,
+    albums,
+    recentCount,
+    filter,
+    albumId,
+    currentAlbumTitle,
+    loading,
+    loadingMore,
+    error,
+    refreshingAlbums,
+    checkAccess,
+    manageAccess,
+    refresh,
+    refreshAlbums,
+    refreshAlbumsIfStale,
+    selectFilter,
+    selectAlbum,
+    loadMore,
+  } = useMediaPickerLibrary({ photosOnly });
   const [albumOpen, setAlbumOpen] = React.useState(false);
-  const [filter, setFilter] = React.useState<MediaPickerFilter>("recents");
   const [selection, setSelection] = React.useState<string[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [loadingMore, setLoadingMore] = React.useState(false);
-  const [hasMore, setHasMore] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [preparing, setPreparing] = React.useState(false);
   const [cameraBusy, setCameraBusy] = React.useState(false);
   const [cameraOpen, setCameraOpen] = React.useState(false);
   const [preview, setPreview] = React.useState<AssetMetadata | null>(null);
-  const [reloadKey, setReloadKey] = React.useState(0);
   const alive = React.useRef(true);
-  const request = React.useRef(0);
   const camera = React.useRef(false);
-  const selectedAlbum = albums.find((item) => item.id === albumId)?.album;
-  const currentAlbumTitle =
-    albums.find((item) => item.id === albumId)?.title || "Recents";
   const limit = props.selectionLimit ?? MEDIA_PICKER_LIMIT;
   const filters = photosOnly ? FILTERS.filter((item) => item.id !== "videos") : FILTERS;
-  const granularPermissions: GranularPermission[] = photosOnly
-    ? ["photo"]
-    : GRANULAR_PERMISSIONS;
-  const checkAccess = React.useCallback(async (prompt: boolean) => {
-    try {
-      let response = await getPermissionsAsync(false, granularPermissions);
-      if (!response.granted && prompt) {
-        response = await requestPermissionsAsync(false, granularPermissions);
-      }
-      if (!alive.current) return;
-      if (response.granted) {
-        setLimited(response.accessPrivileges === "limited");
-        setAccess("ready");
-      } else {
-        setLimited(false);
-        setAccess("denied");
-      }
-    } catch {
-      if (alive.current) setAccess("denied");
-    }
-  }, []);
-  React.useEffect(() => {
-    alive.current = true;
-    void checkAccess(true);
-    return () => {
-      alive.current = false;
-      request.current += 1;
-    };
-  }, [checkAccess]);
-  React.useEffect(() => {
-    if (access !== "ready") return;
-    void Promise.all([loadMediaAlbums(), loadRecentMediaCount()])
-      .then(([items, count]) => {
-        if (!alive.current) return;
-        setAlbums(items);
-        setRecentCount(count);
-      })
-      .catch(() => {
-        if (!alive.current) return;
-        setAlbums([]);
-        setRecentCount(undefined);
-      });
-  }, [access, reloadKey]);
-  React.useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state !== "active") return;
-      void checkAccess(false).then(() => {
-        if (alive.current) setReloadKey((value) => value + 1);
-      });
-    });
-    return () => subscription.remove();
-  }, [checkAccess]);
-  const loadPage = React.useCallback(
-    async (reset: boolean, offset: number) => {
-      if (access !== "ready") return;
-      const token = ++request.current;
-      if (reset) {
-        setLoading(true);
-        setError(null);
-      } else {
-        setLoadingMore(true);
-      }
-      try {
-         const page = await queryMediaPage(filter, offset, selectedAlbum, photosOnly);
-        if (token !== request.current) return;
-         setAssets((current) => {
-           if (reset) return page;
-           return appendUniqueMediaAssets(current, page);
-         });
-         setHasMore(page.length === MEDIA_PAGE_SIZE);
-      } catch (cause) {
-        if (token !== request.current) return;
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "The photo library could not be read.",
-        );
-      } finally {
-        if (token === request.current) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
-      }
-    },
-    [access, filter, photosOnly, selectedAlbum],
-  );
 
   React.useEffect(() => {
-    if (access !== "ready") return;
-    setHasMore(true);
-    void loadPage(true, 0);
-  }, [access, filter, reloadKey, loadPage]);
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  function openAlbums() {
+    refreshAlbumsIfStale();
+    setAlbumOpen(true);
+  }
+
+  function chooseFilter(id: MediaPickerFilter) {
+    if (id === filter) return;
+    tap();
+    selectFilter(id);
+  }
+
+  function chooseAlbum(id: string | null) {
+    setAlbumOpen(false);
+    if (id === albumId) return;
+    selectAlbum(id);
+  }
 
   async function openCamera() {
     if (camera.current) return;
@@ -235,16 +155,6 @@ export function MediaPicker(props: Props) {
     }
   }
 
-  async function manageAccess() {
-    try {
-      await presentPermissionsPicker(photosOnly ? ["photo"] : MEDIA_FILTERS);
-      await checkAccess(false);
-      if (alive.current) setReloadKey((value) => value + 1);
-    } catch {
-      void Linking.openSettings();
-    }
-  }
-
   function toggle(id: string) {
     const selected = selection.includes(id);
     if (!selected && selection.length >= limit) {
@@ -269,26 +179,42 @@ export function MediaPicker(props: Props) {
           try {
             const info = await new Asset(id).getInfo();
             return {
-              uri: info.uri,
-              video: info.mediaType === MediaType.VIDEO,
-              filename: info.filename,
-              mimeType: mediaMimeType(info.filename, info.mediaType === MediaType.VIDEO),
-              width: info.width,
-              height: info.height,
-              duration: info.duration ? info.duration / 1000 : undefined,
+              id,
+              media: {
+                uri: info.uri,
+                video: info.mediaType === MediaType.VIDEO,
+                filename: info.filename,
+                mimeType: mediaMimeType(info.filename, info.mediaType === MediaType.VIDEO),
+                width: info.width,
+                height: info.height,
+                duration: info.duration ? info.duration / 1000 : undefined,
+              } satisfies PickedMedia,
             };
           } catch {
             return null;
           }
         }),
       );
-      const media = resolved.filter(
-        (item): item is NonNullable<typeof item> => !!item?.uri,
+      const available = resolved.filter(
+        (item): item is NonNullable<typeof item> => !!item?.media.uri,
       );
-      if (!media.length) {
+      if (!available.length) {
         throw new Error("Those items are no longer available.");
       }
-      props.onPicked(media);
+      if (available.length !== selection.length) {
+        // A refresh or a permission change can remove an asset that was
+        // selected earlier. Drop it from the selection instead of sending a
+        // shorter story silently, and tell the user it happened.
+        const missing = selection.length - available.length;
+        const keep = new Set(available.map((item) => item.id));
+        setSelection((current) => current.filter((id) => keep.has(id)));
+        Alert.alert(
+          "Some items are unavailable",
+          `${missing} selected item${missing === 1 ? " is" : "s are"} no longer in your library, so ${missing === 1 ? "it was" : "they were"} removed. Check the selection and try again.`,
+        );
+        return;
+      }
+      props.onPicked(available.map((item) => item.media));
     } catch (cause) {
       Alert.alert(
         "Couldn't open media",
@@ -299,11 +225,6 @@ export function MediaPicker(props: Props) {
     }
   }
 
-  function loadMore() {
-    if (loading || loadingMore || !hasMore || error) return;
-    void loadPage(false, assets.length);
-  }
-
   return (
     <View style={[s.flex, { backgroundColor: colors.bg }]}>
       <SafeAreaView
@@ -311,16 +232,16 @@ export function MediaPicker(props: Props) {
         style={s.flex}
       >
         <View style={s.pickerHeader}>
-             <IconButton
+          <IconButton
             name="close"
             label="Cancel story"
             color={colors.fg}
-             onPress={props.onClose}
+            onPress={props.onClose}
           />
-           <Text
-             style={[s.pickerTitle, { color: colors.fg }]}
-           >
-             {props.title ?? "Add to story"}
+          <Text
+            style={[s.pickerTitle, { color: colors.fg }]}
+          >
+            {props.title ?? "Add to story"}
           </Text>
           {cameraBusy ? (
             <View style={s.pickerHeaderBusy}>
@@ -358,7 +279,7 @@ export function MediaPicker(props: Props) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Choose album. Current album: ${currentAlbumTitle}`}
-          onPress={() => setAlbumOpen(true)}
+          onPress={openAlbums}
           style={[s.pickerAlbumButton, { borderColor: colors.line }]}
         >
           <Ionicons name="folder-open-outline" size={18} color={colors.coralInk} />
@@ -375,10 +296,7 @@ export function MediaPicker(props: Props) {
                 key={item.id}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                onPress={() => {
-                  tap();
-                  setFilter(item.id);
-                }}
+                onPress={() => chooseFilter(item.id)}
                 style={[
                   s.pickerChip,
                   { borderColor: active ? coral : colors.line },
@@ -405,10 +323,12 @@ export function MediaPicker(props: Props) {
           selection={selection}
           loading={loading}
           loadingMore={loadingMore}
+          refreshing={loading && assets.length > 0}
           error={error}
           onAllowAccess={() => void checkAccess(true)}
           onOpenCamera={() => void openCamera()}
-          onRetry={() => void loadPage(true, 0)}
+          onRetry={refresh}
+          onRefresh={refresh}
           onToggle={toggle}
           onPreview={setPreview}
           onLoadMore={loadMore}
@@ -458,10 +378,9 @@ export function MediaPicker(props: Props) {
           albums={albums}
           recentCount={recentCount}
           selectedId={albumId}
-          onSelect={(id) => {
-            setAlbumId(id);
-            setAlbumOpen(false);
-          }}
+          refreshing={refreshingAlbums}
+          onRefresh={refreshAlbums}
+          onSelect={chooseAlbum}
           onClose={() => setAlbumOpen(false)}
         />
       )}

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   Text,
   View,
 } from "react-native";
@@ -28,10 +29,12 @@ type Props = {
   selection: string[];
   loading: boolean;
   loadingMore: boolean;
+  refreshing: boolean;
   error: string | null;
   onAllowAccess: () => void;
   onOpenCamera: () => void;
   onRetry: () => void;
+  onRefresh: () => void;
   onToggle: (id: string) => void;
   onPreview: (asset: AssetMetadata) => void;
   onLoadMore: () => void;
@@ -209,6 +212,14 @@ export function MediaPickerGrid(props: Props) {
       }}
       onEndReached={props.onLoadMore}
       onEndReachedThreshold={0.6}
+      refreshControl={
+        <RefreshControl
+          refreshing={props.refreshing}
+          onRefresh={props.onRefresh}
+          colors={[coral]}
+          tintColor={coral}
+        />
+      }
       initialNumToRender={18}
       maxToRenderPerBatch={12}
       windowSize={7}
