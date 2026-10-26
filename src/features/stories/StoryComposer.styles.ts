@@ -10,7 +10,7 @@ export const styles = StyleSheet.create({
   composerTools: { position: "absolute", top: 72, right: 14, gap: 10 },
   composerTool: { minWidth: 58, alignItems: "center", gap: 3, paddingVertical: 8, borderRadius: 16, backgroundColor: "#00000066" },
   composerToolText: { color: "white", fontFamily: "DMSans_500Medium", fontSize: 11 },
-  composerBottom: { position: "absolute", left: 16, right: 16, bottom: 12, gap: 10 },
+  composerBottom: { gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: "#101512EE", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#FFFFFF22" },
   composerReorderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   composerSmallButton: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "#00000066" },
   composerDisabled: { opacity: 0.35 },

@@ -22,6 +22,7 @@ type Props = {
   canAddMedia: boolean;
 };
 const THUMB_SLOT_WIDTH = 60;
+const reviewPosterCache = new Map<string, string>();
 export function StoryDraftReview(props: Props) {
   const pager = useRef<FlatList<StoryDraft>>(null);
   const { width } = useWindowDimensions();
@@ -93,6 +94,7 @@ export function StoryDraftReview(props: Props) {
       <View style={s.flex}>
         <FlatList
           ref={pager}
+          style={s.flex}
           data={props.drafts}
           horizontal
           pagingEnabled
@@ -187,18 +189,27 @@ export function StoryDraftReview(props: Props) {
   );
 }
 function ReviewPage({ draft, active, width }: { draft: StoryDraft; active: boolean; width: number }) {
-  const [poster, setPoster] = React.useState<string | null>(null);
+  const [poster, setPoster] = React.useState<string | null>(() => reviewPosterCache.get(draft.uri) ?? null);
   React.useEffect(() => {
     if (!draft.video) return;
     let alive = true;
-    setPoster(null);
+    const cached = reviewPosterCache.get(draft.uri);
+    if (cached) {
+      setPoster(cached);
+      return () => {
+        alive = false;
+      };
+    }
     void getMediaThumbnail(draft.uri, 384).then((next) => {
-      if (alive && next && next !== draft.uri) setPoster(next);
+      if (alive && next && next !== draft.uri) {
+        reviewPosterCache.set(draft.uri, next);
+        setPoster(next);
+      }
     });
     return () => {
       alive = false;
     };
-  }, [active, draft.uri, draft.video]);
+  }, [draft.uri, draft.video]);
   return (
     <View style={[s.previewPage, { width }]}>
       {active ? <StoryMedia key={`${draft.id}-${draft.uri}`} uri={draft.uri} video={draft.video} crop={draft.crop} preview controls poster={poster ?? undefined} /> : draft.video ? poster ? <Image source={{ uri: poster }} style={s.image} contentFit="contain" /> : <View style={s.previewVideoPlaceholder}><Ionicons name="videocam-outline" size={42} color="#FFFFFF88" /><Text style={s.previewVideoPlaceholderText}>Loading video preview…</Text></View> : <Image source={{ uri: draft.uri }} style={s.image} contentFit="contain" />}
