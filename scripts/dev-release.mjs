@@ -97,7 +97,16 @@ if (!existsSync(metadataPath)) {
   );
 }
 const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
-for (const field of ["packageId", "versionName", "versionCode", "updateFeedUrl", "apk"]) {
+for (const field of [
+  "packageId",
+  "versionName",
+  "versionCode",
+  "updateFeedUrl",
+  "apk",
+  "mapping",
+  "mappingBytes",
+  "mappingSha256",
+]) {
   if (metadata[field] === undefined || metadata[field] === null || metadata[field] === "") {
     throw new Error(`artifacts/messenger-dev.json has no ${field}`);
   }
@@ -113,6 +122,26 @@ const apkBytes = statSync(apkPath).size;
 const apkSha256 = createHash("sha256").update(readFileSync(apkPath)).digest("hex");
 if (apkBytes !== metadata.apkBytes || apkSha256 !== metadata.apkSha256) {
   throw new Error("the dev APK changed after it was built; rebuild before publishing");
+}
+const mappingPath = path.resolve(metadata.mapping);
+if (!existsSync(mappingPath)) {
+  throw new Error(
+    `the dev R8 mapping named by the metadata is missing: ${mappingPath}; ` +
+      "rebuild the dev APK before publishing",
+  );
+}
+const mappingBytes = statSync(mappingPath).size;
+const mappingSha256 = createHash("sha256").update(readFileSync(mappingPath)).digest("hex");
+if (mappingBytes !== metadata.mappingBytes) {
+  throw new Error(
+    `the dev R8 mapping is ${mappingBytes} bytes but the build recorded ` +
+      `${metadata.mappingBytes}; rebuild before publishing`,
+  );
+}
+if (mappingSha256 !== metadata.mappingSha256) {
+  throw new Error(
+    "the dev R8 mapping changed after the APK was built; rebuild before publishing",
+  );
 }
 
 const localEnv = readEnvFile(path.join(root, ".env.local"));
@@ -218,28 +247,17 @@ if (existing.status === 0) {
 // The asset name is stable for a given build, and the release endpoint is the
 // URL the app downloads. `gh`'s `file#name` syntax is inconsistent with Windows
 // drive paths, so stage a copy with the exact name instead.
-const uploadPath = path.join(path.dirname(apkPath), assetName);
+const uploadDirectory = path.dirname(apkPath);
+const uploadPath = path.join(uploadDirectory, assetName);
 copyFileSync(apkPath, uploadPath);
 run("gh", ["release", "upload", tag, uploadPath, "--clobber"]);
 // R8 rewrites the release bytecode, so an obfuscated crash report can only be
-// read with the matching mapping file. Keep it beside the bytes it describes.
-const mappingPath = path.join(
-  root,
-  "android",
-  "app",
-  "build",
-  "outputs",
-  "mapping",
-  "release",
-  "mapping.txt",
-);
-if (existsSync(mappingPath)) {
-  const mappingName = `mapping-${metadata.versionName}.txt`;
-  const mappingUpload = path.join(path.dirname(apkPath), mappingName);
-  copyFileSync(mappingPath, mappingUpload);
-  run("gh", ["release", "upload", tag, mappingUpload, "--clobber"]);
-}
-const assetNameOnRelease = assetName;
+// read with the matching mapping file. Upload the copy that was recorded beside
+// the APK and verified above, staged under the release asset's name.
+const mappingName = `mapping-${metadata.versionName}.txt`;
+const mappingUpload = path.join(uploadDirectory, mappingName);
+copyFileSync(mappingPath, mappingUpload);
+run("gh", ["release", "upload", tag, mappingUpload, "--clobber"]);
 const uploaded = run(
   "gh",
   ["release", "view", tag, "--json", "assets", "--jq", ".assets[].name"],
@@ -248,8 +266,10 @@ const uploaded = run(
   .split(/\r?\n/)
   .map((line) => line.trim())
   .filter(Boolean);
-if (!uploaded.includes(assetNameOnRelease)) {
-  throw new Error(`GitHub release ${tag} does not contain ${assetNameOnRelease}`);
+for (const expected of [assetName, mappingName]) {
+  if (!uploaded.includes(expected)) {
+    throw new Error(`GitHub release ${tag} does not contain ${expected}`);
+  }
 }
 
 const convexEnv = { ...process.env };

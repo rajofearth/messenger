@@ -159,20 +159,24 @@ class AppUpdaterModule : Module() {
    * at startup came from a process that was killed. A verified APK is kept on
    * purpose for a retry, and is deleted once the running version code is newer
    * than the build that started the install -- a local comparison, so it works
-   * with no network and no feed.
+   * with no network and no feed. Android may delete the cache directory itself,
+   * so a completed attempt is recorded as handled even with nothing to delete.
    */
   private fun sweepCache() {
-    val directory = updateDirectory(context)
-    if (!directory.isDirectory) return
     // A live download owns everything in this directory. Touching it here
     // would delete the streaming .part or the verified target mid-download.
     if (activeDownload.get() != null) return
-    directory.listFiles()?.forEach { if (it.name.endsWith(PART_SUFFIX)) it.delete() }
+    val directory = updateDirectory(context)
     val attempted = prefs(context).getLong(KEY_INSTALL_ATTEMPT, 0L)
+    // The attempt is cleared even when Android already removed the directory,
+    // so a later download is not mistaken for leftovers from that install.
     if (attempted in 1L until installedVersionCode(context)) {
       directory.listFiles()?.forEach { it.delete() }
       prefs(context).edit().remove(KEY_INSTALL_ATTEMPT).apply()
+      return
     }
+    if (!directory.isDirectory) return
+    directory.listFiles()?.forEach { if (it.name.endsWith(PART_SUFFIX)) it.delete() }
   }
 
   private fun prefs(context: Context) =

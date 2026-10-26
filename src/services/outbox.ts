@@ -81,16 +81,19 @@ function deleteQuietly(file: File) {
 /**
  * Copies a picked file into app documents before it is uploaded and points the
  * bubble at that copy. Bytes are kept unchanged: no transcode, no re-encode.
- * A source that is already in documents is durable and left alone. A missing
- * source returns the message unchanged, so the upload fails normally while the
- * outbox row still survives for a later retry.
+ * A source that is already in documents is durable and left alone. Returns
+ * null when there is no URI, the source is missing or empty, or the copy
+ * fails, so the caller fails the send instead of queueing a retry that can
+ * never work. A destination from an earlier attempt is reused even when the
+ * picker source is gone, which rescues a kill between the copy and the row
+ * update.
  */
-export async function keepOutgoingCopy(message: Message): Promise<Message> {
-  if (!message.uri) return message;
+export async function keepOutgoingCopy(
+  message: Message,
+): Promise<Message | null> {
+  const { uri } = message;
+  if (!uri) return null;
   try {
-    if (message.uri.startsWith(Paths.document.uri)) return message;
-    const source = new File(message.uri);
-    if (!source.exists || source.size <= 0) return message;
     const destination = new File(
       outboxDirectory(),
       `outbox-${safeName(message.id)}.${extensionFor(message)}`,
@@ -98,20 +101,24 @@ export async function keepOutgoingCopy(message: Message): Promise<Message> {
     if (destination.exists && destination.size > 0) {
       return { ...message, uri: destination.uri };
     }
+    const source = new File(uri);
+    if (!source.exists || source.size <= 0) return null;
+    if (uri.startsWith(Paths.document.uri)) return message;
     try {
       await source.copy(destination);
     } catch {
       deleteQuietly(destination);
-      return message;
+      return null;
     }
     return { ...message, uri: destination.uri };
   } catch {
-    return message;
+    return null;
   }
 }
 
 let records: OutboxRecord[] | null = null;
 let loaded = false;
+let generation = 0;
 let writes: Promise<void> = Promise.resolve();
 
 /** Persists the full in-memory list, one write at a time. */
@@ -133,14 +140,36 @@ function put(chatId: string, message: Message) {
   return queueWrite();
 }
 
+/** Shape guard for a persisted row: a chat id and a message id are required. */
+function isOutboxRecord(value: unknown): value is OutboxRecord {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Partial<OutboxRecord>;
+  return (
+    typeof record.chatId === "string" &&
+    !!record.message &&
+    typeof record.message.id === "string"
+  );
+}
+
 /**
- * Reads the persisted queue and adopts it as the in-memory list. Called once
- * with the rest of the cold-start cache; signing out clears storage first, so
- * the next account cannot inherit the previous one's pending sends.
+ * Reads the persisted queue and adopts it as the in-memory list, keeping rows
+ * queued while the read was in flight. Called once with the rest of the
+ * cold-start cache; signing out clears storage first, so the next account
+ * cannot inherit the previous one's pending sends.
  */
 export async function loadOutbox(): Promise<OutboxRecord[]> {
   try {
-    records = (await messengerRepository.loadOutbox()) ?? [];
+    const stored = await messengerRepository.loadOutbox();
+    // A row queued during the read is newer than the stored copy.
+    const queued = records ?? [];
+    const queuedIds = new Set(queued.map((record) => record.message.id));
+    const valid = Array.isArray(stored)
+      ? stored.filter(isOutboxRecord)
+      : [];
+    records = [
+      ...valid.filter((record) => !queuedIds.has(record.message.id)),
+      ...queued,
+    ];
     loaded = true;
   } catch {
     // A failed read must not drop sends already queued in this session.
@@ -159,6 +188,27 @@ export function outboxLoaded(): boolean {
 }
 
 /**
+ * Drops the in-memory queue before sign-out and waits for writes already
+ * queued. A late upload callback then finds no row and cannot persist a
+ * previous account's message after the store was cleared.
+ */
+export async function clearOutbox(): Promise<void> {
+  generation += 1;
+  records = null;
+  loaded = false;
+  await writes.catch(() => undefined);
+}
+
+/**
+ * Identifies the queue generation a send started in. Sign-out advances it, so
+ * an attachment copy that finishes afterwards cannot enqueue into the next
+ * account's outbox.
+ */
+export function outboxGeneration(): number {
+  return generation;
+}
+
+/**
  * Seeds the queue from the slice loaded with the rest of the cold-start cache.
  * Replacing is deliberate: signing out clears storage, and the next account
  * must not inherit the previous one's pending sends.
@@ -171,11 +221,17 @@ export function outboxSnapshot(): OutboxRecord[] {
   return records ? [...records] : [];
 }
 
-/** Adds an outgoing message before its copy and upload start. */
+/**
+ * Adds an outgoing message to the queue before its upload starts. A send that
+ * began in an earlier queue generation is ignored, so a sign-out during an
+ * attachment copy cannot re-enqueue the old account's message.
+ */
 export function rememberOutgoing(
   chatId: string,
   message: Message,
+  startedIn = generation,
 ): Promise<void> {
+  if (startedIn !== generation) return Promise.resolve();
   return put(chatId, message);
 }
 

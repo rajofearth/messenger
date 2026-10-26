@@ -43,6 +43,42 @@ type Args = {
 };
 
 /**
+ * Confirmation saves are serialized per conversation. Two receipts can arrive
+ * back-to-back, and without a chain both could load the stored thread before
+ * either write landed, so the store's per-key coalescing would keep only the
+ * last one. Module scope is deliberate: the writers object is rebuilt on every
+ * render, so a closure-local chain would not be shared by its callbacks.
+ */
+const threadSaves = new Map<string, Promise<void>>();
+
+/**
+ * Merges the confirmed in-memory rows over the stored thread instead of
+ * replacing it. At cold start the in-memory thread can hold only the message
+ * the outbox just retried; a notification reply can likewise be confirmed
+ * before its conversation was ever loaded. Rows are ordered by `sequence`, the
+ * same order the server thread uses, before they reach the cache.
+ */
+function saveConfirmedThread(chatId: string, confirmed: Message[]) {
+  const previous = threadSaves.get(chatId) ?? Promise.resolve();
+  const save = previous
+    .then(async () => {
+      const stored = (await messengerRepository.loadMessages(chatId)) ?? [];
+      const merged = new Map(stored.map((item) => [item.id, item]));
+      // The in-memory copy is newer, so it wins on a duplicate id.
+      for (const item of confirmed) merged.set(item.id, item);
+      const rows = [...merged.values()]
+        .filter((item) => isConfirmed(item))
+        .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+      await messengerRepository.saveMessages(chatId, rows);
+    })
+    .catch(() => undefined);
+  threadSaves.set(chatId, save);
+  void save.finally(() => {
+    if (threadSaves.get(chatId) === save) threadSaves.delete(chatId);
+  });
+}
+
+/**
  * Small optimistic writers shared by sending, reacting and preferences.
  * Every write updates the ref first so the next action sees it immediately.
  */
@@ -184,9 +220,9 @@ export function createRemoteWriters({
   /**
    * Swaps an optimistic bubble for the server's confirmed view. The mutation
    * result is the first point where the message has a sequence, so this is the
-   * only place a send becomes `sent`. The confirmed row is written to the
-   * thread cache; the pending bubble never was, so a kill between the two
-   * leaves the outbox row in charge of the retry.
+   * only place a send becomes `sent`. The confirmed row is merged into the
+   * stored thread and written to the cache; the pending bubble never was, so a
+   * kill between the two leaves the outbox row in charge of the retry.
    */
   function confirmLocalMessage({
     chatId,
@@ -205,12 +241,7 @@ export function createRemoteWriters({
     const value = { ...messagesRef.current, [chatId]: next };
     messagesRef.current = value;
     updateMessages(() => value);
-    void messengerRepository
-      .saveMessages(
-        chatId,
-        next.filter((item) => isConfirmed(item)),
-      )
-      .catch(() => {});
+    saveConfirmedThread(chatId, next.filter((item) => isConfirmed(item)));
     if (index !== thread.length - 1) return;
     const createdAt = confirmed.createdAt
       ? Date.parse(confirmed.createdAt)

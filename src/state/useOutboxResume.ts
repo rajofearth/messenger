@@ -27,7 +27,13 @@ export function useOutboxResume(
 ) {
   const retry = useRef(retryMessage);
   const attempts = useRef(new Map<string, number>());
-  retry.current = retryMessage;
+
+  // Point the ref at the latest committed callback only. Writing it during
+  // render could select a closure from a render React discards, whose fresh
+  // in-flight set would miss the committed callback's retries.
+  useEffect(() => {
+    retry.current = retryMessage;
+  });
 
   useEffect(() => {
     if (!localReady) return;

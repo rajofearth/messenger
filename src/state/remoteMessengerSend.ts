@@ -6,6 +6,7 @@ import { isSendConfirmed } from "../domain/outbox";
 import {
   forgetOutgoing,
   keepOutgoingCopy,
+  outboxGeneration,
   rememberOutgoing,
   updateOutgoing,
 } from "../services/outbox";
@@ -54,10 +55,11 @@ export type RetryMessage = (
 ) => boolean;
 
 /**
- * Owns text and attachment sends plus retries. Every send is recorded in the
- * durable outbox first, an attachment is copied into app documents before it is
- * uploaded, and a failed message keeps its bubble, local URI, finalized storage
- * id and client message id so a retry reuses all of them.
+ * Owns text and attachment sends plus retries. A text send is recorded in the
+ * durable outbox first; an attachment is copied into app documents before its
+ * row is written, so a missing source fails without leaving a row that can
+ * never succeed. A failed message keeps its bubble, local URI, finalized
+ * storage id and client message id so a retry reuses all of them.
  */
 export function createRemoteSend({
   selectedRef,
@@ -123,10 +125,15 @@ export function createRemoteSend({
     silent = false,
   ) {
     try {
-      await rememberOutgoing(chatId, message);
+      const startedIn = outboxGeneration();
       const durable = await keepOutgoingCopy(message);
-      let sending = message;
-      if (durable.uri && durable.uri !== message.uri) {
+      // Sign-out during the copy clears the queue; do not enqueue or upload
+      // the previous account's attachment.
+      if (startedIn !== outboxGeneration()) return;
+      if (!durable) throw new Error("MISSING_ATTACHMENT");
+      await rememberOutgoing(chatId, durable, startedIn);
+      let sending = durable;
+      if (durable.uri !== message.uri) {
         sending =
           updateLocalMessage({
             chatId,

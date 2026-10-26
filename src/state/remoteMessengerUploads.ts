@@ -22,6 +22,9 @@ export function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("FILE_TOO_LARGE")) return "Choose a file up to 25 MiB.";
   if (message.includes("INVALID_MIME")) return "That file type is not supported here.";
+  if (message.includes("MISSING_ATTACHMENT")) {
+    return "That file is no longer available. Pick it again.";
+  }
   return "Check your connection and try again.";
 }
 

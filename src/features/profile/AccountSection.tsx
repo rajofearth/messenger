@@ -20,6 +20,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { messengerRepository } from "../../data/messengerRepository";
 import { clearLocalAccountFiles } from "../../services/accountCleanup";
+import { clearOutbox } from "../../services/outbox";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 
 type Dialog = "password" | "devices" | null;
@@ -119,6 +120,10 @@ export default function AccountSection({
           onPress: () => {
             void (async () => {
               try {
+                // Stop the in-memory queue before the account goes away, so a
+                // late upload callback cannot re-queue a previous account's
+                // message after the local store is cleared.
+                await clearOutbox();
                 await unregister({}).catch(() => {});
                 await signOut();
               } catch {
