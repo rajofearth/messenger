@@ -14,7 +14,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
 import {
   Album,
-  Asset,
   MediaType,
   getPermissionsAsync,
   presentPermissionsPicker,
@@ -44,7 +43,8 @@ import {
 import { MediaPickerPreview } from "./MediaPickerPreview";
 import { MediaCamera } from "./MediaCamera";
 import { MEDIA_PAGE_SIZE, queryMediaPage } from "./mediaPickerQuery";
-import { mediaMimeType } from "./mediaMimeType";
+import { resolvePickedMedia } from "./resolvePickedMedia";
+import { useMediaPickerBack } from "./useMediaPickerBack";
 import { trackDevEvent } from "../../services/devTelemetry";
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
@@ -67,6 +67,7 @@ type Props = {
   emptyText?: string;
   mediaMode?: "photos" | "photos-and-videos";
   selectionLimit?: number;
+  appendCameraCapture?: boolean;
 };
 export function MediaPicker(props: Props) {
   const colors = palette(props.dark);
@@ -99,6 +100,15 @@ export function MediaPicker(props: Props) {
     albums.find((item) => item.id === albumId)?.title || "Recents";
   const limit = props.selectionLimit ?? MEDIA_PICKER_LIMIT;
   const filters = photosOnly ? FILTERS.filter((item) => item.id !== "videos") : FILTERS;
+  useMediaPickerBack({
+    preview: !!preview,
+    albumOpen,
+    cameraOpen,
+    onClose: props.onClose,
+    onPreview: () => setPreview(null),
+    onAlbum: () => setAlbumOpen(false),
+    onCamera: () => setCameraOpen(false),
+  });
   const granularPermissions: GranularPermission[] = photosOnly
     ? ["photo"]
     : GRANULAR_PERMISSIONS;
@@ -264,27 +274,7 @@ export function MediaPicker(props: Props) {
     if (!selection.length || preparing) return;
     setPreparing(true);
     try {
-      const resolved = await Promise.all(
-        selection.map(async (id) => {
-          try {
-            const info = await new Asset(id).getInfo();
-            return {
-              uri: info.uri,
-              video: info.mediaType === MediaType.VIDEO,
-              filename: info.filename,
-              mimeType: mediaMimeType(info.filename, info.mediaType === MediaType.VIDEO),
-              width: info.width,
-              height: info.height,
-              duration: info.duration ? info.duration / 1000 : undefined,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const media = resolved.filter(
-        (item): item is NonNullable<typeof item> => !!item?.uri,
-      );
+      const media = await resolvePickedMedia(selection);
       if (!media.length) {
         throw new Error("Those items are no longer available.");
       }
@@ -483,8 +473,24 @@ export function MediaPicker(props: Props) {
             photosOnly={photosOnly}
             onClose={() => setCameraOpen(false)}
             onCaptured={(media) => {
-              setCameraOpen(false);
-              props.onPicked([media]);
+              if (!props.appendCameraCapture) {
+                setCameraOpen(false);
+                props.onPicked([media]);
+                return;
+              }
+              if (selection.length >= limit) {
+                Alert.alert(
+                  "Story is full",
+                  `You can add up to ${limit} items. Remove one before capturing another.`,
+                );
+                setCameraOpen(false);
+                return;
+              }
+              void resolvePickedMedia(selection).then((selected) => {
+                if (!alive.current) return;
+                setCameraOpen(false);
+                props.onPicked([...selected, media]);
+              });
             }}
           />
         </View>

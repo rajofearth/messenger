@@ -70,22 +70,23 @@ function button(tree, label) {
   return nodes(tree).find((node) => node.type === "Button" && (node.props.accessibilityLabel === label || text(node).includes(label)));
 }
 
-test("update prompt is safe-area bounded with release notes collapsed by default", () => {
+test("update prompt is safe-area bounded with release notes expanded by default", () => {
   const tree = harness().render();
   assert.ok(nodes(tree).some((node) => node.type === "SafeAreaView"));
   assert.ok(nodes(tree).some((node) => node.type === "ScrollView"));
-  assert.equal(text(tree).includes("Video timeline"), false);
+  assert.ok(text(tree).includes("Video timeline"));
   assert.ok(text(tree).includes("0.1.1-dev.20261024.093510"));
-  assert.equal(button(tree, "What's new").props.accessibilityState.expanded, false);
+  assert.equal(button(tree, "What's new").props.accessibilityState.expanded, true);
 });
 
 test("release notes expand and collapse without hiding download or dismiss", () => {
   const app = harness();
   button(app.render(), "What's new").props.onPress();
+  assert.equal(text(app.render()).includes("Video timeline"), false);
+  assert.equal(button(app.render(), "What's new").props.accessibilityState.expanded, false);
+  button(app.render(), "What's new").props.onPress();
   assert.ok(text(app.render()).includes("Video timeline"));
   assert.equal(button(app.render(), "What's new").props.accessibilityState.expanded, true);
-  button(app.render(), "What's new").props.onPress();
-  assert.equal(text(app.render()).includes("Video timeline"), false);
   button(app.render(), "Download").props.onPress();
   button(app.render(), "Later").props.onPress();
   assert.equal(app.downloaded, 1);

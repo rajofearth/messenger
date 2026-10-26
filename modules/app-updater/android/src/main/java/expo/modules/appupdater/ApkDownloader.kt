@@ -62,12 +62,17 @@ internal class ApkDownloader(
       onProgress(target.length(), target.length())
       return target to true
     }
-    // A partial file or an older release can never be installed, and keeping
-    // them would double the cache used by the next download.
-    partial.delete()
-    directory.listFiles()?.forEach { if (it != target) it.delete() }
+    // Nothing here can be installed: a partial file, an older release, or a
+    // file whose digest no longer matches its name. Clearing the directory also
+    // removes whatever a killed process left behind before this attempt.
+    directory.listFiles()?.forEach { it.delete() }
 
-    val response = open(url)
+    val response = try {
+      open(url)
+    } catch (error: Exception) {
+      if (cancelRequested.get()) throw cancelled()
+      throw error
+    }
     val digest = MessageDigest.getInstance("SHA-256")
     var downloaded = 0L
     try {
@@ -92,9 +97,11 @@ internal class ApkDownloader(
           }
         }
       }
-    } catch (error: Exception) {
+    } catch (error: Throwable) {
+      // Catch Throwable, not Exception: a killed worker or an Error must not
+      // leave a partial file for the next launch to wonder about.
       partial.delete()
-      if (cancelRequested.get() && error !is UpdateException) throw cancelled()
+      if (cancelRequested.get()) throw cancelled()
       throw error
     } finally {
       response.disconnect()
@@ -139,7 +146,14 @@ internal class ApkDownloader(
         open.disconnect()
         throw cancelled()
       }
-      val status = open.responseCode
+      val status = try {
+        open.responseCode
+      } catch (error: Exception) {
+        // The socket exists even when the connect or the status line fails, so
+        // close it here instead of leaking it.
+        open.disconnect()
+        throw error
+      }
       if (status !in 300..399) return open
       val location = open.getHeaderField("Location")
       open.disconnect()

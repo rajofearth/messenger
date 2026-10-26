@@ -6,6 +6,8 @@ export type StoryDraft = PickedMedia & {
   crop: "fit" | "fill";
 };
 
+export const MEDIA_STORY_LIMIT = 10;
+
 export function draftFromMedia(media: PickedMedia, seed: string): StoryDraft {
   return { ...media, id: `${seed}-${media.uri}`, caption: "", crop: "fit" };
 }
@@ -14,6 +16,7 @@ export function appendDrafts(
   current: readonly StoryDraft[],
   media: readonly PickedMedia[],
   seed: string,
+  limit = MEDIA_STORY_LIMIT,
 ): StoryDraft[] {
   const existing = new Set(current.map((item) => item.uri));
   return [
@@ -21,7 +24,7 @@ export function appendDrafts(
     ...media
       .filter((item) => !existing.has(item.uri))
       .map((item, index) => draftFromMedia(item, `${seed}-${index}`)),
-  ];
+  ].slice(0, limit);
 }
 
 export function removeDraft(current: readonly StoryDraft[], index: number) {
@@ -39,6 +42,20 @@ export function moveDraft(
   }
   const next = [...current];
   [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
+export function moveDraftTo(
+  current: readonly StoryDraft[],
+  from: number,
+  to: number,
+) {
+  if (from < 0 || from >= current.length || to < 0 || to >= current.length || from === to) {
+    return [...current];
+  }
+  const next = [...current];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
   return next;
 }
 

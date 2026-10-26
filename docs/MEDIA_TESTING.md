@@ -39,21 +39,28 @@ are not a physical-device acceptance run.
 1. Open Add story, select at least two library items, then tap the camera and
    capture another item. The review screen must show all three in one numbered
    thumbnail strip; the captured item must not replace the library selection.
-2. Tap thumbnails to switch the main preview. Use the left/right controls to
-   reorder, Delete to remove one item, and Add media to return to the picker.
-   The Share button publishes only after this review step.
-3. Use Crop/Fill to switch between fitting the full frame and filling/cropping
-   the story canvas. Add a caption to each item, then publish and verify the
-   order, captions and framing in the resulting stories.
-4. Open the self story while one item is still uploading. It must show a frozen
+2. Swipe the main preview and tap thumbnails to switch media. Long-press and
+   drag thumbnails to reorder them; TalkBack's Move earlier/later actions are
+   the accessible fallback. Delete removes one item, and Add media returns to
+   the picker without losing the drafts. The Share button publishes only after
+   this review step.
+3. Open Crop on a photo and choose Story 9:16, Square 1:1 or Original, then
+   Apply crop. Add a caption to each item, publish, and verify the order,
+   captions and cropped output in the resulting stories. Video items use Fit or
+   Fill framing instead of pixel crop.
+4. Press Android Back from review and confirm it returns to the picker; press
+   Back again to close the story composer. At 10 items, Add media is disabled
+   and an additional capture/selection reports the limit.
+5. Open the self story while one item is still uploading. It must show a frozen
    local preview and upload progress/status, with no view timer, viewer count or
    Save action. It must not advance automatically. Failed uploads show Retry.
 
 ## Update prompt
 
-1. On an older dev APK, open the available update. The compact initial card must
-   show the version, size and download/install action, with release notes hidden.
-2. Expand/collapse What's new. Scroll long notes without losing access to actions.
+1. On an older dev APK, open the available update. The compact card must show
+   the version, size, download/install action, and release notes **expanded by
+   default**.
+2. Collapse and re-expand What's new. Scroll long notes without losing access to actions.
    Check a small screen/landscape and larger fonts; the card must stay within
    safe-area bounds and allow scrolling instead of clipping content.
 3. Download, cancel, retry and install. Optional updates can be postponed; forced

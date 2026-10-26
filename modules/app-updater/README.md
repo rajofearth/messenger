@@ -21,7 +21,9 @@ Failures reject with a stable `code`: `ERR_UPDATE_BUSY`, `ERR_UPDATE_HTTP`, `ERR
 
 ## Download behaviour
 
-`downloadApk` runs on a single worker thread, one download at a time (`ERR_UPDATE_BUSY` otherwise). The file name is derived from the expected digest, never from the URL or the feed, so a hostile manifest cannot choose a path: the target is always `cacheDir/updates/update-<first 12 hex of the digest>.apk`. Before downloading, the directory is emptied of anything else, so at most one release APK is ever cached. Downloads happen through a `.part` file that is renamed only after the streaming SHA-256 matches; a mismatch deletes it and rejects with `ERR_UPDATE_CHECKSUM`. Redirects are followed by hand (GitHub release assets redirect to a CDN), a maximum of five, and only to `http`/`https`. The declared and the actual sizes are both capped at 200 MiB. `http` is accepted only in a debuggable build, so a test feed can run on a laptop.
+`downloadApk` runs on a single worker thread, one download at a time (`ERR_UPDATE_BUSY` otherwise). The file name is derived from the expected digest, never from the URL or the feed, so a hostile manifest cannot choose a path: the target is always `cacheDir/updates/update-<first 12 hex of the digest>.apk`. Before downloading, the directory is emptied, so at most one release APK is ever cached and a file whose digest no longer matches its name cannot survive. Downloads happen through a `.part` file that is renamed only after the streaming SHA-256 matches; every failure path deletes it, including an `Error`, a cancellation, a timeout, an HTTP error and a checksum mismatch.
+
+Fragment cleanup does not depend on the user starting another download. Every status read with no download running deletes leftover `.part` files, so a process killed mid-download leaves nothing behind after the next launch. A verified APK is kept on purpose for a retry, and is deleted once the running version code is newer than the build that started the install; that comparison is local, so an offline launch after an update still clears the cache. Redirects are followed by hand (GitHub release assets redirect to a CDN), a maximum of five, and only to `http`/`https`. The declared and the actual sizes are both capped at 200 MiB. `http` is accepted only in a debuggable build, so a test feed can run on a laptop.
 
 The digest proves the bytes match the published release. It does not prove the release is genuine; that guarantee comes from Android refusing to install an APK signed by a different key. Never disable that check by shipping a "signature ignored" install path.
 
@@ -40,7 +42,7 @@ Focused Kotlin compilation: `gradlew.bat :app-updater:compileDebugKotlin --conso
 Device acceptance checklist, not yet verified on hardware:
 
 1. Clean install, check `getStatus().versionCode` against `app.json`.
-2. Download a release APK, interrupt the network mid-download, confirm the `.part` file is gone and the retry starts over.
+2. Download a release APK, interrupt the network mid-download, confirm the `.part` file is gone and the retry starts over. Then kill the app mid-download, relaunch, and confirm the leftover `.part` is gone without starting a new download (`adb shell run-as <applicationId> ls cache/updates` in a debuggable build).
 3. With installs still disallowed, `installApk` rejects with `ERR_UPDATE_PERMISSION`; the settings intent lands on the app's own toggle.
-4. Install the downloaded package over the current build; confirm the app restarts on the new version and the cached file is cleared on the next launch.
+4. Install the downloaded package over the current build; confirm the app restarts on the new version and the cached file is cleared on the next launch, including while offline.
 5. Rotate a published digest to a wrong value and confirm `ERR_UPDATE_CHECKSUM` with nothing installed.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendDrafts, moveDraft, removeDraft, toggleDraftCrop } from "./storyComposerModel.ts";
+import { appendDrafts, moveDraft, moveDraftTo, removeDraft, toggleDraftCrop } from "./storyComposerModel.ts";
 
 const media = (uri) => ({ uri, video: false });
 
@@ -14,6 +14,7 @@ test("review order can move items and remove the current item", () => {
   const drafts = appendDrafts([], [media("a"), media("b"), media("c")], "seed");
   assert.deepEqual(moveDraft(drafts, 2, -1).map((item) => item.uri), ["a", "c", "b"]);
   assert.deepEqual(removeDraft(drafts, 1).map((item) => item.uri), ["a", "c"]);
+  assert.deepEqual(moveDraftTo(drafts, 0, 2).map((item) => item.uri), ["b", "c", "a"]);
 });
 
 test("crop is a deliberate fit/fill framing toggle", () => {
