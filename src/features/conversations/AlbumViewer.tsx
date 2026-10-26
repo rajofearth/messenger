@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
+import { Modal, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { AlbumItem } from "./MediaAlbum";
 import type { MessageBubbleProps } from "./MessageBubble";
 import VideoAttachment from "./VideoAttachment";
@@ -16,6 +16,7 @@ type Props = Pick<MessageBubbleProps, "onActions"> & {
 
 export default function AlbumViewer({ messages, initialId, visible, onClose, onActions }: Props) {
   const [selectedId, setSelectedId] = useState(initialId);
+  const { width } = useWindowDimensions();
   const found = messages.findIndex((message) => message.id === selectedId);
   const index = Math.max(0, found);
   const message = messages[index];
@@ -44,8 +45,13 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
             {message.uri ? message.kind === "video" ? (
               <VideoAttachment uri={message.uri} />
             ) : (
-              <Image
-                source={{ uri: message.uri }}
+              <ResponsiveImage
+                uri={message.uri}
+                variants={message.variants}
+                sourceWidth={message.width}
+                previewUri={message.previewUri}
+                previewWidth={message.previewWidth}
+                displayWidth={width}
                 recyclingKey={message.id}
                 style={s.image}
                 contentFit="contain"

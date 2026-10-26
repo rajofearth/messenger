@@ -31,6 +31,9 @@ export type Message = {
   height?: number;
   uri?: string;
   variants?: ImageVariant[];
+  /** Local file for the chosen width; `uri` still points at the original. */
+  previewUri?: string;
+  previewWidth?: number;
   filename?: string;
   duration?: number;
   reaction?: string;
@@ -85,6 +88,9 @@ export type Story = {
   variants?: ImageVariant[];
   width?: number;
   height?: number;
+  /** Local file for the chosen width; `image` still points at the original. */
+  previewUri?: string;
+  previewWidth?: number;
   /** Local-only MIME type of a just-picked story file. */
   mimeType?: string;
   seen: boolean;

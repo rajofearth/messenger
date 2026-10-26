@@ -6,6 +6,25 @@ import ts from "typescript";
 const sourceUri = "file:///private/documents/story.jpg";
 const publicUri = "file:///storage/emulated/0/Pictures/Messenger/story.jpg";
 
+// mediaCache imports the real domain helpers, so compile them once here.
+function loadModule(relative, modules = {}) {
+  const compiled = ts.transpileModule(
+    readFileSync(new URL(relative, import.meta.url), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+  ).outputText;
+  const exports = {};
+  new Function("require", "exports", compiled)((name) => {
+    assert.ok(name in modules, `Missing mock: ${name}`);
+    return modules[name];
+  }, exports);
+  return exports;
+}
+
+const cache = loadModule("../data/cache.ts");
+const imageVariants = loadModule("../domain/imageVariants.ts", {
+  "../data/cache": cache,
+});
+
 function harness(options = {}) {
   const events = [];
   const calls = [];
@@ -35,7 +54,10 @@ function harness(options = {}) {
       uri = "file:///private/documents/messenger-media";
       constructor() { if (options.cacheFails) throw new Error("Cache unavailable"); }
     }, Paths: { document: { uri: "file:///private/documents/" }, cache: { uri: "file:///private/cache/" } } },
-    "react-native": { Platform: { OS: "android" } },
+    "react-native": {
+      Platform: { OS: "android" },
+      PixelRatio: { get: () => 2 },
+    },
     "expo-media-library": {
       MediaType: { IMAGE: "image", VIDEO: "video" },
       requestPermissionsAsync: async () => { calls.push(["permission"]); return { granted: !options.denied }; },
@@ -45,6 +67,7 @@ function harness(options = {}) {
       },
       Asset: { create: async (...args) => { calls.push(["assetCreate", ...args]); return asset; } },
     },
+    "../domain/imageVariants": imageVariants,
     "./devTelemetry": { trackDevEvent: (event, fields) => events.push({ event, ...fields }) },
   };
   const compiled = ts.transpileModule(readFileSync(new URL("./mediaCache.ts", import.meta.url), "utf8"), {
@@ -145,4 +168,57 @@ test("without a variant the message id remains the whole local filename", async 
     mimeType: "image/jpeg",
   });
   assert.equal(uri, "file:///private/documents/messenger-media/message-1.jpg");
+});
+
+const remoteStory = "https://example.invalid/story.jpg";
+const storyVariants = [
+  { name: "w256", width: 256, height: 480, uri: "https://example.invalid/w256.webp", mimeType: "image/webp" },
+  { name: "w512", width: 512, height: 960, uri: "https://example.invalid/w512.webp", mimeType: "image/webp" },
+  { name: "w1080", width: 1080, height: 1920, uri: "https://example.invalid/w1080.webp", mimeType: "image/webp" },
+];
+
+function story(overrides = {}) {
+  return {
+    id: "s1",
+    name: "Alex",
+    avatar: "",
+    image: remoteStory,
+    variants: storyVariants,
+    width: 1080,
+    seen: false,
+    caption: "",
+    expiresAt: Date.now() + 60_000,
+    ...overrides,
+  };
+}
+
+test("a photo story caches the viewer width and keeps the remote original", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const [cached] = await app.prefetchStories([story()]);
+  assert.equal(cached.image, remoteStory);
+  assert.equal(cached.previewWidth, 1080);
+  assert.equal(
+    cached.previewUri,
+    "file:///private/documents/messenger-media/story-s1-w1080.webp",
+  );
+  assert.deepEqual(app.downloads, [cached.previewUri]);
+});
+
+test("a video story never downloads an image variant", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const [cached] = await app.prefetchStories([story({ video: true })]);
+  assert.equal(
+    cached.image,
+    "file:///private/documents/messenger-media/story-s1.mp4",
+  );
+  assert.equal(cached.previewUri, undefined);
+  assert.deepEqual(app.downloads, [cached.image]);
+});
+
+test("a failed variant download leaves the photo story on its remote source", async () => {
+  const app = harness();
+  const remote = story();
+  const [cached] = await app.prefetchStories([remote]);
+  assert.equal(cached.image, remoteStory);
+  assert.equal(cached.previewUri, undefined);
 });

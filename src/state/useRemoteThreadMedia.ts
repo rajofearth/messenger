@@ -1,8 +1,11 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { PixelRatio } from "react-native";
 import type { Message } from "../domain/data";
+import { chooseImageSource } from "../domain/imageVariants";
 import { isConfirmed, mergeThread } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
-import { cacheRemoteMedia, saveMediaToGallery } from "../services/mediaCache";
+import { cacheRemoteMedia } from "../services/mediaCache";
+import { saveMessageMedia } from "./remoteMessengerMedia";
 
 type Args = {
   selected: string | null;
@@ -48,16 +51,44 @@ export function useRemoteThreadMedia({
       .catch(() => {});
     void Promise.all(
       remoteThread.map(async (item) => {
-        const message = { ...item };
-        if (!message.uri || message.kind === "file") return message;
+        if (!item.uri || item.kind === "file") return item;
+        // An image keeps its remote original in `uri` and caches the chosen
+        // bubble width beside it, so opening or saving still has full quality.
+        if (item.kind === "image" && item.variants?.length) {
+          const choice = chooseImageSource({
+            uri: item.uri,
+            variants: item.variants,
+            sourceWidth: item.width,
+            displayWidth: 220,
+            density: PixelRatio.get(),
+          });
+          if (
+            choice?.kind === "variant" &&
+            choice.name &&
+            choice.width !== undefined
+          ) {
+            const previewUri = await cacheRemoteMedia({
+              id: item.id,
+              uri: choice.uri,
+              variant: choice.name,
+              mimeType: choice.mimeType,
+              kind: item.kind,
+            });
+            // A failed download keeps the remote variant for the renderer.
+            if (previewUri && previewUri !== choice.uri) {
+              return { ...item, previewUri, previewWidth: choice.width };
+            }
+            return item;
+          }
+        }
         const uri = await cacheRemoteMedia({
-          id: message.id,
-          uri: message.uri,
-          filename: message.filename,
-          mimeType: message.mimeType,
-          kind: message.kind,
+          id: item.id,
+          uri: item.uri,
+          filename: item.filename,
+          mimeType: item.mimeType,
+          kind: item.kind,
         });
-        return uri && uri !== message.uri ? { ...message, uri } : message;
+        return uri && uri !== item.uri ? { ...item, uri } : item;
       }),
     )
       .then(async (next) => {
@@ -80,7 +111,7 @@ export function useRemoteThreadMedia({
           // stay in app storage even when the conversation exports media.
           if (message.kind !== "image" && message.kind !== "video") continue;
           if (gallerySavedRef.current.has(message.id)) continue;
-          const saved = await saveMediaToGallery(message.uri).catch(() => false);
+          const saved = await saveMessageMedia(message).catch(() => false);
           if (!saved) continue;
           gallerySavedRef.current.add(message.id);
           setGallerySaved([...gallerySavedRef.current]);

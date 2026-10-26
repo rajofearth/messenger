@@ -8,6 +8,7 @@
  */
 
 import { cacheKey } from "../data/cache";
+import type { ImageVariant } from "./data";
 
 /** Stored widths, smallest first. A source narrower than a width is never upscaled. */
 export const IMAGE_VARIANT_WIDTHS = [256, 512, 1080] as const;
@@ -73,4 +74,67 @@ export function imageCacheKey(uri: string): string | undefined {
 
 export function variantName(width: number): string {
   return `w${width}`;
+}
+
+/** What one image surface should load, and the cache key a remote URI needs. */
+export type ImageSourceChoice = {
+  kind: "local" | "variant" | "original";
+  uri: string;
+  /** Chosen variant width and name, when kind === "variant". */
+  width?: number;
+  name?: string;
+  mimeType?: string;
+  /** expo-image cache key for a remote URI. */
+  cacheKey?: string;
+};
+
+const local = /^(?:file|content|asset|data):/i;
+
+/**
+ * The source a view should ask for. A local file is authoritative: it is
+ * already downloaded, and an original may be needed for a gallery save. Remote
+ * images take the smallest variant that covers the view at its 2x density,
+ * falling back to the original when no variant covers it or when the variant
+ * would widen a smaller source. An already-downloaded preview is reused only
+ * when it is at least as wide as the chosen variant.
+ */
+export function chooseImageSource(input: {
+  uri?: string;
+  variants?: readonly ImageVariant[];
+  /** Original image width in pixels, when known. */
+  sourceWidth?: number;
+  /** Display slot width in dp. */
+  displayWidth: number;
+  density: number;
+  /** A local file already downloaded for one width. */
+  preview?: { uri: string; width: number };
+}): ImageSourceChoice | undefined {
+  const { uri, variants, sourceWidth, displayWidth, density, preview } = input;
+  if (!uri) return undefined;
+  if (local.test(uri)) return { kind: "local", uri };
+  const target = targetPixels(displayWidth, density);
+  let choice: ImageSourceChoice = { kind: "original", uri };
+  if (variants && variants.length > 0) {
+    const picked = pickImageVariant(variants, target);
+    if (picked) {
+      const covers = picked.width >= target;
+      const matchesSource =
+        sourceWidth !== undefined && sourceWidth <= picked.width;
+      if (covers || matchesSource) {
+        choice = {
+          kind: "variant",
+          uri: picked.uri,
+          width: picked.width,
+          name: picked.name,
+          mimeType: picked.mimeType,
+        };
+      }
+    }
+  }
+  if (choice.kind === "variant") {
+    if (preview && preview.width >= (choice.width ?? 0)) {
+      return { kind: "local", uri: preview.uri };
+    }
+  }
+  return { ...choice, cacheKey: imageCacheKey(choice.uri) };
 }

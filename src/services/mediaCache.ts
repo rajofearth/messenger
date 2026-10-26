@@ -1,7 +1,8 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { Album, Asset, MediaType, requestPermissionsAsync } from "expo-media-library";
-import { Platform } from "react-native";
+import { PixelRatio, Platform } from "react-native";
 import type { Message, Story } from "../domain/data";
+import { chooseImageSource } from "../domain/imageVariants";
 import { trackDevEvent } from "./devTelemetry";
 
 const FOLDER = "messenger-media";
@@ -69,7 +70,11 @@ export async function cacheRemoteMedia(input: {
   }
 }
 
-/** Downloads the visible stories, newest first, and points them at local files. */
+/**
+ * Downloads the visible stories, newest first. A photo keeps its remote
+ * original in `image` and caches the full-screen width beside it in
+ * `previewUri`; videos and stories without variants keep one local original.
+ */
 export async function prefetchStories(stories: Story[], limit = 8) {
   const now = Date.now();
   const targets = [...stories]
@@ -77,23 +82,55 @@ export async function prefetchStories(stories: Story[], limit = 8) {
     .sort((a, b) => (b.expiresAt ?? 0) - (a.expiresAt ?? 0))
     .slice(0, limit);
   const ids = new Set(targets.map((story) => story.id));
-  const cached = new Map<string, string>();
+  const originals = new Map<string, string>();
+  const previews = new Map<string, { uri: string; width: number }>();
   await Promise.all(
     targets.map(async (story) => {
+      if (!story.video && story.variants?.length) {
+        const choice = chooseImageSource({
+          uri: story.image,
+          variants: story.variants,
+          sourceWidth: story.width,
+          displayWidth: 430,
+          density: PixelRatio.get(),
+        });
+        if (
+          choice?.kind === "variant" &&
+          choice.name &&
+          choice.width !== undefined
+        ) {
+          const uri = await cacheRemoteMedia({
+            id: `story-${story.id}`,
+            uri: choice.uri,
+            variant: choice.name,
+            mimeType: choice.mimeType,
+            kind: "story",
+          });
+          // A failed variant download leaves the remote source for the viewer.
+          if (uri && uri !== choice.uri) {
+            previews.set(story.id, { uri, width: choice.width });
+          }
+          return;
+        }
+      }
       const uri = await cacheRemoteMedia({
         id: `story-${story.id}`,
         uri: story.image,
         mimeType: story.video ? "video/mp4" : "image/jpeg",
         kind: "story",
       });
-      if (uri) cached.set(story.id, uri);
+      if (uri) originals.set(story.id, uri);
     }),
   );
-  return stories.map((story) =>
-    ids.has(story.id) && cached.has(story.id)
-      ? { ...story, image: cached.get(story.id)! }
-      : story,
-  );
+  return stories.map((story) => {
+    if (!ids.has(story.id)) return story;
+    const preview = previews.get(story.id);
+    if (preview) {
+      return { ...story, previewUri: preview.uri, previewWidth: preview.width };
+    }
+    const uri = originals.get(story.id);
+    return uri ? { ...story, image: uri } : story;
+  });
 }
 
 /**

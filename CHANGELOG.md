@@ -35,8 +35,10 @@ and this project adheres to
   `mediaVariants`, validates each against a per-width byte ceiling, and returns
   them from the message and story projections with a URL resolved at write time.
   Deleting the source, expiring a story, replacing an avatar or sweeping an
-  orphan removes the variant rows and blobs too. The renderer still shows the
-  original until the next phase.
+  orphan removes the variant rows and blobs too. The client now renders each
+  message and story photo from the smallest stored width that covers its slot
+  at 2x density, caches one preview file per image and keeps the original URI
+  in `uri`/`image`, so a gallery save still exports full resolution.
 
 ### Changed
 

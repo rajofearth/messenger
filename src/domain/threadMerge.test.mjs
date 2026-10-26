@@ -107,6 +107,44 @@ test("merge keeps a downloaded local URI for a server row", () => {
   assert.equal(merged.sequence, 1);
 });
 
+test("merge keeps a cached preview without clearing the server's", () => {
+  const cached = confirmed({
+    id: "server-1",
+    uri: "https://example.com/photo.jpg",
+    kind: "image",
+    text: undefined,
+    previewUri: "file:///cached-w512.webp",
+    previewWidth: 512,
+  });
+  const remote = confirmed({
+    id: "server-1",
+    uri: "https://example.com/photo.jpg",
+    kind: "image",
+    text: undefined,
+  });
+  const [merged] = mergeThread([remote], [cached]);
+  assert.equal(merged.previewUri, "file:///cached-w512.webp");
+  assert.equal(merged.previewWidth, 512);
+
+  const serverPreview = confirmed({
+    id: "server-1",
+    uri: "https://example.com/photo.jpg",
+    kind: "image",
+    text: undefined,
+    previewUri: "file:///older-w512.webp",
+    previewWidth: 512,
+  });
+  const empty = confirmed({
+    id: "server-1",
+    uri: "https://example.com/photo.jpg",
+    kind: "image",
+    text: undefined,
+  });
+  const [kept] = mergeThread([serverPreview], [empty]);
+  assert.equal(kept.previewUri, "file:///older-w512.webp");
+  assert.equal(kept.previewWidth, 512);
+});
+
 test("a matched optimistic bubble is replaced, an unmatched one stays", () => {
   const matched = optimistic();
   const second = optimistic({ id: "local-2", text: "Second" });

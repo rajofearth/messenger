@@ -63,6 +63,22 @@ are not a physical-device acceptance run.
    it does not delete the variants of a message that still references them.
 4. A failed send keeps the original message id and storage id. Retrying must not
    upload the widths again; the finalized source already owns them.
+5. Open the conversation, its media album and the full-screen viewer, then the
+   shared-media tab. On a 2x phone the bubble (220dp) must render from a cached
+   `w512` file, the album tile (180dp) and shared grid (130dp) from the next
+   stored width up (`w256` at 1x, `w512` at 2x), and the viewer from the largest
+   width the screen needs. No surface should still show a full-resolution
+   original once a covering variant exists.
+6. Open a photo story and check it uses the `story-<id>-w1080.webp` preview on a
+   large phone. In `Paths.document/messenger-media` (or the development file
+   inspector) there must be one preview file per image, named with its width,
+   and reopening the thread or story must not download another width. A local
+   preview narrower than the width the new surface needs must be ignored, not
+   stretched.
+7. Save that image from the conversation and the story from the viewer, then
+   check the exported file's dimensions in the gallery. Both must be the
+   original's size, not the preview width, and deleting the message or story
+   must still remove every stored width.
 
 ## Update prompt
 
