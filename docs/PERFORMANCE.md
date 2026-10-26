@@ -74,20 +74,24 @@ ships, keeping only the glyph names discovered in `App.tsx`, `src/` and `app/`.
 The scan is deliberately over-inclusive: every string literal that matches a
 name in the shipped glyph map is kept. `scripts/check-icon-glyphs.mjs` re-runs
 the same scan in `npm test` and fails if a new name is not in the subset, so a
-new icon cannot silently render as an empty square. The font falls from
-389,724 B to 26,980 B raw, and from 210,672 B to 15,850 B stored in the APK:
-**-194,822 bytes**. The current subset carries 96 glyphs.
+new icon cannot silently render as an empty square. On the master-merged head
+(`ea5bf49`) the font falls from 389,724 B to 26,736 B raw, and from 210,672 B
+to 15,713 B stored in the dev APK: **-194,959 bytes**. The subset carries 96
+glyphs; the 244 B difference from the first subset build is the changed glyph
+set after the master merge.
 
 `scripts/prune-densities.mjs` runs from `scripts/android.mjs` before Gradle. It
 deletes only `ic_launcher`, `ic_launcher_round`, `ic_launcher_foreground`,
 `ic_launcher_monochrome` and `splashscreen_logo` rasters below `xxxhdpi`; it
 never touches `drawable-nodpi`, `mipmap-anydpi-v26` or
 `ic_launcher_background`. On the real generated resource tree it removed **20
-files and 274,709 B**. The stacked build is 12,702,235 bytes, **458,828 bytes
-(-3.5%)** below the 13,161,063-byte R8 build; the rest of the difference is
-C3's client code and normal ZIP metadata/alignment variation. The build still
-has 17 native libraries, one dex, a 2.06 MiB JavaScript bundle stored
-uncompressed and 26 resource configurations.
+files and 274,709 B**. The first stacked build was 12,702,235 bytes, **458,828
+bytes (-3.5%)** below the 13,161,063-byte R8 build; the rest of the difference
+is C3's client code and normal ZIP metadata/alignment variation. After the
+master merge and the responsive-image work, the dev APK from `ea5bf49` is
+12,723,715 bytes (12.13 MiB), still 3.87 MiB under the 16 MiB gate. The build
+has 17 native libraries, one dex, a JavaScript bundle stored uncompressed and
+26 resource configurations.
 
 ### The camera barcode scanner is not bundled
 
@@ -264,7 +268,7 @@ bundle stored uncompressed, a 0.16 MiB `resources.arsc`, English-only
 resources, and 11 passing checks with one size warning for the increase over
 published v0.1.0.
 
-The A2/A3/C3 stacked build is 12,702,235 bytes. The font is the single
+The first A2/A3/C3 stacked build was 12,702,235 bytes. The font is the single
 measurable entry: 389,724 to 26,980 bytes raw, 210,672 to 15,850 bytes stored,
 so 194,822 bytes leave the APK. The density prune removes 20 files and
 274,709 bytes from the generated resource tree before packaging. C3 adds a
