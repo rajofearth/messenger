@@ -37,10 +37,10 @@ export default function UpdatePrompt({
   const colors = palette(dark);
   const { manifest, progress, download, dismissible } = updates;
   const showing = visible && updates.promptVisible;
-  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(true);
 
   useEffect(() => {
-    setNotesExpanded(false);
+    setNotesExpanded(true);
   }, [showing, manifest?.versionCode]);
 
   // A forced update has no way back: Android's back gesture must not hide the

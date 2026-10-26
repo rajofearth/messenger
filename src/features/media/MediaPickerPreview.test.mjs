@@ -58,7 +58,7 @@ function harness(initialStates = []) {
     "react-native": { View: "View", Text: "Text", Pressable: "Pressable", Platform: { OS: "android" } },
     "expo-image": { Image: "Image" },
     "expo-video": { ...video, VideoView: "VideoView" },
-    "expo-media-library": { MediaType: { VIDEO: "video", IMAGE: "image" } },
+     "expo-media-library": { MediaType: { VIDEO: "video", IMAGE: "image" }, Asset: function () { return { getUri: async () => "content://media/video.mp4" }; } },
     "expo-navigation-bar": { NavigationBar: "NavigationBar" },
     "expo-status-bar": { StatusBar: "StatusBar" },
     "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },

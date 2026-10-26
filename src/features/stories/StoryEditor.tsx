@@ -1,14 +1,16 @@
-import React, { useState } from "react";
-import { Keyboard } from "react-native";
+import React, { forwardRef, useImperativeHandle, useState } from "react";
+import { Alert, Keyboard } from "react-native";
 import type { Story } from "../../domain/data";
 import { MediaPicker } from "../media/MediaPicker";
 import type { PickedMedia } from "../media/mediaPickerModel";
 import { StoryDraftReview } from "./StoryDraftReview";
 import {
   appendDrafts,
+  MEDIA_STORY_LIMIT,
   type StoryDraft,
 } from "./storyComposerModel";
 
+export type StoryEditorHandle = { handleBack: () => boolean };
 type Props = {
   avatar: string;
   dark: boolean;
@@ -16,17 +18,28 @@ type Props = {
   onClose: () => void;
 };
 
-export function StoryEditor(props: Props) {
+export const StoryEditor = forwardRef<StoryEditorHandle, Props>(function StoryEditor(props, ref) {
   const [drafts, setDrafts] = useState<StoryDraft[]>([]);
   const [index, setIndex] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(true);
 
+  useImperativeHandle(ref, () => ({
+    handleBack() {
+      if (pickerOpen) return false;
+      setPickerOpen(true);
+      return true;
+    },
+  }), [drafts.length, pickerOpen]);
+
   function addMedia(media: PickedMedia[]) {
-    setDrafts((current) => {
-      const next = appendDrafts(current, media, Date.now().toString(36));
-      setIndex(current.length ? current.length : 0);
-      return next;
-    });
+    const next = appendDrafts(drafts, media, Date.now().toString(36), MEDIA_STORY_LIMIT);
+    const uniqueNew = media.filter((item) => !drafts.some((old) => old.uri === item.uri));
+    if (drafts.length + uniqueNew.length > MEDIA_STORY_LIMIT) {
+      Alert.alert("Story limit", `You can share up to ${MEDIA_STORY_LIMIT} items. Extra media was not added.`);
+    }
+    const firstNew = next.findIndex((item) => !drafts.some((old) => old.uri === item.uri));
+    setDrafts(next);
+    setIndex(firstNew >= 0 ? firstNew : Math.max(0, Math.min(index, next.length - 1)));
     setPickerOpen(false);
   }
 
@@ -59,6 +72,8 @@ export function StoryEditor(props: Props) {
         dark={props.dark}
         onPicked={addMedia}
         onClose={props.onClose}
+        selectionLimit={Math.max(1, MEDIA_STORY_LIMIT - drafts.length)}
+        appendCameraCapture
       />
     );
   }
@@ -72,9 +87,12 @@ export function StoryEditor(props: Props) {
         setDrafts(next);
         if (!next.length) setPickerOpen(true);
       }}
-      onAddMedia={() => setPickerOpen(true)}
+      onAddMedia={() => {
+        if (drafts.length < MEDIA_STORY_LIMIT) setPickerOpen(true);
+      }}
+      canAddMedia={drafts.length < MEDIA_STORY_LIMIT}
       onPublish={publish}
       onClose={() => setPickerOpen(true)}
     />
   );
-}
+});

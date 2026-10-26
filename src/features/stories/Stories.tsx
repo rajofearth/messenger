@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Modal } from "react-native";
 import type { Story } from "../../domain/data";
 import { groupStories } from "../../domain/stories";
 import { saveStoryToGallery } from "../../services/mediaCache";
 import { StoryViewer } from "./StoryViewer";
-import { StoryEditor } from "./StoryEditor";
+import { StoryEditor, type StoryEditorHandle } from "./StoryEditor";
 
 export type StoriesProps = {
   stories: Story[];
@@ -33,6 +33,7 @@ export default function Stories(props: StoriesProps) {
 
 function StorySession(props: StoriesProps) {
   const [closed, setClosed] = useState(false);
+  const editorRef = useRef<StoryEditorHandle>(null);
   function close() {
     setClosed(true);
     props.onClose();
@@ -46,10 +47,14 @@ function StorySession(props: StoriesProps) {
       visible
       animationType="fade"
       presentationStyle="fullScreen"
-      onRequestClose={close}
+      onRequestClose={() => {
+        if (props.adding && editorRef.current?.handleBack()) return;
+        close();
+      }}
     >
       {props.adding ? (
         <StoryEditor
+          ref={editorRef}
           avatar={props.avatar}
           dark={props.dark}
           onShare={props.onShare}

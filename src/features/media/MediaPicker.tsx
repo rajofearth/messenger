@@ -11,7 +11,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
-import { Asset, MediaType } from "expo-media-library";
 import type { AssetMetadata } from "expo-media-library";
 import { IconButton, tap } from "../../ui/primitives";
 import { coral, onCoral, palette } from "../../ui/theme";
@@ -25,10 +24,11 @@ import { MediaPickerGrid } from "./MediaPickerGrid";
 import { MediaAlbumSheet } from "./MediaAlbumSheet";
 import { MediaPickerPreview } from "./MediaPickerPreview";
 import { MediaCamera } from "./MediaCamera";
-import { mediaMimeType } from "./mediaMimeType";
+import { resolvePickedMediaItems } from "./resolvePickedMedia";
+import { useMediaPickerBack } from "./useMediaPickerBack";
 import { trackDevEvent } from "../../services/devTelemetry";
+import { prepareCameraCapture } from "./prepareCameraCapture";
 import { useMediaPickerLibrary } from "./useMediaPickerLibrary";
-
 const GRID_GAP = 4;
 const GRID_PADDING = 12;
 const FILTERS: { id: MediaPickerFilter; label: string }[] = [
@@ -48,6 +48,7 @@ type Props = {
   emptyText?: string;
   mediaMode?: "photos" | "photos-and-videos";
   selectionLimit?: number;
+  appendCameraCapture?: boolean;
 };
 
 export function MediaPicker(props: Props) {
@@ -87,6 +88,15 @@ export function MediaPicker(props: Props) {
   const camera = React.useRef(false);
   const limit = props.selectionLimit ?? MEDIA_PICKER_LIMIT;
   const filters = photosOnly ? FILTERS.filter((item) => item.id !== "videos") : FILTERS;
+  useMediaPickerBack({
+    preview: !!preview,
+    albumOpen,
+    cameraOpen,
+    onClose: props.onClose,
+    onPreview: () => setPreview(null),
+    onAlbum: () => setAlbumOpen(false),
+    onCamera: () => setCameraOpen(false),
+  });
 
   React.useEffect(() => {
     alive.current = true;
@@ -174,30 +184,7 @@ export function MediaPicker(props: Props) {
     if (!selection.length || preparing) return;
     setPreparing(true);
     try {
-      const resolved = await Promise.all(
-        selection.map(async (id) => {
-          try {
-            const info = await new Asset(id).getInfo();
-            return {
-              id,
-              media: {
-                uri: info.uri,
-                video: info.mediaType === MediaType.VIDEO,
-                filename: info.filename,
-                mimeType: mediaMimeType(info.filename, info.mediaType === MediaType.VIDEO),
-                width: info.width,
-                height: info.height,
-                duration: info.duration ? info.duration / 1000 : undefined,
-              } satisfies PickedMedia,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      );
-      const available = resolved.filter(
-        (item): item is NonNullable<typeof item> => !!item?.media.uri,
-      );
+      const available = await resolvePickedMediaItems(selection);
       if (!available.length) {
         throw new Error("Those items are no longer available.");
       }
@@ -402,8 +389,18 @@ export function MediaPicker(props: Props) {
             photosOnly={photosOnly}
             onClose={() => setCameraOpen(false)}
             onCaptured={(media) => {
-              setCameraOpen(false);
-              props.onPicked([media]);
+              void prepareCameraCapture(media, selection, !!props.appendCameraCapture, limit).then((result) => {
+                if (!alive.current) return;
+                setCameraOpen(false);
+                if (result.full) {
+                  Alert.alert(
+                    "Story is full",
+                    `You can add up to ${limit} items. Remove one before capturing another.`,
+                  );
+                  return;
+                }
+                props.onPicked(result.media ?? []);
+              });
             }}
           />
         </View>

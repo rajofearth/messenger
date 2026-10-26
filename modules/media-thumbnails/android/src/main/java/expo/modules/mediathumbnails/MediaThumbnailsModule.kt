@@ -2,6 +2,8 @@ package expo.modules.mediathumbnails
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.ThumbnailUtils
 import android.net.Uri
 import android.os.Build
 import android.util.Size
@@ -23,11 +25,7 @@ class MediaThumbnailsModule : Module() {
       val file = File(directory, "${cacheKey(source, boundedSize)}.jpg")
       if (file.isFile && file.length() > 0) return@AsyncFunction file.toUriString()
 
-      val bitmap = context.contentResolver.loadThumbnail(
-        Uri.parse(source),
-        Size(boundedSize, boundedSize),
-        null,
-      )
+      val bitmap = loadThumbnail(context, source, boundedSize) ?: return@AsyncFunction null
       if (!file.parentFile!!.exists()) file.parentFile!!.mkdirs()
       if (!file.outputStream().use { output ->
           bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
@@ -38,6 +36,30 @@ class MediaThumbnailsModule : Module() {
       prune(directory)
       file.toUriString()
     }
+  }
+
+  private fun loadThumbnail(context: Context, source: String, size: Int): Bitmap? {
+    val uri = Uri.parse(source)
+    if (uri.scheme == "file") {
+      val file = File(uri.path ?: return null)
+      return ThumbnailUtils.createVideoThumbnail(file, Size(size, size), null)
+        ?: decodeImage(file, size)
+    }
+    return context.contentResolver.loadThumbnail(uri, Size(size, size), null)
+  }
+
+  private fun decodeImage(file: File, size: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val sample = generateSample(bounds.outWidth, bounds.outHeight, size)
+    return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+  }
+
+  private fun generateSample(width: Int, height: Int, size: Int): Int {
+    var sample = 1
+    while (width / (sample * 2) >= size && height / (sample * 2) >= size) sample *= 2
+    return sample
   }
 
   private fun cacheKey(source: String, size: Int): String {
