@@ -1,6 +1,15 @@
 /** Delivery state for a message this device sent. Server rows omit it. */
 export type MessageStatus = "sending" | "sent" | "failed";
 
+/** One stored width of an image, smallest first. */
+export type ImageVariant = {
+  name: string;
+  width: number;
+  height: number;
+  uri: string;
+  mimeType?: string;
+};
+
 export type Message = {
   id: string;
   text?: string;
@@ -21,6 +30,7 @@ export type Message = {
   width?: number;
   height?: number;
   uri?: string;
+  variants?: ImageVariant[];
   filename?: string;
   duration?: number;
   reaction?: string;
@@ -72,6 +82,11 @@ export type Story = {
   name: string;
   avatar: string;
   image: string;
+  variants?: ImageVariant[];
+  width?: number;
+  height?: number;
+  /** Local-only MIME type of a just-picked story file. */
+  mimeType?: string;
   seen: boolean;
   caption: string;
   video?: boolean;

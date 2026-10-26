@@ -8,6 +8,10 @@ import {
   removeMessageRef,
   shouldDeleteBlob,
 } from "./lib/retention";
+import {
+  deleteMediaVariants,
+  readMediaVariants,
+} from "./lib/mediaVariants";
 
 const messageArgs = {
   conversationId: v.string(),
@@ -112,9 +116,19 @@ async function messageView(
   const textPart = message.parts.find((part) => part.type === "text");
   const attachment = message.parts.find((part) => part.type === "attachment");
   const attachmentData = attachment?.type === "attachment" ? attachment : undefined;
+  const kind = attachmentData ? attachmentKind(attachmentData.mediaType) : undefined;
   const uri = attachmentData
     ? await ctx.storage.getUrl(attachmentData.storageKey as Id<"_storage">)
     : undefined;
+  // Variant rows store their URL, so this adds one indexed read per image and
+  // never a `getUrl` call per width.
+  const variants =
+    attachmentData && kind === "image"
+      ? await readMediaVariants(
+          ctx,
+          attachmentData.storageKey as Id<"_storage">,
+        )
+      : [];
   const reaction = message.reactions.find((item) => item.reactedByMe) ||
     message.reactions[0];
   return {
@@ -122,8 +136,9 @@ async function messageView(
     text: textPart?.type === "text" ? textPart.text : undefined,
     mine: message.authorSubjectId === subjectId,
     createdAt: new Date(message.createdAt).toISOString(),
-    kind: attachmentData ? attachmentKind(attachmentData.mediaType) : undefined,
+    kind,
     uri: uri ?? undefined,
+    variants: variants.length ? variants : undefined,
     filename: attachmentData?.filename,
     mimeType: attachmentData?.mediaType,
     width: attachmentData?.width,
@@ -592,6 +607,7 @@ export const deleteOwnMessage = mutation({
       if (!row || row.messageRefs === undefined) continue;
       const next = removeMessageRef(row.messageRefs, result.message.id);
       if (shouldDeleteBlob(next)) {
+        await deleteMediaVariants(ctx, row.storageId);
         await ctx.db.delete(row._id);
         await ctx.storage.delete(row.storageId);
       } else {

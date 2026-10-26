@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
 import { normalizeUsername, requireUser, validateUsername } from "./lib/identity";
+import { deleteMediaVariants } from "./lib/mediaVariants";
 
 type ProfileCtx = QueryCtx | MutationCtx;
 
@@ -153,6 +154,7 @@ export const update = mutation({
       current.avatarStorageId &&
       current.avatarStorageId !== args.avatarStorageId
     ) {
+      await deleteMediaVariants(ctx, current.avatarStorageId);
       await ctx.storage.delete(current.avatarStorageId);
     }
     return await publicProfile(ctx, actor.userId);

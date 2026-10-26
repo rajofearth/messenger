@@ -18,7 +18,11 @@ function extensionFor(name?: string, mimeType?: string) {
   if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName;
   if (mimeType?.startsWith("video/")) return "mp4";
   if (mimeType?.startsWith("audio/")) return "m4a";
-  if (mimeType?.startsWith("image/")) return mimeType.includes("png") ? "png" : "jpg";
+  if (mimeType?.startsWith("image/")) {
+    if (mimeType.includes("png")) return "png";
+    if (mimeType.includes("webp")) return "webp";
+    return "jpg";
+  }
   return "bin";
 }
 
@@ -29,6 +33,10 @@ function safeName(value: string) {
 /**
  * Keeps received media in app storage so a thread and its stories render from
  * disk after the first fetch. The remote URL is only a fallback.
+ *
+ * A `variant` name stores one width beside the main file instead of replacing
+ * it. Variant files always take their extension from the supplied MIME type, so
+ * `image/webp` never lands as `.jpg`.
  */
 export async function cacheRemoteMedia(input: {
   id: string;
@@ -36,16 +44,19 @@ export async function cacheRemoteMedia(input: {
   filename?: string;
   mimeType?: string;
   kind?: Message["kind"] | "story";
+  variant?: string;
 }) {
   if (!input.uri || !/^https?:\/\//i.test(input.uri)) return input.uri;
-  const extension = extensionFor(
-    input.filename,
-    input.mimeType || (input.kind === "story" ? "image/jpeg" : undefined),
-  );
-  const file = new File(
-    mediaDirectory(),
-    `${safeName(input.id)}.${extension}`,
-  );
+  const extension = input.variant
+    ? extensionFor(undefined, input.mimeType)
+    : extensionFor(
+        input.filename,
+        input.mimeType || (input.kind === "story" ? "image/jpeg" : undefined),
+      );
+  const name = input.variant
+    ? `${safeName(input.id)}-${safeName(input.variant)}.${extension}`
+    : `${safeName(input.id)}.${extension}`;
+  const file = new File(mediaDirectory(), name);
   if (file.exists) return file.uri;
   try {
     const downloaded = await File.downloadFileAsync(input.uri, file, {

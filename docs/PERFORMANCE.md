@@ -362,7 +362,7 @@ before calling those runtime behaviours verified.
 
 ### Remote media is downloaded once
 
-Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Images keep the sender's aspect ratio; no server-side resize is performed, and `expo-image` decodes at the displayed size.
+Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Image messages and photo stories also store up to three client-rendered WebP widths (`w256`, `w512`, `w1080`) in `mediaVariants`; a variant file is named `<id>-<variant>.<mime extension>` so it cannot collide with the original, and the server caps each width at 128 KiB, 384 KiB and 1 MiB. Message and story projections return the variant rows with their stored URLs, but this phase does not yet render them. The original file still keeps the sender's aspect ratio, no server-side resize is performed, and `expo-image` decodes whatever source the renderer asks for at the displayed size.
 
 ### Avatars in the notification pipeline
 

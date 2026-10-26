@@ -3,6 +3,11 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Message, Story } from "../domain/data";
 import { convexClient } from "../services/convexClient";
 import { uploadLocalFile } from "../services/remoteFiles";
+import {
+  discardPreparedImage,
+  prepareImageVariants,
+  type PreparedImage,
+} from "../services/imageVariants";
 import type { RemoteMessage } from "./remoteMessengerTypes";
 
 export type SendAttachment = (args: {
@@ -16,7 +21,31 @@ type CreateStory = (args: {
   storageId: Id<"_storage">;
   caption: string;
   crop?: "fit" | "fill";
+  width?: number;
+  height?: number;
 }) => Promise<Id<"stories">>;
+
+/** A failed transform leaves the original as the only upload. */
+async function prepareVariants(
+  uri: string,
+  mimeType?: string,
+): Promise<PreparedImage | undefined> {
+  try {
+    return await prepareImageVariants(uri, mimeType);
+  } catch {
+    return undefined;
+  }
+}
+
+function discardVariants(prepared: PreparedImage | undefined) {
+  for (const variant of prepared?.variants ?? []) {
+    discardPreparedImage(variant.uri);
+  }
+}
+
+function positive(value: number | undefined) {
+  return value && value > 0 ? value : undefined;
+}
 
 export function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -53,23 +82,37 @@ export async function sendAttachmentMessage({
   const { uri, kind } = message;
   if (!uri || !kind) throw new Error("MISSING_ATTACHMENT");
   const upload = async () => {
-    const uploaded = await uploadLocalFile(
-      convexClient,
-      api.files.generateUploadUrl,
-      api.files.finalizeUpload,
-      {
-        uri,
-        kind,
-        mimeType: message.mimeType,
-        filename: message.filename,
-        width: message.width,
-        height: message.height,
-        durationMs: message.duration ? message.duration * 1000 : undefined,
-        onProgress,
-      },
-    );
-    await onUploaded?.(uploaded);
-    return uploaded;
+    let prepared: PreparedImage | undefined;
+    try {
+      // A retry that already holds a finalized id points at a source whose
+      // variants were attached at finalize time; preparing again would only
+      // create bytes nobody references.
+      if (kind === "image" && !message.storageId) {
+        prepared = await prepareVariants(uri, message.mimeType);
+      }
+      const uploaded = await uploadLocalFile(
+        convexClient,
+        api.files.generateUploadUrl,
+        api.files.finalizeUpload,
+        {
+          uri,
+          kind,
+          mimeType: message.mimeType,
+          filename: message.filename,
+          width: message.width ?? positive(prepared?.width),
+          height: message.height ?? positive(prepared?.height),
+          durationMs: message.duration ? message.duration * 1000 : undefined,
+          variants: prepared?.variants.length
+            ? prepared.variants
+            : undefined,
+          onProgress,
+        },
+      );
+      await onUploaded?.(uploaded);
+      return uploaded;
+    } finally {
+      discardVariants(prepared);
+    }
   };
   const send = (storageId: Id<"_storage">) =>
     sendAttachment({
@@ -110,21 +153,41 @@ export async function uploadAndCreateStory(
   onProgress?: (progress: number) => void,
 ) {
   if (!story.image) throw new Error("MISSING_ATTACHMENT");
-  const storageId = await uploadLocalFile(
-    convexClient,
-    api.files.generateUploadUrl,
-    api.files.finalizeUpload,
-    {
-      uri: story.image,
-      kind: "story",
-      mimeType: story.video ? "video/mp4" : "image/jpeg",
-      filename: `story-${story.id}`,
-      onProgress,
-    },
-  );
-  return await createStory({
-    storageId,
-    caption: story.caption,
-    crop: story.crop,
-  });
+  // Video stories keep a single stored file; only a photo gets stored widths.
+  // Keep the picked file's real type: mislabelling a GIF as JPEG would flatten
+  // its animation into static variants.
+  const mimeType =
+    story.mimeType ?? (story.video ? "video/mp4" : "image/jpeg");
+  let prepared: PreparedImage | undefined;
+  try {
+    if (!story.video) prepared = await prepareVariants(story.image, mimeType);
+    const width = story.width ?? positive(prepared?.width);
+    const height = story.height ?? positive(prepared?.height);
+    const storageId = await uploadLocalFile(
+      convexClient,
+      api.files.generateUploadUrl,
+      api.files.finalizeUpload,
+      {
+        uri: story.image,
+        kind: "story",
+        mimeType,
+        filename: `story-${story.id}`,
+        width,
+        height,
+        variants: prepared?.variants.length
+          ? prepared.variants
+          : undefined,
+        onProgress,
+      },
+    );
+    return await createStory({
+      storageId,
+      caption: story.caption,
+      crop: story.crop,
+      width,
+      height,
+    });
+  } finally {
+    discardVariants(prepared);
+  }
 }

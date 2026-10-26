@@ -30,6 +30,13 @@ and this project adheres to
   live message references it. A daily orphan sweep removes uploads that never
   became a message and blobs no row protects; rows created before reference
   tracking are left alone.
+- Image messages and photo stories now upload up to three WebP widths
+  (`w256`, `w512`, `w1080`) beside the original. Convex stores them as
+  `mediaVariants`, validates each against a per-width byte ceiling, and returns
+  them from the message and story projections with a URL resolved at write time.
+  Deleting the source, expiring a story, replacing an avatar or sweeping an
+  orphan removes the variant rows and blobs too. The renderer still shows the
+  original until the next phase.
 
 ### Changed
 

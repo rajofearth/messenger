@@ -1,4 +1,4 @@
-import type { Chat, Message, Story } from "../domain/data";
+import type { Chat, ImageVariant, Message, Story } from "../domain/data";
 import type { SettingsRecord } from "../data/records";
 
 export type RemoteProfile = {
@@ -100,6 +100,9 @@ export function mapStory(item: {
   name: string;
   avatar?: string;
   image: string | null;
+  variants?: ImageVariant[];
+  width?: number;
+  height?: number;
   video: boolean;
   caption: string;
   crop?: "fit" | "fill";
@@ -113,6 +116,9 @@ export function mapStory(item: {
     name: item.name,
     avatar: item.avatar || "",
     image: item.image || "",
+    variants: item.variants,
+    width: item.width,
+    height: item.height,
     video: item.video,
     caption: item.caption,
     crop: item.crop,

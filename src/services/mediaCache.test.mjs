@@ -9,6 +9,7 @@ const publicUri = "file:///storage/emulated/0/Pictures/Messenger/story.jpg";
 function harness(options = {}) {
   const events = [];
   const calls = [];
+  const downloads = [];
   const album = { id: "messenger", add: async () => { calls.push(["add"]); } };
   const asset = {
     id: "content://media/external/images/media/1",
@@ -22,7 +23,11 @@ function harness(options = {}) {
     constructor(uri, name) { this.uri = name ? `${uri.uri}/${name}` : uri; }
     get exists() { return !options.missingFile && [sourceUri, publicUri].includes(this.uri); }
     get size() { return options.emptyFile ? 0 : options.shortCopy && this.uri === publicUri ? 10 : 100; }
-    static downloadFileAsync = async () => { throw new Error("Offline"); };
+    static downloadFileAsync = async (uri, file) => {
+      downloads.push(file.uri);
+      if (options.downloadSucceeds) return file;
+      throw new Error("Offline");
+    };
   }
   const modules = {
     "expo-file-system": { File, Directory: class {
@@ -50,7 +55,7 @@ function harness(options = {}) {
     assert.ok(name in modules, `Missing mock: ${name}`);
     return modules[name];
   }, exports);
-  return { ...exports, events, calls, asset, album };
+  return { ...exports, events, calls, downloads, asset, album };
 }
 
 test("exports directly into an existing album without a second move or duplicate", async () => {
@@ -107,4 +112,37 @@ test("a verified video export emits video kind and story completion without priv
   assert.ok(app.events.some(({ event }) => event === "story_save_completed"));
   assert.equal(JSON.stringify(app.events).includes(sourceUri), false);
   assert.equal(JSON.stringify(app.events).includes(publicUri), false);
+});
+
+test("a cached variant gets its own name and the MIME extension, not the filename's", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "message 1",
+    uri: "https://example.invalid/w512.webp",
+    filename: "photo.jpg",
+    mimeType: "image/webp",
+    variant: "w512",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/message-1-w512.webp");
+});
+
+test("a variant with a PNG MIME type keeps .png", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "story-1",
+    uri: "https://example.invalid/w256.png",
+    mimeType: "image/png",
+    variant: "w256",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/story-1-w256.png");
+});
+
+test("without a variant the message id remains the whole local filename", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "message-1",
+    uri: "https://example.invalid/photo.jpg",
+    mimeType: "image/jpeg",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/message-1.jpg");
 });

@@ -49,6 +49,21 @@ are not a physical-device acceptance run.
    local preview and upload progress/status, with no view timer, viewer count or
    Save action. It must not advance automatically. Failed uploads show Retry.
 
+## Image variants
+
+1. Send a photo wider than 1080px and post a photo story. In the development
+   Convex dashboard, `files.variantsState` must be `ready` and `mediaVariants`
+   must hold one row per rendered width with a non-empty `url` and a storage
+   size under the per-width ceiling.
+2. Send a GIF, a video and a file. They must finalize without variant rows, and
+   a video story must not generate any.
+3. Delete an image message for everyone, remove a story, then replace an avatar.
+   The source blob and every variant row/blob for that source must disappear.
+   Let the daily sweep run (or invoke `files:sweepOrphans` by hand) and confirm
+   it does not delete the variants of a message that still references them.
+4. A failed send keeps the original message id and storage id. Retrying must not
+   upload the widths again; the finalized source already owns them.
+
 ## Update prompt
 
 1. On an older dev APK, open the available update. The compact initial card must

@@ -17,6 +17,8 @@ import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_manifest from "../lib/manifest.js";
+import type * as lib_mediaVariantRules from "../lib/mediaVariantRules.js";
+import type * as lib_mediaVariants from "../lib/mediaVariants.js";
 import type * as lib_retention from "../lib/retention.js";
 import type * as preferences from "../preferences.js";
 import type * as profiles from "../profiles.js";
@@ -40,6 +42,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/identity": typeof lib_identity;
   "lib/manifest": typeof lib_manifest;
+  "lib/mediaVariantRules": typeof lib_mediaVariantRules;
+  "lib/mediaVariants": typeof lib_mediaVariants;
   "lib/retention": typeof lib_retention;
   preferences: typeof preferences;
   profiles: typeof profiles;

@@ -20,12 +20,14 @@ conversation preferences, message deletes, files, 24-hour stories, the
   the hidden-until-newer-message state per user.
 - `files.ts` finalizes uploads and records owner and metadata. Storage's real
   size must be non-zero and at most 25 MiB, and the declared MIME type must
-  match the upload kind. Message and story media are stored in Convex storage;
-  readers receive signed URLs only through the membership-checked message and
-  story queries.
+  match the upload kind. An image upload may also carry up to three rendered
+  widths, stored in `mediaVariants` after a per-width size, MIME and dimension
+  check. Message and story media are stored in Convex storage; readers receive
+  signed URLs only through the membership-checked message and story queries,
+  and a variant row keeps the URL resolved when it was written.
 - `stories.ts` creates, lists, marks and removes stories. The list is capped to
   the newest rows first, and `crons.ts` deletes expired rows hourly, including
-  their storage objects and views.
+  their storage objects, variants and views.
 - `http.ts` keeps the public `/updates/manifest` release feed next to the auth
   HTTP routes.
 
