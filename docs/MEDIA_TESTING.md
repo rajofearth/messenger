@@ -60,6 +60,37 @@ are not a physical-device acceptance run.
    local preview and upload progress/status, with no view timer, viewer count or
    Save action. It must not advance automatically. Failed uploads show Retry.
 
+## Image variants
+
+1. Send a photo wider than 1080px and post a photo story. In the development
+   Convex dashboard, `files.variantsState` must be `ready` and `mediaVariants`
+   must hold one row per rendered width with a non-empty `url` and a storage
+   size under the per-width ceiling.
+2. Send a GIF, a video and a file. They must finalize without variant rows, and
+   a video story must not generate any.
+3. Delete an image message for everyone, remove a story, then replace an avatar.
+   The source blob and every variant row/blob for that source must disappear.
+   Let the daily sweep run (or invoke `files:sweepOrphans` by hand) and confirm
+   it does not delete the variants of a message that still references them.
+4. A failed send keeps the original message id and storage id. Retrying must not
+   upload the widths again; the finalized source already owns them.
+5. Open the conversation, its media album and the full-screen viewer, then the
+   shared-media tab. On a 2x phone the bubble (220dp) must render from a cached
+   `w512` file, the album tile (180dp) and shared grid (130dp) from the next
+   stored width up (`w256` at 1x, `w512` at 2x), and the viewer from the largest
+   width the screen needs. No surface should still show a full-resolution
+   original once a covering variant exists.
+6. Open a photo story and check it uses the `story-<id>-w1080.webp` preview on a
+   large phone. In `Paths.document/messenger-media` (or the development file
+   inspector) there must be one preview file per image, named with its width,
+   and reopening the thread or story must not download another width. A local
+   preview narrower than the width the new surface needs must be ignored, not
+   stretched.
+7. Save that image from the conversation and the story from the viewer, then
+   check the exported file's dimensions in the gallery. Both must be the
+   original's size, not the preview width, and deleting the message or story
+   must still remove every stored width.
+
 ## Update prompt
 
 1. On an older dev APK, open the available update. The compact card must show

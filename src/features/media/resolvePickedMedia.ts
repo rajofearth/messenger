@@ -3,7 +3,12 @@ import type { PickedMedia } from "./mediaPickerModel";
 import { mediaMimeType } from "./mediaMimeType";
 import { cachePickedMedia } from "../../services/mediaCache";
 
-export async function resolvePickedMedia(ids: readonly string[]): Promise<PickedMedia[]> {
+export type ResolvedPickedMedia = { id: string; media: PickedMedia };
+
+/** Resolves each asset and keeps the id so a caller can prune missing picks. */
+export async function resolvePickedMediaItems(
+  ids: readonly string[],
+): Promise<ResolvedPickedMedia[]> {
   const resolved = await Promise.all(
     ids.map(async (id) => {
       try {
@@ -17,11 +22,17 @@ export async function resolvePickedMedia(ids: readonly string[]): Promise<Picked
           height: info.height,
           duration: info.duration ? info.duration / 1000 : undefined,
         };
-        return cachePickedMedia(item, `picked-${id}`);
+        return { id, media: await cachePickedMedia(item, `picked-${id}`) };
       } catch {
         return null;
       }
     }),
   );
-  return resolved.filter((item): item is PickedMedia => item !== null);
+  return resolved.filter(
+    (item): item is ResolvedPickedMedia => item !== null,
+  );
+}
+
+export async function resolvePickedMedia(ids: readonly string[]): Promise<PickedMedia[]> {
+  return (await resolvePickedMediaItems(ids)).map((item) => item.media);
 }

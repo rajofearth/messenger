@@ -5,6 +5,7 @@ import { setHapticsEnabled } from "../../ui/primitives";
 import { messengerRepository } from "../../data/messengerRepository";
 import type { SettingsRecord } from "../../data/records";
 import type { PickedMedia } from "../media/mediaPickerModel";
+import { prepareAvatarImage } from "../../services/imageVariants";
 
 type Preferences = SettingsRecord;
 export type SettingsProfile = Pick<
@@ -183,12 +184,20 @@ export function useSettingsPreferences(
     mimeType?: string,
     filename?: string,
   ) {
+    // Upload and show the small copy right away. The picker's original stays
+    // untouched, and any preparation failure falls back to it.
+    const prepared = await prepareAvatarImage(uri, mimeType);
     const previousAvatar = current.current.avatar;
-    await persist({ avatar: uri });
+    await persist({ avatar: prepared?.uri ?? uri });
     try {
       await onProfileChange?.(
         { ...current.current },
-        { avatar: { mimeType, filename } },
+        {
+          avatar: {
+            mimeType: prepared?.mimeType ?? mimeType,
+            filename: prepared?.filename ?? filename,
+          },
+        },
       );
     } catch (error) {
       await persist({ avatar: previousAvatar }).catch(() => {});

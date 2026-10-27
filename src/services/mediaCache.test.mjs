@@ -7,9 +7,29 @@ const sourceUri = "file:///private/documents/story.jpg";
 const publicUri = "file:///storage/emulated/0/Pictures/Messenger/story.jpg";
 const pickedUri = "content://media/external/video/media/7";
 
+// mediaCache imports the real domain helpers, so compile them once here.
+function loadModule(relative, modules = {}) {
+  const compiled = ts.transpileModule(
+    readFileSync(new URL(relative, import.meta.url), "utf8"),
+    { compilerOptions: { module: ts.ModuleKind.CommonJS } },
+  ).outputText;
+  const exports = {};
+  new Function("require", "exports", compiled)((name) => {
+    assert.ok(name in modules, `Missing mock: ${name}`);
+    return modules[name];
+  }, exports);
+  return exports;
+}
+
+const cache = loadModule("../data/cache.ts");
+const imageVariants = loadModule("../domain/imageVariants.ts", {
+  "../data/cache": cache,
+});
+
 function harness(options = {}) {
   const events = [];
   const calls = [];
+  const downloads = [];
   const copied = new Set();
   const deleted = new Set();
   const album = { id: "messenger", add: async () => { calls.push(["add"]); } };
@@ -33,7 +53,11 @@ function harness(options = {}) {
     get size() { return options.emptyFile ? 0 : options.shortCopy && this.uri === publicUri ? 10 : 100; }
     async copy(destination) { copied.add(destination.uri); calls.push(["copy", this.uri, destination.uri]); }
     delete() { deleted.add(this.uri); copied.delete(this.uri); calls.push(["delete", this.uri]); }
-    static downloadFileAsync = async () => { throw new Error("Offline"); };
+    static downloadFileAsync = async (uri, file) => {
+      downloads.push(file.uri);
+      if (options.downloadSucceeds) return file;
+      throw new Error("Offline");
+    };
   }
   class Directory {
     exists = true;
@@ -43,8 +67,15 @@ function harness(options = {}) {
     list() { return (options.files ?? []).map((name) => new File(this, name)); }
   }
   const modules = {
-    "expo-file-system": { File, Directory, Paths: { document: { uri: "file:///private/documents/" }, cache: { uri: "file:///private/cache/" } } },
-    "react-native": { Platform: { OS: "android" } },
+    "expo-file-system": {
+      File,
+      Directory,
+      Paths: { document: { uri: "file:///private/documents/" }, cache: { uri: "file:///private/cache/" } },
+    },
+    "react-native": {
+      Platform: { OS: "android" },
+      PixelRatio: { get: () => 2 },
+    },
     "expo-media-library": {
       MediaType: { IMAGE: "image", VIDEO: "video" },
       requestPermissionsAsync: async () => { calls.push(["permission"]); return { granted: !options.denied }; },
@@ -54,6 +85,7 @@ function harness(options = {}) {
       },
       Asset: { create: async (...args) => { calls.push(["assetCreate", ...args]); return asset; } },
     },
+    "../domain/imageVariants": imageVariants,
     "./devTelemetry": { trackDevEvent: (event, fields) => events.push({ event, ...fields }) },
   };
   const compiled = ts.transpileModule(readFileSync(new URL("./mediaCache.ts", import.meta.url), "utf8"), {
@@ -64,7 +96,7 @@ function harness(options = {}) {
     assert.ok(name in modules, `Missing mock: ${name}`);
     return modules[name];
   }, exports);
-  return { ...exports, events, calls, asset, album, copied, deleted };
+  return { ...exports, events, calls, downloads, asset, album, copied, deleted };
 }
 
 test("exports directly into an existing album without a second move or duplicate", async () => {
@@ -140,6 +172,7 @@ test("story cleanup removes expired cache files but protects live story and mess
   const app = harness({
     files: [
       "story-live.jpg",
+      "story-live-w430.webp",
       "story-expired.jpg",
       "story-referenced.jpg",
       "story-save-keep.jpg",
@@ -151,6 +184,8 @@ test("story cleanup removes expired cache files but protects live story and mess
     ["file:///private/documents/messenger-media/story-referenced.jpg"],
   );
   assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-live.jpg"), false);
+
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-live-w430.webp"), false);
   assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-referenced.jpg"), false);
   assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-save-keep.jpg"), false);
   assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-expired.jpg"), true);
@@ -179,4 +214,90 @@ test("a verified video export emits video kind and story completion without priv
   assert.ok(app.events.some(({ event }) => event === "story_save_completed"));
   assert.equal(JSON.stringify(app.events).includes(sourceUri), false);
   assert.equal(JSON.stringify(app.events).includes(publicUri), false);
+});
+
+test("a cached variant gets its own name and the MIME extension, not the filename's", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "message 1",
+    uri: "https://example.invalid/w512.webp",
+    filename: "photo.jpg",
+    mimeType: "image/webp",
+    variant: "w512",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/message-1-w512.webp");
+});
+
+test("a variant with a PNG MIME type keeps .png", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "story-1",
+    uri: "https://example.invalid/w256.png",
+    mimeType: "image/png",
+    variant: "w256",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/story-1-w256.png");
+});
+
+test("without a variant the message id remains the whole local filename", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const uri = await app.cacheRemoteMedia({
+    id: "message-1",
+    uri: "https://example.invalid/photo.jpg",
+    mimeType: "image/jpeg",
+  });
+  assert.equal(uri, "file:///private/documents/messenger-media/message-1.jpg");
+});
+
+const remoteStory = "https://example.invalid/story.jpg";
+const storyVariants = [
+  { name: "w256", width: 256, height: 480, uri: "https://example.invalid/w256.webp", mimeType: "image/webp" },
+  { name: "w512", width: 512, height: 960, uri: "https://example.invalid/w512.webp", mimeType: "image/webp" },
+  { name: "w1080", width: 1080, height: 1920, uri: "https://example.invalid/w1080.webp", mimeType: "image/webp" },
+];
+
+function story(overrides = {}) {
+  return {
+    id: "s1",
+    name: "Alex",
+    avatar: "",
+    image: remoteStory,
+    variants: storyVariants,
+    width: 1080,
+    seen: false,
+    caption: "",
+    expiresAt: Date.now() + 60_000,
+    ...overrides,
+  };
+}
+
+test("a photo story caches the viewer width and keeps the remote original", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const [cached] = await app.prefetchStories([story()]);
+  assert.equal(cached.image, remoteStory);
+  assert.equal(cached.previewWidth, 1080);
+  assert.equal(
+    cached.previewUri,
+    "file:///private/documents/messenger-media/story-s1-w1080.webp",
+  );
+  assert.deepEqual(app.downloads, [cached.previewUri]);
+});
+
+test("a video story never downloads an image variant", async () => {
+  const app = harness({ downloadSucceeds: true });
+  const [cached] = await app.prefetchStories([story({ video: true })]);
+  assert.equal(
+    cached.image,
+    "file:///private/documents/messenger-media/story-s1.mp4",
+  );
+  assert.equal(cached.previewUri, undefined);
+  assert.deepEqual(app.downloads, [cached.image]);
+});
+
+test("a failed variant download leaves the photo story on its remote source", async () => {
+  const app = harness();
+  const remote = story();
+  const [cached] = await app.prefetchStories([remote]);
+  assert.equal(cached.image, remoteStory);
+  assert.equal(cached.previewUri, undefined);
 });

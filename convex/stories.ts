@@ -3,6 +3,10 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { requireUser } from "./lib/identity";
+import {
+  deleteMediaVariants,
+  readMediaVariants,
+} from "./lib/mediaVariants";
 
 /**
  * A story is visible to its owner and to anyone who shares a conversation with
@@ -22,29 +26,39 @@ async function storyAudience(
   return allowed;
 }
 
-const story = (ctx: QueryCtx | MutationCtx, row: {
+const story = async (ctx: QueryCtx | MutationCtx, row: {
   _id: Id<"stories">;
   ownerId: Id<"users">;
   storageId: Id<"_storage">;
   mimeType: string;
   caption: string;
   crop?: "fit" | "fill";
+  width?: number;
+  height?: number;
   createdAt: number;
   expiresAt: number;
-}, seen: boolean, name: string, avatar: string | undefined) =>
-  ctx.storage.getUrl(row.storageId).then((url) => ({
+}, seen: boolean, name: string, avatar: string | undefined) => {
+  const image = await ctx.storage.getUrl(row.storageId);
+  const variants = row.mimeType.startsWith("image/")
+    ? await readMediaVariants(ctx, row.storageId)
+    : [];
+  return {
     id: row._id,
     ownerId: row.ownerId,
     name,
     avatar,
-    image: url,
+    image,
+    variants: variants.length ? variants : undefined,
+    width: row.width,
+    height: row.height,
     video: row.mimeType.startsWith("video/"),
     caption: row.caption,
     crop: row.crop,
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     seen,
-  }));
+  };
+};
 
 export const list = query({
   args: { limit: v.optional(v.number()) },
@@ -96,6 +110,9 @@ export const create = mutation({
     storageId: v.id("_storage"),
     caption: v.string(),
     crop: v.optional(v.union(v.literal("fit"), v.literal("fill"))),
+    /** Fallback dimensions when the finalized file row has none. */
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const actor = await requireUser(ctx);
@@ -113,6 +130,8 @@ export const create = mutation({
       mimeType: file.mimeType,
       caption: args.caption.trim(),
       crop: args.crop,
+      width: file.width ?? args.width,
+      height: file.height ?? args.height,
       createdAt: now,
       expiresAt: now + 24 * 60 * 60 * 1000,
     });
@@ -197,6 +216,7 @@ export const remove = mutation({
     const actor = await requireUser(ctx);
     const row = await ctx.db.get(args.storyId);
     if (!row || row.ownerId !== actor.userId) throw new ConvexError("STORY_FORBIDDEN");
+    await deleteMediaVariants(ctx, row.storageId);
     await ctx.db.delete(args.storyId);
     await ctx.storage.delete(row.storageId);
     return true;
@@ -211,6 +231,7 @@ export const cleanupExpired = internalMutation({
       .withIndex("by_expiresAt", (q) => q.lt("expiresAt", Date.now()))
       .collect();
     for (const row of rows) {
+      await deleteMediaVariants(ctx, row.storageId);
       await ctx.db.delete(row._id);
       await ctx.storage.delete(row.storageId);
       const views = await ctx.db

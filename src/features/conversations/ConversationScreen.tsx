@@ -15,14 +15,15 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { Image } from "expo-image";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { palette } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
@@ -74,6 +75,7 @@ export default function ConversationScreen({
   onRetry,
 }: ConversationScreenProps) {
   const { bg, fg, muted, card, line, coralInk } = palette(dark);
+  const { width: windowWidth } = useWindowDimensions();
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [target, setTarget] = useState<ActionTarget | null>(null);
@@ -479,8 +481,13 @@ export default function ConversationScreen({
             (viewer.kind === "video" ? (
               <VideoAttachment uri={viewer.uri} />
             ) : (
-              <Image
-                source={{ uri: viewer.uri }}
+              <ResponsiveImage
+                uri={viewer.uri}
+                variants={viewer.variants}
+                sourceWidth={viewer.width}
+                previewUri={viewer.previewUri}
+                previewWidth={viewer.previewWidth}
+                displayWidth={windowWidth}
                 style={{ width: "100%", height: "80%" }}
                 contentFit="contain"
               />

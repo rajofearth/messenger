@@ -191,6 +191,10 @@ export function StoryViewer(props: Props) {
         <StoryMedia
           key={active.id}
           uri={active.image}
+          variants={active.variants}
+          sourceWidth={active.width}
+          previewUri={active.previewUri}
+          previewWidth={active.previewWidth}
           video={active.video}
           crop={active.crop}
           paused={paused || !ready}

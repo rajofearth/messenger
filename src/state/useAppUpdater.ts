@@ -85,6 +85,9 @@ export function useAppUpdater() {
   // with "busy" and would replace the live progress with a failure message
   // while the first download keeps running.
   const startingRef = useRef(false);
+  // Same guard for install: two taps in one batch would otherwise start two
+  // installer activities before the "installing" stage renders.
+  const installingRef = useRef(false);
 
   const applyStatus = useCallback((status: AppUpdateStatus) => {
     installedRef.current = status;
@@ -228,7 +231,14 @@ export function useAppUpdater() {
 
   const install = useCallback(async () => {
     const current = latest.current.download;
-    if (!supported || current.stage !== "ready" || !current.path) return;
+    if (
+      !supported ||
+      current.stage !== "ready" ||
+      !current.path ||
+      installingRef.current
+    )
+      return;
+    installingRef.current = true;
     setDownload({ ...current, stage: "installing", message: null });
     try {
       await installApk(current.path);
@@ -239,6 +249,8 @@ export function useAppUpdater() {
         message: updateErrorMessage(error),
         reused: current.reused,
       });
+    } finally {
+      installingRef.current = false;
     }
   }, [supported]);
 

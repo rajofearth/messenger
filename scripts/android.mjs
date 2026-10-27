@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { pruneExtraDensities } from "./prune-densities.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -266,6 +267,10 @@ if (action === "install") {
     path.join(android, "local.properties"),
     `sdk.dir=${sdk.replaceAll("\\", "/").replaceAll(":", "\\:")}\n`,
   );
+  // Runs on both paths: a fresh prebuild writes five densities, and a reused
+  // android/ tree is already pruned, so this is a no-op the second time.
+  const pruned = pruneExtraDensities(android);
+  console.log(`Pruned ${pruned.files} launcher/splash files (${pruned.bytes} B)`);
   run(
     "cmd.exe",
     [
@@ -292,6 +297,29 @@ if (action === "install") {
   const apkBytes = statSync(artifact).size;
   const apkSha256 = createHash("sha256").update(readFileSync(artifact)).digest("hex");
   if (dev) {
+    // R8 rewrites the release bytecode, so this build's obfuscated stack traces
+    // are only readable with the mapping Gradle generated for it. Every dev
+    // build is minified (enableMinifyInReleaseBuilds), so a missing mapping
+    // means the APK cannot be published safely.
+    const gradleMapping = path.join(
+      android,
+      "app",
+      "build",
+      "outputs",
+      "mapping",
+      "release",
+      "mapping.txt",
+    );
+    if (!existsSync(gradleMapping)) {
+      throw new Error(
+        `the release R8 mapping is missing at ${gradleMapping}; ` +
+          "a minified dev APK cannot be published without its mapping",
+      );
+    }
+    const mapping = path.join(root, "artifacts", "messenger-dev-mapping.txt");
+    copyFileSync(gradleMapping, mapping);
+    const mappingBytes = statSync(mapping).size;
+    const mappingSha256 = createHash("sha256").update(readFileSync(mapping)).digest("hex");
     const metadata = {
       variant,
       packageId,
@@ -301,6 +329,9 @@ if (action === "install") {
       apk: artifact,
       apkBytes,
       apkSha256,
+      mapping,
+      mappingBytes,
+      mappingSha256,
       builtAt: new Date().toISOString(),
     };
     writeFileSync(

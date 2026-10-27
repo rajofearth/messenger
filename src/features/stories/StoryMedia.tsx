@@ -1,11 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Text, View } from "react-native";
+import { Animated, Text, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
+import type { ImageVariant } from "../../domain/data";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { styles as s } from "./Stories.styles";
 
 type Props = {
   uri: string;
+  variants?: ImageVariant[];
+  sourceWidth?: number;
+  previewUri?: string;
+  previewWidth?: number;
   video?: boolean;
   paused?: boolean;
   preview?: boolean;
@@ -100,9 +106,19 @@ function StoryVideoSurface(props: Props) {
 }
 
 export function StoryMedia(props: Props) {
+  const { width } = useWindowDimensions();
   return props.video ? (
     <StoryVideo {...props} />
   ) : (
-    <Image source={{ uri: props.uri }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />
+    <ResponsiveImage
+      uri={props.uri}
+      variants={props.variants}
+      sourceWidth={props.sourceWidth}
+      previewUri={props.previewUri}
+      previewWidth={props.previewWidth}
+      displayWidth={width}
+      style={s.image}
+      contentFit={props.crop === "fill" ? "cover" : "contain"}
+    />
   );
 }

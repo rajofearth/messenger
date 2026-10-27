@@ -16,6 +16,7 @@ import type {
   ChatRecord,
   LegacyAppearanceRecord,
   MessageRecord,
+  OutboxRecord,
   PendingCallRecord,
   SettingsRecord,
   StoryRecord,
@@ -60,6 +61,9 @@ export function createMessengerRepository(
     saveMessages: (chatId: string, messages: MessageRecord[]) =>
       store.save(`messages/${chatId}`, messages),
     removeMessages: (chatId: string) => store.save(`messages/${chatId}`, null),
+    /** Unsent outgoing messages, separate from the confirmed thread cache. */
+    loadOutbox: () => store.load<OutboxRecord[]>("outbox"),
+    saveOutbox: (records: OutboxRecord[]) => store.save("outbox", records),
     loadPendingCall: () => store.load<PendingCallRecord>("pending-call"),
     savePendingCall: (call: PendingCallRecord | null) =>
       store.save("pending-call", call),

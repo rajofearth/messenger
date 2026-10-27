@@ -5,8 +5,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message } from "../domain/data";
 import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
-import { syncAvatarReferences } from "../data/avatars";
 import { deviceIdentity } from "../services/deviceIdentity";
+import { useAvatarReferenceSync } from "./useAvatarReferenceSync";
 import type { ThemePreference } from "../ui/theme";
 import { useThemePreference } from "./useThemePreference";
 import type { SettingsProfile } from "../features/profile/SettingsPreferences";
@@ -21,6 +21,7 @@ import { useRemotePresence } from "./useRemotePresence";
 import { useRemoteServerSync } from "./useRemoteServerSync";
 import { useRemoteStories } from "./useRemoteStories";
 import { useRemoteThreadMedia } from "./useRemoteThreadMedia";
+import { useOutboxResume } from "./useOutboxResume";
 import { createRemoteContact } from "./remoteMessengerContacts";
 import { saveTrackedMedia } from "./remoteMessengerMedia";
 import { createChatPreferences } from "./remoteMessengerPreferences";
@@ -121,30 +122,12 @@ export function useRemoteMessenger() {
     }));
   }, [remoteProfile, setSettings]);
 
-  useEffect(() => {
-    syncAvatarReferences(
-      "chats",
-      cachedChats.map((chat) => ({ id: chat.id, uri: chat.avatar })),
-    );
-  }, [cachedChats]);
-
-  useEffect(() => {
-    syncAvatarReferences(
-      "stories",
-      stories.map((story) => ({ id: story.id, uri: story.avatar })),
-    );
-  }, [stories]);
-
-  useEffect(() => {
-    syncAvatarReferences(
-      "history",
-      history.map((record) => ({ id: record.id, uri: record.chat.avatar })),
-    );
-  }, [history]);
-
-  useEffect(() => {
-    syncAvatarReferences("self", [{ id: "self", uri: settings.avatar }]);
-  }, [settings.avatar]);
+  useAvatarReferenceSync({
+    chats: cachedChats,
+    stories,
+    history,
+    selfAvatar: settings.avatar,
+  });
 
   useEffect(() => {
     if (remoteProfile !== null || !localReady) return;
@@ -253,6 +236,8 @@ export function useRemoteMessenger() {
     updateMessages,
     updateChats,
     appendLocal,
+    updateLocalMessage,
+    confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
   } = createRemoteWriters({
@@ -265,6 +250,7 @@ export function useRemoteMessenger() {
     chatsRef,
     messagesRef,
     appendLocal,
+    confirmLocalMessage,
     markLocalMessageStatus,
     sendText: sendTextMutation,
   });
@@ -357,11 +343,14 @@ export function useRemoteMessenger() {
     chatsRef,
     messagesRef,
     appendLocal,
+    updateLocalMessage,
+    confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
     sendText: sendTextMutation,
     sendAttachment: sendAttachmentMutation,
   });
+  useOutboxResume(localReady, retryMessage);
 
   function react(messageId: string, emoji: string) {
     const chatId = selectedRef.current;

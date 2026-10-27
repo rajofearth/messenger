@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import type { Message } from "../../domain/data";
@@ -9,6 +8,7 @@ import { formatDuration } from "../../domain/model";
 import { onCoral, palette } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import { openAttachment } from "../../ui/openAttachment";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { messageAccessibilityLabel } from "./conversationModel";
 import { styles as s } from "./MessageBubble.styles";
 
@@ -360,11 +360,16 @@ export default function MessageBubble({
             <Text style={{ color: "white" }}>Video · Tap to play</Text>
           </View>
         ) : m.kind === "image" ? (
-          <Image
-            source={{ uri: m.uri }}
-            recyclingKey={m.id}
+          <ResponsiveImage
+            uri={m.uri}
+            variants={m.variants}
+            sourceWidth={m.width}
+            previewUri={m.previewUri}
+            previewWidth={m.previewWidth}
+            displayWidth={220}
             style={s.chatImage}
             contentFit="cover"
+            recyclingKey={m.id}
             accessibilityLabel="Photo attachment"
           />
         ) : m.kind === "audio" ? (

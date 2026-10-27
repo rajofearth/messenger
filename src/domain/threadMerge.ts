@@ -56,14 +56,30 @@ export function sameOptimistic(remote: Message, local: Message): boolean {
 /**
  * Keep local-only bubbles while the server page catches up, and reuse media
  * already downloaded to this device instead of dropping it on every refresh.
- * Failed bubbles stay because the server page has no copy to replace them.
+ * A cached preview for the chosen width survives too; an empty local preview
+ * never replaces the server's copy. Failed bubbles stay because the server
+ * page has no copy to replace them.
  */
 export function mergeThread(remote: Message[], local: Message[]): Message[] {
   const localById = new Map(local.map((message) => [message.id, message]));
   const merged = remote.map((message) => {
     const cached = localById.get(message.id);
-    const uri = cached?.uri?.startsWith("file://") ? cached.uri : message.uri;
-    return uri && uri !== message.uri ? { ...message, uri } : message;
+    if (!cached) return message;
+    let next = message;
+    const uri = cached.uri?.startsWith("file://") ? cached.uri : message.uri;
+    if (uri && uri !== message.uri) next = { ...next, uri };
+    const previewUri = cached.previewUri || message.previewUri;
+    const previewWidth = cached.previewUri
+      ? (cached.previewWidth ?? message.previewWidth)
+      : message.previewWidth;
+    if (
+      previewUri &&
+      (previewUri !== message.previewUri ||
+        previewWidth !== message.previewWidth)
+    ) {
+      next = { ...next, previewUri, previewWidth };
+    }
+    return next;
   });
   const used = new Set<string>();
   const optimistic = local.filter((message) => {

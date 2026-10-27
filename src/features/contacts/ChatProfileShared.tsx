@@ -7,12 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
 import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { palette } from "../../ui/theme";
 import VideoAttachment from "../conversations/VideoAttachment";
 import { sharedLinks } from "./ChatProfileMetadata";
@@ -54,6 +55,7 @@ export default function ChatProfileShared({
   dark: boolean;
 }) {
   const colors = palette(dark);
+  const { width } = useWindowDimensions();
   const [tab, setTab] = useState<"Media" | "Docs" | "Links">("Media");
   const [selected, setSelected] = useState<Message | null>(null);
   const [failed, setFailed] = useState(false);
@@ -120,10 +122,14 @@ export default function ChatProfileShared({
               style={[s.tile, { backgroundColor: colors.card }]}
             >
               {message.kind === "image" && message.uri ? (
-                <Image
-                  source={{ uri: message.uri }}
+                <ResponsiveImage
+                  uri={message.uri}
+                  variants={message.variants}
+                  sourceWidth={message.width}
+                  previewUri={message.previewUri}
+                  previewWidth={message.previewWidth}
+                  displayWidth={130}
                   recyclingKey={message.id}
-                  cachePolicy="memory-disk"
                   contentFit="cover"
                   style={s.thumbnail}
                 />
@@ -212,9 +218,14 @@ export default function ChatProfileShared({
                 minimumZoomScale={1}
                 centerContent
               >
-                <Image
+                <ResponsiveImage
                   accessibilityLabel="Shared image"
-                  source={{ uri: selected.uri }}
+                  uri={selected.uri}
+                  variants={selected.variants}
+                  sourceWidth={selected.width}
+                  previewUri={selected.previewUri}
+                  previewWidth={selected.previewWidth}
+                  displayWidth={width * 4}
                   contentFit="contain"
                   style={s.fullImage}
                   onError={() => setFailed(true)}

@@ -239,6 +239,7 @@ jobs:
           mkdir -p artifacts/release
           apk="artifacts/release/messenger-$VERSION-arm64-v8a.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$apk"
+          cp android/app/build/outputs/mapping/release/mapping.txt "artifacts/release/mapping-$VERSION.txt"
           size=$(du -h "$apk" | cut -f1)
           echo "APK size: $size"
           (cd artifacts/release && sha256sum "messenger-$VERSION-arm64-v8a.apk" > SHA256SUMS.txt)
@@ -283,6 +284,7 @@ jobs:
           assets=(
             "artifacts/release/messenger-$VERSION-arm64-v8a.apk"
             "artifacts/release/SHA256SUMS.txt"
+            "artifacts/release/mapping-$VERSION.txt"
           )
           # Re-running a tag, or tagging a version whose release already exists
           # by hand, should replace the assets instead of failing.
@@ -335,5 +337,6 @@ jobs:
           path: |
             artifacts/release/messenger-*.apk
             artifacts/release/SHA256SUMS.txt
+            artifacts/release/mapping-*.txt
           if-no-files-found: error
           retention-days: 14

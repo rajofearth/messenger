@@ -12,6 +12,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { styles, settingsColors } from "./SettingsScreen.styles";
+import { imageCacheKey } from "../../domain/imageVariants";
 import {
   useSettingsPreferences,
   type ProfileChangeHandler,
@@ -78,8 +79,9 @@ export default function SettingsScreen({
     toggle,
     editProfile,
   } = settings;
-  useEffect(() => setAvatarFailed(false), [preferences.avatar, setAvatarFailed]);
+  useEffect(() => setAvatarFailed(false), [avatarUri, setAvatarFailed]);
   const colors = settingsColors(dark);
+  const avatarKey = avatarUri ? imageCacheKey(avatarUri) : undefined;
   const themeNote =
     theme === "system"
       ? `Following your device, ${dark ? "dark" : "light"} right now`
@@ -198,8 +200,14 @@ export default function SettingsScreen({
                   </View>
                 ) : (
                   <Image
-                    source={{ uri: avatarUri }}
+                    source={{
+                      uri: avatarUri,
+                      cacheKey: avatarKey,
+                    }}
                     style={styles.avatar}
+                    contentFit="cover"
+                    allowDownscaling
+                    recyclingKey={avatarKey ?? preferences.avatar}
                     onError={() => setAvatarFailed(true)}
                   />
                 )}

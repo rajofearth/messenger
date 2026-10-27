@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { AssetMetadata } from "expo-media-library";
 import { IconButton } from "../../ui/primitives";
@@ -14,6 +14,8 @@ type Props = {
   albums: Array<Omit<MediaAlbum, "album">>;
   recentCount?: number;
   selectedId: string | null;
+  refreshing: boolean;
+  onRefresh: () => void;
   onSelect: (id: string | null) => void;
   onClose: () => void;
 };
@@ -40,6 +42,14 @@ export function MediaAlbumSheet(props: Props) {
         <ScrollView
           contentContainerStyle={s.albumList}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={props.refreshing}
+              onRefresh={props.onRefresh}
+              colors={[props.colors.coralInk]}
+              tintColor={props.colors.coralInk}
+            />
+          }
         >
           <AlbumRow
             colors={props.colors}

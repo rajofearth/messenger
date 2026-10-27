@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { Chat, Message, Story } from "../domain/data";
 import { markOwnStories } from "../domain/stories";
-import { mergeChats } from "../domain/threadMerge";
+import { mergeChats, mergeThread } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { prefetchStories } from "../services/mediaCache";
 import { mapChat, mapStory } from "./remoteMessengerTypes";
@@ -119,7 +119,12 @@ export function useRemoteServerSync({
       .loadMessages(selected)
       .then((stored) => {
         if (!active || remoteThread) return;
-        setMessages((current) => ({ ...current, [selected]: stored || [] }));
+        // The disk copy holds confirmed rows only; merge so the outbox bubbles
+        // hydrated at startup stay on screen while the network is away.
+        setMessages((current) => ({
+          ...current,
+          [selected]: mergeThread(stored || [], current[selected] || []),
+        }));
       })
       .catch(() => {});
     return () => {

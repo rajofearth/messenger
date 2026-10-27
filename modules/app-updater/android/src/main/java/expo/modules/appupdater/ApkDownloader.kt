@@ -38,6 +38,8 @@ internal class UpdateException(val code: String, message: String) : Exception(me
 internal class ApkDownloader(
   private val directory: File,
   private val expectedSha256: String,
+  /** Development builds may use a plain-http feed; release builds may not. */
+  private val allowHttp: Boolean,
   private val onProgress: (downloaded: Long, total: Long) -> Unit,
 ) {
   private val target = File(directory, "update-${expectedSha256.take(12)}.apk")
@@ -101,7 +103,9 @@ internal class ApkDownloader(
       // Catch Throwable, not Exception: a killed worker or an Error must not
       // leave a partial file for the next launch to wonder about.
       partial.delete()
-      if (cancelRequested.get()) throw cancelled()
+      // A real protocol/checksum failure must keep its code even when a cancel
+      // arrives at the same moment; only an interrupted read is a cancel.
+      if (cancelRequested.get() && error !is UpdateException) throw cancelled()
       throw error
     } finally {
       response.disconnect()
@@ -161,7 +165,7 @@ internal class ApkDownloader(
         throw UpdateException(UpdateException.HTTP, "The update server redirected too many times")
       }
       address = URL(address, location)
-      if (address.protocol != "https" && address.protocol != "http") {
+      if (address.protocol != "https" && !(allowHttp && address.protocol == "http")) {
         throw UpdateException(UpdateException.HTTP, "The update server redirected to ${address.protocol}://")
       }
     }

@@ -1,7 +1,8 @@
 import { Directory, File, Paths } from "expo-file-system";
 import { Album, Asset, MediaType, requestPermissionsAsync } from "expo-media-library";
-import { Platform } from "react-native";
+import { PixelRatio, Platform } from "react-native";
 import type { Message, Story } from "../domain/data";
+import { chooseImageSource } from "../domain/imageVariants";
 import { trackDevEvent } from "./devTelemetry";
 
 const FOLDER = "messenger-media";
@@ -19,7 +20,11 @@ function extensionFor(name?: string, mimeType?: string) {
   if (fromName && /^[a-z0-9]{2,5}$/.test(fromName)) return fromName;
   if (mimeType?.startsWith("video/")) return "mp4";
   if (mimeType?.startsWith("audio/")) return "m4a";
-  if (mimeType?.startsWith("image/")) return mimeType.includes("png") ? "png" : "jpg";
+  if (mimeType?.startsWith("image/")) {
+    if (mimeType.includes("png")) return "png";
+    if (mimeType.includes("webp")) return "webp";
+    return "jpg";
+  }
   return "bin";
 }
 
@@ -50,6 +55,10 @@ function cachePrefix(name: string) {
 /**
  * Keeps received media in app storage so a thread and its stories render from
  * disk after the first fetch. The remote URL is only a fallback.
+ *
+ * A `variant` name stores one width beside the main file instead of replacing
+ * it. Variant files always take their extension from the supplied MIME type, so
+ * `image/webp` never lands as `.jpg`.
  */
 export async function cacheRemoteMedia(input: {
   id: string;
@@ -57,16 +66,19 @@ export async function cacheRemoteMedia(input: {
   filename?: string;
   mimeType?: string;
   kind?: Message["kind"] | "story";
+  variant?: string;
 }) {
   if (!input.uri || !/^https?:\/\//i.test(input.uri)) return input.uri;
-  const extension = extensionFor(
-    input.filename,
-    input.mimeType || (input.kind === "story" ? "image/jpeg" : undefined),
-  );
-  const file = new File(
-    mediaDirectory(),
-    `${safeName(input.id)}.${extension}`,
-  );
+  const extension = input.variant
+    ? extensionFor(undefined, input.mimeType)
+    : extensionFor(
+        input.filename,
+        input.mimeType || (input.kind === "story" ? "image/jpeg" : undefined),
+      );
+  const name = input.variant
+    ? `${safeName(input.id)}-${safeName(input.variant)}.${extension}`
+    : `${safeName(input.id)}.${extension}`;
+  const file = new File(mediaDirectory(), name);
   if (file.exists) return file.uri;
   try {
     const downloaded = await File.downloadFileAsync(input.uri, file, {
@@ -191,9 +203,11 @@ export async function cleanupStoryMedia(
   stories: readonly Story[],
   referencedUris: readonly string[] = [],
 ) {
-  const livePrefixes = new Set(
-    stories.map((story) => safeName(`story-${story.id}`)),
-  );
+  const livePrefixes = stories.map((story) => safeName(`story-${story.id}`));
+  // A story keeps its original and one file per responsive width, e.g.
+  // `story-<id>-w430.webp`; all of them belong to the live story.
+  const isLiveStory = (prefix: string) =>
+    livePrefixes.some((live) => prefix === live || prefix.startsWith(`${live}-`));
   const protectedUris = new Set([
     ...referencedUris,
     ...stories.map((story) => story.image),
@@ -213,7 +227,7 @@ export async function cleanupStoryMedia(
       !protectedUris.has(entry.uri);
     const staleStory =
       isStoryCacheName(name) &&
-      !livePrefixes.has(cachePrefix(name)) &&
+      !isLiveStory(cachePrefix(name)) &&
       !protectedUris.has(entry.uri);
     if (!staleTemporary && !staleStory) continue;
     try {
@@ -225,7 +239,11 @@ export async function cleanupStoryMedia(
   }
 }
 
-/** Downloads the visible stories, newest first, and points them at local files. */
+/**
+ * Downloads the visible stories, newest first. A photo keeps its remote
+ * original in `image` and caches the full-screen width beside it in
+ * `previewUri`; videos and stories without variants keep one local original.
+ */
 export async function prefetchStories(stories: Story[], limit = 8) {
   const now = Date.now();
   const targets = [...stories]
@@ -233,23 +251,55 @@ export async function prefetchStories(stories: Story[], limit = 8) {
     .sort((a, b) => (b.expiresAt ?? 0) - (a.expiresAt ?? 0))
     .slice(0, limit);
   const ids = new Set(targets.map((story) => story.id));
-  const cached = new Map<string, string>();
+  const originals = new Map<string, string>();
+  const previews = new Map<string, { uri: string; width: number }>();
   await Promise.all(
     targets.map(async (story) => {
+      if (!story.video && story.variants?.length) {
+        const choice = chooseImageSource({
+          uri: story.image,
+          variants: story.variants,
+          sourceWidth: story.width,
+          displayWidth: 430,
+          density: PixelRatio.get(),
+        });
+        if (
+          choice?.kind === "variant" &&
+          choice.name &&
+          choice.width !== undefined
+        ) {
+          const uri = await cacheRemoteMedia({
+            id: `story-${story.id}`,
+            uri: choice.uri,
+            variant: choice.name,
+            mimeType: choice.mimeType,
+            kind: "story",
+          });
+          // A failed variant download leaves the remote source for the viewer.
+          if (uri && uri !== choice.uri) {
+            previews.set(story.id, { uri, width: choice.width });
+          }
+          return;
+        }
+      }
       const uri = await cacheRemoteMedia({
         id: `story-${story.id}`,
         uri: story.image,
         mimeType: story.video ? "video/mp4" : "image/jpeg",
         kind: "story",
       });
-      if (uri) cached.set(story.id, uri);
+      if (uri) originals.set(story.id, uri);
     }),
   );
-  return stories.map((story) =>
-    ids.has(story.id) && cached.has(story.id)
-      ? { ...story, image: cached.get(story.id)! }
-      : story,
-  );
+  return stories.map((story) => {
+    if (!ids.has(story.id)) return story;
+    const preview = previews.get(story.id);
+    if (preview) {
+      return { ...story, previewUri: preview.uri, previewWidth: preview.width };
+    }
+    const uri = originals.get(story.id);
+    return uri ? { ...story, image: uri } : story;
+  });
 }
 
 /**

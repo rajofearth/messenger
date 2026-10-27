@@ -1,11 +1,11 @@
 import React, { useRef } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
-import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Message } from "../../domain/data";
 import { albumOverflowCount } from "../../domain/mediaAlbums";
 import { palette } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
+import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import type { MessageBubbleProps } from "./MessageBubble";
 
 type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "visible"> & {
@@ -93,10 +93,15 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
               style={[s.tile, messages.length === 3 && index === 2 && { width: "100%", aspectRatio: 2 }]}
             >
               {message.kind === "image" ? (
-                <Image
-                  source={{ uri: message.uri }}
+                <ResponsiveImage
+                  uri={message.uri}
+                  variants={message.variants}
+                  sourceWidth={message.width}
+                  previewUri={message.previewUri}
+                  previewWidth={message.previewWidth}
+                  // The third tile in a three-item album spans the full width.
+                  displayWidth={messages.length === 3 && index === 2 ? 340 : 180}
                   recyclingKey={message.id}
-                  cachePolicy="memory-disk"
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />

@@ -9,6 +9,7 @@
 
 import { Directory, File, Paths } from "expo-file-system";
 import { cacheKey, createCache } from "./cache";
+import { imageCacheKey } from "../domain/imageVariants";
 import { createAvatarReferenceIndex, type AvatarReference } from "./avatarReferences";
 
 const remote = /^https?:\/\//i;
@@ -40,12 +41,23 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
+/** One cache file per storage object, however many signed URLs point at it. */
+function avatarKey(uri: string) {
+  return imageCacheKey(uri) ?? cacheKey(uri);
+}
+
 function deleteCachedFile(uri: string) {
-  resolved.delete(uri);
+  const key = avatarKey(uri);
+  // Different signed URLs for the same avatar share one file, so keep it while
+  // another live snapshot still links to that storage object.
+  for (const other of references.references()) {
+    if (other !== uri && avatarKey(other) === key) return;
+  }
+  resolved.delete(key);
   const directory = folder();
   if (directory) {
     try {
-      const file = new File(directory, `${cacheKey(uri)}.img`);
+      const file = new File(directory, `${key}.img`);
       if (file.exists) file.delete();
     } catch {
       // A cache file the OS already removed is not worth reporting.
@@ -67,7 +79,7 @@ function prune(directory: Directory) {
     if (uri) keep.add(uri);
   }
   for (const uri of references.references()) {
-    keep.add(new File(directory, `${cacheKey(uri)}.img`).uri);
+    keep.add(new File(directory, `${avatarKey(uri)}.img`).uri);
   }
   for (const file of files) {
     if (remaining <= 0) return;
@@ -81,10 +93,12 @@ function prune(directory: Directory) {
   }
 }
 
-async function download(uri: string): Promise<string> {
+async function download(uri: string, key: string): Promise<string> {
   const directory = folder();
   if (!directory) return "";
-  const target = new File(directory, `${cacheKey(uri)}.img`);
+  // One file per storage object: chat, story and profile queries hand out a
+  // different signed URL for the same person, and all of them land here.
+  const target = new File(directory, `${key}.img`);
   if (target.exists && target.size > 0) return target.uri;
   const file = await File.downloadFileAsync(uri, target, { idempotent: true });
   downloads += 1;
@@ -103,14 +117,15 @@ export async function localAvatarUri(
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
   if (!remote.test(uri)) return undefined;
-  const cached = resolved.get(uri);
+  const key = avatarKey(uri);
+  const cached = resolved.get(key);
   if (cached) {
     if (new File(cached).exists) return cached;
     // Android can clear the cache directory, so a stale entry is dropped
     // instead of being handed back for the rest of the session.
-    resolved.delete(uri);
+    resolved.delete(key);
   }
-  const file = await resolved.load(uri, () => download(uri)).catch(() => "");
+  const file = await resolved.load(key, () => download(uri, key)).catch(() => "");
   return file || undefined;
 }
 
@@ -148,14 +163,15 @@ export function clearAvatarCache() {
 export function cachedAvatarUri(uri: string | undefined): string | undefined {
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
-  const cached = resolved.get(uri);
-  if (cached && new File(cached).exists) return cached;
   if (!remote.test(uri)) return undefined;
+  const key = avatarKey(uri);
+  const cached = resolved.get(key);
+  if (cached && new File(cached).exists) return cached;
   const directory = folder();
   if (!directory) return undefined;
-  const target = new File(directory, `${cacheKey(uri)}.img`);
+  const target = new File(directory, `${key}.img`);
   if (!target.exists || target.size <= 0) return undefined;
-  resolved.set(uri, target.uri);
+  resolved.set(key, target.uri);
   return target.uri;
 }
 
@@ -165,10 +181,16 @@ export function cachedAvatarUri(uri: string | undefined): string | undefined {
  */
 export function warmAvatars(uris: Array<string | undefined>, limit = 12) {
   if (!supported) return;
-  const queue = [...new Set(uris.filter((uri): uri is string => !!uri && remote.test(uri)))].slice(
-    0,
-    limit,
-  );
+  const queue: string[] = [];
+  const seen = new Set<string>();
+  for (const uri of uris) {
+    if (queue.length >= limit) break;
+    if (!uri || !remote.test(uri)) continue;
+    const key = avatarKey(uri);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    queue.push(uri);
+  }
   let running = 0;
   const pump = () => {
     while (running < 2 && queue.length) {

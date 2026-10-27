@@ -1,6 +1,15 @@
 /** Delivery state for a message this device sent. Server rows omit it. */
 export type MessageStatus = "sending" | "sent" | "failed";
 
+/** One stored width of an image, smallest first. */
+export type ImageVariant = {
+  name: string;
+  width: number;
+  height: number;
+  uri: string;
+  mimeType?: string;
+};
+
 export type Message = {
   id: string;
   text?: string;
@@ -21,6 +30,10 @@ export type Message = {
   width?: number;
   height?: number;
   uri?: string;
+  variants?: ImageVariant[];
+  /** Local file for the chosen width; `uri` still points at the original. */
+  previewUri?: string;
+  previewWidth?: number;
   filename?: string;
   duration?: number;
   reaction?: string;
@@ -30,6 +43,12 @@ export type Message = {
   status?: MessageStatus;
   /** Local-only upload fraction (0..1) while an attachment is on its way. */
   uploadProgress?: number;
+  /**
+   * Local-only Convex `_storage` id of a finalized upload, kept so a retry
+   * reuses the same blob instead of uploading again. The server rejects a
+   * reused client message id whose parts changed, so this must survive too.
+   */
+  storageId?: string;
 };
 
 export type Chat = {
@@ -66,6 +85,14 @@ export type Story = {
   name: string;
   avatar: string;
   image: string;
+  variants?: ImageVariant[];
+  width?: number;
+  height?: number;
+  /** Local file for the chosen width; `image` still points at the original. */
+  previewUri?: string;
+  previewWidth?: number;
+  /** Local-only MIME type of a just-picked story file. */
+  mimeType?: string;
   seen: boolean;
   caption: string;
   video?: boolean;

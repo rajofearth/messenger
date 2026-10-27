@@ -101,16 +101,54 @@ export default defineSchema({
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     durationMs: v.optional(v.number()),
+    /**
+     * Message ids that currently reference this blob. Undefined means a
+     * pre-migration row, so deletion leaves the blob alone.
+     */
+    messageRefs: v.optional(v.array(v.string())),
+    /**
+     * Image uploads record whether responsive widths exist. `pending` and
+     * `failed` are reserved for a server-side generator; finalize currently
+     * writes `ready` or `skipped`.
+     */
+    variantsState: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("ready"),
+        v.literal("skipped"),
+        v.literal("failed"),
+      ),
+    ),
     createdAt: v.number(),
   })
     .index("by_storageId", ["storageId"])
     .index("by_owner", ["ownerId"]),
+  /**
+   * One stored width of an image upload. The URL is resolved once when the row
+   * is written, so a thread projection never calls `getUrl` per variant.
+   */
+  mediaVariants: defineTable({
+    sourceStorageId: v.id("_storage"),
+    variantStorageId: v.id("_storage"),
+    name: v.string(),
+    width: v.number(),
+    height: v.number(),
+    bytes: v.number(),
+    mimeType: v.string(),
+    url: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_source", ["sourceStorageId"])
+    .index("by_variant_storage", ["variantStorageId"]),
   stories: defineTable({
     ownerId: v.id("users"),
     storageId: v.id("_storage"),
     mimeType: v.string(),
     caption: v.string(),
     crop: v.optional(v.union(v.literal("fit"), v.literal("fill"))),
+    /** Source dimensions, copied from the finalized story upload. */
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
     createdAt: v.number(),
     expiresAt: v.number(),
   }).index("by_expiresAt", ["expiresAt"]),

@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import type { Chat, Message, Story } from "../domain/data";
+import { applyOutboxToChats, hydrateOutbox } from "../domain/outbox";
 import { messengerRepository } from "../data/messengerRepository";
 import type { SettingsRecord } from "../data/records";
 import { setHapticsEnabled } from "../ui/primitives";
 import type { ThemePreference } from "../ui/theme";
 import { cleanupStoryMedia } from "../services/mediaCache";
+import {
+  initializeOutbox,
+  loadOutbox,
+  outboxLoaded,
+  sweepOutboxFiles,
+} from "../services/outbox";
 import {
   DEFAULT_SETTINGS,
   type RemoteCallRecord,
@@ -36,6 +43,7 @@ export function useRemoteCache() {
       messengerRepository.loadAppearance(),
       messengerRepository.loadSettings(),
       messengerRepository.loadGallerySaved(),
+      loadOutbox(),
     ])
       .then(
         ([
@@ -45,9 +53,20 @@ export function useRemoteCache() {
           appearance,
           saved,
           savedMedia,
+          storedOutbox,
         ]) => {
         if (!active) return;
-        if (storedChats) setCachedChats(storedChats);
+        const outbox = storedOutbox ?? [];
+        initializeOutbox(outbox);
+        // Copies left by an earlier session are safe to remove only after the
+        // queue was actually read; see outboxLoaded.
+        if (outboxLoaded()) sweepOutboxFiles();
+        if (storedChats) {
+          setCachedChats(applyOutboxToChats(storedChats, outbox));
+        }
+        if (outbox.length) {
+          setMessages((current) => hydrateOutbox(current, outbox));
+        }
         if (savedMedia) setGallerySaved(savedMedia);
         if (storedStories) {
           const now = Date.now();
