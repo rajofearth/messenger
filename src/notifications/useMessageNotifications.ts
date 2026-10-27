@@ -84,6 +84,7 @@ export function useMessageNotifications({
             if (local) avatars[uri] = local;
           }),
       );
+      await avatarPromise;
       if (cancelled) return;
       for (const chat of targets) {
         if (cancelled) return;
@@ -94,8 +95,9 @@ export function useMessageNotifications({
           self: {
             id: "self",
             name: self.name,
-            avatarUri: undefined,
+            avatarUri: self.avatarUri ? avatars[self.avatarUri] : undefined,
           },
+          avatars: { [chat.id]: avatars[chat.avatar] },
           previews,
           sound,
         });
@@ -106,21 +108,6 @@ export function useMessageNotifications({
         // permission, channel off) stays eligible, so granting permission later
         // does not silently swallow the message.
         if (result?.posted === true) announced.current.set(chat.id, last);
-        void avatarPromise.then(() => {
-          if (cancelled) return;
-          const resolvedSelfAvatar = self.avatarUri ? avatars[self.avatarUri] : undefined;
-          const resolvedChatAvatar = avatars[chat.avatar];
-          if (result?.posted === true && !resolvedSelfAvatar && !resolvedChatAvatar) return;
-          const updated = messagePayload({
-            chat,
-            messages: thread,
-            self: { id: "self", name: self.name, avatarUri: self.avatarUri ? avatars[self.avatarUri] : undefined },
-            avatars: { [chat.id]: avatars[chat.avatar] },
-            previews,
-            sound,
-          });
-          if (updated) void showMessage(updated).catch(() => {});
-        });
       }
     })();
     return () => {

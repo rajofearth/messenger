@@ -8,14 +8,16 @@
  */
 
 import { Directory, File, Paths } from "expo-file-system";
-import { createCache } from "./cache";
+import { cacheKey, createCache } from "./cache";
 import { imageCacheKey } from "../domain/imageVariants";
+import { createAvatarReferenceIndex, type AvatarReference } from "./avatarReferences";
 
 const remote = /^https?:\/\//i;
 const local = /^(file|content|asset|data):/i;
 const resolved = createCache<string>({ max: 256 });
 const MAX_FILES = 240;
 let downloads = 0;
+const listeners = new Set<() => void>();
 
 /** `false` when the native file system is unavailable (web, tests). */
 const supported = (() => {
@@ -35,6 +37,37 @@ function folder(): Directory | null {
   return target;
 }
 
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+/** One cache file per storage object, however many signed URLs point at it. */
+function avatarKey(uri: string) {
+  return imageCacheKey(uri) ?? cacheKey(uri);
+}
+
+function deleteCachedFile(uri: string) {
+  const key = avatarKey(uri);
+  // Different signed URLs for the same avatar share one file, so keep it while
+  // another live snapshot still links to that storage object.
+  for (const other of references.references()) {
+    if (other !== uri && avatarKey(other) === key) return;
+  }
+  resolved.delete(key);
+  const directory = folder();
+  if (directory) {
+    try {
+      const file = new File(directory, `${key}.img`);
+      if (file.exists) file.delete();
+    } catch {
+      // A cache file the OS already removed is not worth reporting.
+    }
+  }
+  notify();
+}
+
+const references = createAvatarReferenceIndex(deleteCachedFile);
+
 /** Removes downloads the cache no longer references once the folder grows. */
 function prune(directory: Directory) {
   const files = directory.list().filter((item): item is File => item instanceof File);
@@ -44,6 +77,9 @@ function prune(directory: Directory) {
   for (const key of resolved.keys()) {
     const uri = resolved.get(key);
     if (uri) keep.add(uri);
+  }
+  for (const uri of references.references()) {
+    keep.add(new File(directory, `${avatarKey(uri)}.img`).uri);
   }
   for (const file of files) {
     if (remaining <= 0) return;
@@ -81,7 +117,7 @@ export async function localAvatarUri(
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
   if (!remote.test(uri)) return undefined;
-  const key = imageCacheKey(uri) ?? uri;
+  const key = avatarKey(uri);
   const cached = resolved.get(key);
   if (cached) {
     if (new File(cached).exists) return cached;
@@ -93,26 +129,50 @@ export async function localAvatarUri(
   return file || undefined;
 }
 
+/** Keeps current server snapshots tied to the files they still use. */
+export function syncAvatarReferences(
+  scope: string,
+  values: AvatarReference[],
+) {
+  references.sync(scope, values);
+}
+
+/** Lets avatar UI refresh if a cache file is cleared while it is mounted. */
+export function subscribeAvatarCache(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 /** Drops every cached avatar file and memory entry. */
 export function clearAvatarCache() {
   resolved.clear();
   const directory = folder();
-  if (!directory) return;
-  for (const item of directory.list()) {
-    try {
-      item.delete();
-    } catch {
-      // Ignore entries the OS removed first.
+  if (directory) {
+    for (const item of directory.list()) {
+      try {
+        item.delete();
+      } catch {
+        // Ignore entries the OS removed first.
+      }
     }
   }
+  notify();
 }
 
 /** Local URI when the avatar is already cached, without touching the network. */
 export function cachedAvatarUri(uri: string | undefined): string | undefined {
   if (!uri) return undefined;
   if (local.test(uri)) return uri;
-  const cached = resolved.get(imageCacheKey(uri) ?? uri);
-  return cached && new File(cached).exists ? cached : undefined;
+  if (!remote.test(uri)) return undefined;
+  const key = avatarKey(uri);
+  const cached = resolved.get(key);
+  if (cached && new File(cached).exists) return cached;
+  const directory = folder();
+  if (!directory) return undefined;
+  const target = new File(directory, `${key}.img`);
+  if (!target.exists || target.size <= 0) return undefined;
+  resolved.set(key, target.uri);
+  return target.uri;
 }
 
 /**
@@ -126,7 +186,7 @@ export function warmAvatars(uris: Array<string | undefined>, limit = 12) {
   for (const uri of uris) {
     if (queue.length >= limit) break;
     if (!uri || !remote.test(uri)) continue;
-    const key = imageCacheKey(uri) ?? uri;
+    const key = avatarKey(uri);
     if (seen.has(key)) continue;
     seen.add(key);
     queue.push(uri);

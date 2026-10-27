@@ -142,6 +142,14 @@ test("direct conversations show the sender, groups use the chat name and a title
   assert.equal(direct.messages[0].sender.avatarUri, "file:///avatars/1.jpg");
   assert.equal(direct.self.id, "me");
 
+  const selfAvatar = messagePayload({
+    chat,
+    messages: [message({ text: "Hi" })],
+    self: { id: "me", name: "Yashraj", avatarUri: "file:///avatars/self.jpg" },
+    previews: true,
+  });
+  assert.equal(selfAvatar.self.avatarUri, "file:///avatars/self.jpg");
+
   const group = messagePayload({
     chat: { ...chat, id: "g1", name: "The weekend people", group: true },
     messages: [message({ text: "Who brings the playlist?" })],

@@ -24,6 +24,7 @@ function harness(initialStates = []) {
   let released = false;
   let releaseCount = 0;
   let playing = false;
+  let backPress;
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
     useState(initial) {
@@ -55,7 +56,20 @@ function harness(initialStates = []) {
   });
   const preview = load("./MediaPickerPreview.tsx", {
     react,
-    "react-native": { View: "View", Text: "Text", Pressable: "Pressable", Platform: { OS: "android" } },
+    "react-native": {
+      View: "View",
+      Text: "Text",
+      Pressable: "Pressable",
+      Platform: { OS: "android" },
+      useWindowDimensions: () => ({ width: 360 }),
+      BackHandler: {
+        addEventListener: (event, handler) => {
+          assert.equal(event, "hardwareBackPress");
+          backPress = handler;
+          return { remove() {} };
+        },
+      },
+    },
     "expo-image": { Image: "Image" },
     "expo-video": { ...video, VideoView: "VideoView" },
      "expo-media-library": { MediaType: { VIDEO: "video", IMAGE: "image" }, Asset: function () { return { getUri: async () => "content://media/video.mp4" }; } },
@@ -68,7 +82,7 @@ function harness(initialStates = []) {
     "../../services/mediaThumbnails": { getMediaThumbnail: async () => "file:///thumbnail.jpg" },
     "../../services/devTelemetry": { trackDevEvent: (event, fields) => events.push({ event, ...fields }) },
     "./MediaPicker.styles": { styles: {} },
-  }, "\nexport { PreviewVideo, PreviewPage };\n");
+  }, "\nexport { MediaPickerPreview, PreviewVideo, PreviewPage };\n");
   return {
     player,
     events,
@@ -77,8 +91,23 @@ function harness(initialStates = []) {
       asset: { id: "content://media/external/video/media/1", mediaType },
       active, width: 360, selected: false, onToggle() {}, colors: {},
     }),
+    pickerPreview: (onClose) => preview.MediaPickerPreview({
+      assets: [{ id: "content://media/external/video/media/1", mediaType: "video" }],
+      initialIndex: 0,
+      colors: {},
+      selection: [],
+      onClose,
+      onToggle() {},
+    }),
+    pressBack() {
+      assert.equal(typeof backPress, "function", "preview should register an Android back handler");
+      return backPress();
+    },
+    mount() {
+      return effects.map((effect) => effect());
+    },
     unmount() {
-      const cleanups = effects.map((effect) => effect());
+      const cleanups = this.mount();
       for (const cleanup of cleanups) cleanup?.();
     },
     get playing() { return playing; },
@@ -128,4 +157,13 @@ test("video timing records the first rendered frame once, not a thumbnail resolu
   assert.equal(app.events[0].event, "media_preview_video_first_frame");
   assert.equal(app.events[0].video, true);
   assert.ok(app.events[0].durationMs >= 0);
+});
+
+test("Android back from the media preview closes only the preview layer", () => {
+  const app = harness();
+  let closed = 0;
+  app.pickerPreview(() => { closed += 1; });
+  app.mount();
+  assert.equal(app.pressBack(), true);
+  assert.equal(closed, 1);
 });

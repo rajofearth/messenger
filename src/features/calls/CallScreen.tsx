@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -18,6 +18,7 @@ import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
 import CallScreenCamera from "./CallScreenCamera";
 import { Avatar } from "../../ui/primitives";
+import { useAvatarUri } from "../../ui/useAvatarUri";
 import { imageCacheKey } from "../../domain/imageVariants";
 
 export type CallScreenProps = {
@@ -59,16 +60,20 @@ export default function CallScreen({
   const [frontCamera, setFrontCamera] = useState(true);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
+  const avatarUri = useAvatarUri(avatar);
+  useEffect(() => {
+    setRemoteFailed(false);
+  }, [avatar]);
 
   const showingVideo = cameraOn;
   const displayName = name.trim() || "Your contact";
-  const backdropUri = avatar.replace(/w=\d+/, "w=1080");
-  const backdropKey = imageCacheKey(backdropUri);
+  const backdropUri = avatarUri?.replace(/w=\d+/, "w=1080");
+  const backdropKey = backdropUri ? imageCacheKey(backdropUri) : undefined;
 
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor="#161B20" />
-      {showingVideo && !remoteFailed && (
+      {showingVideo && !remoteFailed && avatarUri && (
         <Image
           source={{ uri: backdropUri, cacheKey: backdropKey }}
           style={StyleSheet.absoluteFill}

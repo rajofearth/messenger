@@ -28,6 +28,7 @@ import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
 import AccountSection from "./AccountSection";
 import { MediaPicker } from "../media/MediaPicker";
+import { useAvatarUri } from "../../ui/useAvatarUri";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -54,6 +55,7 @@ export default function SettingsScreen({
   updates,
 }: SettingsScreenProps) {
   const settings = useSettingsPreferences(onProfileChange);
+  const avatarUri = useAvatarUri(settings.preferences.avatar);
   const [page, setPage] = useState<"profile" | "settings">("profile");
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   useEffect(() => {
@@ -77,8 +79,9 @@ export default function SettingsScreen({
     toggle,
     editProfile,
   } = settings;
+  useEffect(() => setAvatarFailed(false), [avatarUri, setAvatarFailed]);
   const colors = settingsColors(dark);
-  const avatarKey = imageCacheKey(preferences.avatar);
+  const avatarKey = avatarUri ? imageCacheKey(avatarUri) : undefined;
   const themeNote =
     theme === "system"
       ? `Following your device, ${dark ? "dark" : "light"} right now`
@@ -185,7 +188,7 @@ export default function SettingsScreen({
                 onPress={() => setAvatarPickerOpen(true)}
                 style={styles.avatarWrap}
               >
-                {avatarFailed ? (
+                {!avatarUri || avatarFailed ? (
                   <View
                     style={[
                       styles.avatar,
@@ -198,7 +201,7 @@ export default function SettingsScreen({
                 ) : (
                   <Image
                     source={{
-                      uri: preferences.avatar,
+                      uri: avatarUri,
                       cacheKey: avatarKey,
                     }}
                     style={styles.avatar}

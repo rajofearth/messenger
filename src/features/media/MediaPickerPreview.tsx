@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { BackHandler, FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Asset, MediaType } from "expo-media-library";
@@ -27,6 +27,16 @@ export function MediaPickerPreview(props: Props) {
   const [index, setIndex] = React.useState(props.initialIndex);
   const initialIndex = Math.max(0, Math.min(props.initialIndex, Math.max(0, props.assets.length - 1)));
   const current = props.assets[index] ?? props.assets[0];
+  const onCloseRef = React.useRef(props.onClose);
+  onCloseRef.current = props.onClose;
+
+  React.useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onCloseRef.current();
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   React.useEffect(() => {
     setIndex(initialIndex);

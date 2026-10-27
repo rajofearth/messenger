@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { imageCacheKey } from "../domain/imageVariants";
+import { useAvatarUri } from "./useAvatarUri";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
 let hapticsEnabled = true;
 export function setHapticsEnabled(enabled: boolean) {
@@ -75,10 +76,11 @@ export function Avatar({
   online?: boolean;
 }) {
   const [failed, setFailed] = React.useState(false);
-  React.useEffect(() => setFailed(false), [uri]);
+  const imageUri = useAvatarUri(uri);
+  React.useEffect(() => setFailed(false), [imageUri]);
   const initials = avatarInitials(name);
-  const fallback = !uri || failed;
-  const cacheKey = uri ? imageCacheKey(uri) : undefined;
+  const fallback = !imageUri || failed;
+  const cacheKey = imageUri ? imageCacheKey(imageUri) : undefined;
   return (
     <View style={{ width: size, height: size }}>
       {fallback ? (
@@ -99,11 +101,11 @@ export function Avatar({
         </View>
       ) : (
         <Image
-          source={{ uri, cacheKey }}
+          source={{ uri: imageUri, cacheKey }}
           cachePolicy="memory-disk"
           contentFit="cover"
           allowDownscaling
-          recyclingKey={cacheKey ?? uri}
+          recyclingKey={cacheKey ?? imageUri}
           accessible={false}
           onError={() => setFailed(true)}
           style={{

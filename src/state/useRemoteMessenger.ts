@@ -6,6 +6,7 @@ import type { Chat, Message } from "../domain/data";
 import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { deviceIdentity } from "../services/deviceIdentity";
+import { useAvatarReferenceSync } from "./useAvatarReferenceSync";
 import type { ThemePreference } from "../ui/theme";
 import { useThemePreference } from "./useThemePreference";
 import type { SettingsProfile } from "../features/profile/SettingsPreferences";
@@ -117,9 +118,16 @@ export function useRemoteMessenger() {
       name: remoteProfile.name,
       username: remoteProfile.username,
       bio: remoteProfile.bio,
-      avatar: remoteProfile.avatarUrl || current.avatar,
+      avatar: remoteProfile.avatarUrl || "",
     }));
   }, [remoteProfile, setSettings]);
+
+  useAvatarReferenceSync({
+    chats: cachedChats,
+    stories,
+    history,
+    selfAvatar: settings.avatar,
+  });
 
   useEffect(() => {
     if (remoteProfile !== null || !localReady) return;

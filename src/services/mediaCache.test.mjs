@@ -31,6 +31,7 @@ function harness(options = {}) {
   const calls = [];
   const downloads = [];
   const copied = new Set();
+  const deleted = new Set();
   const album = { id: "messenger", add: async () => { calls.push(["add"]); } };
   const asset = {
     id: "content://media/external/images/media/1",
@@ -42,22 +43,35 @@ function harness(options = {}) {
   };
   class File {
     constructor(uri, name) { this.uri = name ? `${uri.uri}/${name}` : uri; }
-    get exists() { return !options.missingFile && ([sourceUri, publicUri].includes(this.uri) || (options.localSource && this.uri === pickedUri) || copied.has(this.uri)); }
+    get name() { return this.uri.slice(this.uri.lastIndexOf("/") + 1); }
+    get exists() {
+      return !deleted.has(this.uri) && !options.missingFile &&
+        ([sourceUri, publicUri].includes(this.uri) ||
+          (options.localSource && this.uri === pickedUri) ||
+          copied.has(this.uri) || (options.files ?? []).includes(this.name));
+    }
     get size() { return options.emptyFile ? 0 : options.shortCopy && this.uri === publicUri ? 10 : 100; }
     async copy(destination) { copied.add(destination.uri); calls.push(["copy", this.uri, destination.uri]); }
-    delete() { copied.delete(this.uri); }
+    delete() { deleted.add(this.uri); copied.delete(this.uri); calls.push(["delete", this.uri]); }
     static downloadFileAsync = async (uri, file) => {
       downloads.push(file.uri);
       if (options.downloadSucceeds) return file;
       throw new Error("Offline");
     };
   }
+  class Directory {
+    exists = true;
+    uri = "file:///private/documents/messenger-media";
+    constructor() { if (options.cacheFails) throw new Error("Cache unavailable"); }
+    create() {}
+    list() { return (options.files ?? []).map((name) => new File(this, name)); }
+  }
   const modules = {
-    "expo-file-system": { File, Directory: class {
-      exists = true;
-      uri = "file:///private/documents/messenger-media";
-      constructor() { if (options.cacheFails) throw new Error("Cache unavailable"); }
-    }, Paths: { document: { uri: "file:///private/documents/" }, cache: { uri: "file:///private/cache/" } } },
+    "expo-file-system": {
+      File,
+      Directory,
+      Paths: { document: { uri: "file:///private/documents/" }, cache: { uri: "file:///private/cache/" } },
+    },
     "react-native": {
       Platform: { OS: "android" },
       PixelRatio: { get: () => 2 },
@@ -82,7 +96,7 @@ function harness(options = {}) {
     assert.ok(name in modules, `Missing mock: ${name}`);
     return modules[name];
   }, exports);
-  return { ...exports, events, calls, downloads, asset, album };
+  return { ...exports, events, calls, downloads, asset, album, copied, deleted };
 }
 
 test("exports directly into an existing album without a second move or duplicate", async () => {
@@ -129,6 +143,60 @@ test("selected content media is copied into app storage before review", async ()
   const uri = await app.cacheLocalMedia({ id: "picked-video", uri: pickedUri, mimeType: "video/mp4" });
   assert.match(uri, /messenger-media\/picked-video\.mp4$/);
   assert.deepEqual(app.calls.find(([name]) => name === "copy"), ["copy", pickedUri, uri]);
+});
+
+test("a temporary draft copy can be discarded without touching a referenced copy", async () => {
+  const app = harness({ localSource: true });
+  const draft = await app.cachePickedMedia({ uri: pickedUri, mimeType: "video/mp4" }, "picked-video");
+  const uri = draft.uri;
+  assert.equal(app.discardTemporaryMedia(uri, [uri]), false);
+  assert.equal(app.deleted.has(uri), false);
+  assert.equal(app.discardTemporaryMedia(uri), true);
+  assert.equal(app.deleted.has(uri), true);
+});
+
+test("publishing promotes the local draft copy and removes the temporary file", async () => {
+  const app = harness({ localSource: true });
+  const draft = await app.cachePickedMedia({ uri: pickedUri, mimeType: "video/mp4" }, "picked-video");
+  const stable = await app.promoteStoryMedia({
+    id: "server-story",
+    uri: draft.uri,
+    mimeType: "video/mp4",
+  });
+  assert.match(stable, /messenger-media\/story-server-story\.mp4$/);
+  assert.ok(app.calls.some(([name, source]) => name === "delete" && source === draft.uri));
+  assert.ok(app.copied.has(stable));
+});
+
+test("story cleanup removes expired cache files but protects live story and message references", async () => {
+  const app = harness({
+    files: [
+      "story-live.jpg",
+      "story-live-w430.webp",
+      "story-expired.jpg",
+      "story-referenced.jpg",
+      "story-save-keep.jpg",
+      "picked-orphan.jpg",
+    ],
+  });
+  await app.cleanupStoryMedia(
+    [{ id: "live", image: "file:///private/documents/messenger-media/story-live.jpg" }],
+    ["file:///private/documents/messenger-media/story-referenced.jpg"],
+  );
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-live.jpg"), false);
+
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-live-w430.webp"), false);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-referenced.jpg"), false);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-save-keep.jpg"), false);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/story-expired.jpg"), true);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/picked-orphan.jpg"), true);
+});
+
+test("temporary files left by an earlier process are pruned", async () => {
+  const app = harness({ files: ["picked-orphan.jpg", "camera-active.jpg"] });
+  await app.pruneTemporaryMedia(["file:///private/documents/messenger-media/camera-active.jpg"]);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/picked-orphan.jpg"), true);
+  assert.equal(app.deleted.has("file:///private/documents/messenger-media/camera-active.jpg"), false);
 });
 
 test("cache failures record a safe failure result rather than losing the outcome event", async () => {

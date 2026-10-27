@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { StoryDraft } from "./storyComposerModel";
 import { dragTargetIndex, moveDraftTo, removeDraft } from "./storyComposerModel";
 import { StoryMedia } from "./StoryMedia";
+import { shouldMountStoryVideoSurface } from "./storyMediaModel";
 import { StoryCropSheet } from "./StoryCropSheet";
 import { getMediaThumbnail } from "../../services/mediaThumbnails";
 import { tap } from "../../ui/primitives";
@@ -29,6 +30,7 @@ export function StoryDraftReview(props: Props) {
   const [cropOpen, setCropOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragTarget, setDragTarget] = useState<number | null>(null);
+  const [settledIndex, setSettledIndex] = useState(props.index);
   const dragOrigin = useRef<number | null>(null);
   const currentIndex = useRef(props.index);
   const onIndexRef = useRef(props.onIndex);
@@ -52,8 +54,10 @@ export function StoryDraftReview(props: Props) {
   }
   function removeCurrent() {
     const next = removeDraft(props.drafts, props.index);
+    const nextIndex = Math.max(0, Math.min(props.index, next.length - 1));
     props.onDrafts(next);
-    props.onIndex(Math.max(0, Math.min(props.index, next.length - 1)));
+    setSettledIndex(nextIndex);
+    props.onIndex(nextIndex);
   }
   function startDrag(index: number) {
     dragOrigin.current = index;
@@ -73,6 +77,7 @@ export function StoryDraftReview(props: Props) {
     props.onDrafts(next);
     const nextIndex = next.findIndex((item) => item.id === activeId);
     if (nextIndex >= 0) {
+      setSettledIndex(nextIndex);
       props.onIndex(nextIndex);
       pager.current?.scrollToIndex({ index: nextIndex, animated: false });
     }
@@ -107,12 +112,21 @@ export function StoryDraftReview(props: Props) {
           extraData={props.index}
           getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
           keyExtractor={(item) => `page-${item.id}`}
-          renderItem={({ item, index }) => <ReviewPage draft={item} active={index === props.index} width={width} />}
+          renderItem={({ item, index }) => (
+            <ReviewPage
+              draft={item}
+              active={index === props.index}
+              settled={index === settledIndex}
+              width={width}
+            />
+          )}
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
           onMomentumScrollEnd={(event) => {
             const next = Math.round(event.nativeEvent.contentOffset.x / Math.max(1, event.nativeEvent.layoutMeasurement.width));
-            props.onIndex(Math.max(0, Math.min(next, props.drafts.length - 1)));
+            const bounded = Math.max(0, Math.min(next, props.drafts.length - 1));
+            setSettledIndex(bounded);
+            props.onIndex(bounded);
           }}
         />
         <View style={c.composerScrim} pointerEvents="none" />
@@ -188,7 +202,7 @@ export function StoryDraftReview(props: Props) {
     </SafeAreaView>
   );
 }
-function ReviewPage({ draft, active, width }: { draft: StoryDraft; active: boolean; width: number }) {
+function ReviewPage({ draft, active, settled, width }: { draft: StoryDraft; active: boolean; settled: boolean; width: number }) {
   const [poster, setPoster] = React.useState<string | null>(() => reviewPosterCache.get(draft.uri) ?? null);
   React.useEffect(() => {
     if (!draft.video) return;
@@ -211,8 +225,18 @@ function ReviewPage({ draft, active, width }: { draft: StoryDraft; active: boole
     };
   }, [draft.uri, draft.video]);
   return (
-    <View style={[s.previewPage, { width }]}>
-      {active ? <StoryMedia key={`${draft.id}-${draft.uri}`} uri={draft.uri} video={draft.video} crop={draft.crop} preview controls poster={poster ?? undefined} /> : draft.video ? poster ? <Image source={{ uri: poster }} style={s.image} contentFit="contain" /> : <View style={s.previewVideoPlaceholder}><Ionicons name="videocam-outline" size={42} color="#FFFFFF88" /><Text style={s.previewVideoPlaceholderText}>Loading video preview…</Text></View> : <Image source={{ uri: draft.uri }} style={s.image} contentFit="contain" />}
+    <View style={[s.previewPage, { width }]}>{/* Keep the poster/image tree mounted during swipes. */}
+      <StoryMedia
+        key={`${draft.id}-${draft.uri}`}
+        uri={draft.uri}
+        video={draft.video}
+        crop={draft.crop}
+        preview
+        controls
+        poster={poster ?? undefined}
+        posterPlaceholder
+        videoSurface={shouldMountStoryVideoSurface(draft.video, active, settled)}
+      />
     </View>
   );
 }

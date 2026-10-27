@@ -4,6 +4,10 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Story } from "../domain/data";
 import { mergeStoryUploads } from "../domain/stories";
+import {
+  discardTemporaryMedia,
+  promoteStoryMedia,
+} from "../services/mediaCache";
 import { uploadAndCreateStory } from "./remoteMessengerUploads";
 
 type Args = {
@@ -54,11 +58,20 @@ export function useRemoteStories({ stories, setStories }: Args) {
 
   function updateUpload(
     id: string,
-    patch: Partial<Pick<Story, "id" | "uploadStatus" | "uploadProgress">>,
+    patch: Partial<Pick<Story, "id" | "image" | "uploadStatus" | "uploadProgress">>,
   ) {
     setUploads((current) =>
       current.map((story) => (story.id === id ? { ...story, ...patch } : story)),
     );
+  }
+
+  function otherMediaUris(id: string) {
+    return [
+      ...stories.filter((item) => item.id !== id).map((item) => item.image),
+      ...uploadsRef.current
+        .filter((item) => item.id !== id)
+        .map((item) => item.image),
+    ];
   }
 
   function startUpload(story: Story) {
@@ -71,13 +84,29 @@ export function useRemoteStories({ stories, setStories }: Args) {
           setUploads((current) =>
             current.filter((item) => item.id !== localId),
           );
+          discardTemporaryMedia(story.image, otherMediaUris(localId));
           void storyDelete({ storyId: serverId }).catch(() => {});
           return;
         }
-        updateUpload(localId, {
+        void promoteStoryMedia({
           id: serverId,
-          uploadStatus: "uploaded",
-          uploadProgress: 1,
+          uri: story.image,
+          mimeType: story.video ? "video/mp4" : "image/jpeg",
+          referencedUris: otherMediaUris(localId),
+        }).then((image) => {
+          if (cancelled.current.delete(localId)) {
+            setUploads((current) =>
+              current.filter((item) => item.id !== localId),
+            );
+            void storyDelete({ storyId: serverId }).catch(() => {});
+            return;
+          }
+          updateUpload(localId, {
+            id: serverId,
+            image,
+            uploadStatus: "uploaded",
+            uploadProgress: 1,
+          });
         });
       })
       .catch(() => {
@@ -88,8 +117,10 @@ export function useRemoteStories({ stories, setStories }: Args) {
 
   function deleteStory(id: string) {
     const pending = uploadsRef.current.find((story) => story.id === id);
-    if (pending && pending.uploadStatus !== "uploaded")
+    if (pending && pending.uploadStatus !== "uploaded") {
       cancelled.current.add(id);
+      discardTemporaryMedia(pending.image, otherMediaUris(id));
+    }
     setUploads((current) => current.filter((story) => story.id !== id));
     setStories((current) => current.filter((story) => story.id !== id));
     if (pending && pending.uploadStatus !== "uploaded") return;

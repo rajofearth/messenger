@@ -7,6 +7,7 @@ import { trackDevEvent } from "./devTelemetry";
 
 const FOLDER = "messenger-media";
 const ALBUM = "Messenger";
+const temporaryMediaUris = new Set<string>();
 
 function mediaDirectory() {
   const directory = new Directory(Paths.document, FOLDER);
@@ -29,6 +30,26 @@ function extensionFor(name?: string, mimeType?: string) {
 
 function safeName(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function fileName(uri: string) {
+  return uri.slice(uri.lastIndexOf("/") + 1);
+}
+
+function isMediaFileUri(uri: string) {
+  return uri.startsWith(`${mediaDirectory().uri}/`);
+}
+
+function isTemporaryName(name: string) {
+  return /^(?:picked|camera)-[^/]+\.[a-z0-9]{2,5}$/i.test(name);
+}
+
+function isStoryCacheName(name: string) {
+  return /^story-(?!save-)[^/]+\.[a-z0-9]{2,5}$/i.test(name);
+}
+
+function cachePrefix(name: string) {
+  return name.slice(0, name.lastIndexOf("."));
 }
 
 /**
@@ -99,7 +120,123 @@ export async function cachePickedMedia<T extends { uri: string; filename?: strin
   id: string,
 ) {
   const uri = await cacheLocalMedia({ ...media, id });
+  if (isMediaFileUri(uri) && isTemporaryName(fileName(uri))) {
+    temporaryMediaUris.add(uri);
+  }
   return uri === media.uri ? media : { ...media, uri };
+}
+
+/** Removes one draft copy, unless another live item still references it. */
+export function discardTemporaryMedia(
+  uri: string,
+  referencedUris: readonly string[] = [],
+) {
+  if (!isMediaFileUri(uri) || !isTemporaryName(fileName(uri))) return false;
+  if (referencedUris.includes(uri)) return false;
+  temporaryMediaUris.delete(uri);
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Removes abandoned draft copies left by an earlier process. */
+export async function pruneTemporaryMedia(
+  referencedUris: readonly string[] = [],
+) {
+  const protectedUris = new Set(referencedUris);
+  let entries: (Directory | File)[];
+  try {
+    entries = mediaDirectory().list();
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!(entry instanceof File) || !isTemporaryName(entry.name)) continue;
+    if (temporaryMediaUris.has(entry.uri) || protectedUris.has(entry.uri)) continue;
+    try {
+      if (entry.exists) entry.delete();
+    } catch {
+      // A stale cache file is best-effort cleanup.
+    }
+  }
+}
+
+/** Promotes a published story's local draft copy to its stable story key. */
+export async function promoteStoryMedia(input: {
+  id: string;
+  uri: string;
+  filename?: string;
+  mimeType?: string;
+  referencedUris?: readonly string[];
+}) {
+  try {
+    if (!isMediaFileUri(input.uri)) return input.uri;
+    const extension = extensionFor(input.filename, input.mimeType);
+    const destination = new File(
+      mediaDirectory(),
+      `${safeName(`story-${input.id}`)}.${extension}`,
+    );
+    const source = new File(input.uri);
+    if (!destination.exists || destination.size <= 0) {
+      if (!source.exists || source.size <= 0) return input.uri;
+      await source.copy(destination, { overwrite: true });
+    }
+    if (!destination.exists || destination.size <= 0) return input.uri;
+    if (
+      isTemporaryName(fileName(input.uri)) &&
+      !input.referencedUris?.includes(input.uri)
+    ) {
+      discardTemporaryMedia(input.uri);
+    }
+    return destination.uri;
+  } catch {
+    return input.uri;
+  }
+}
+
+/** Deletes stale story cache files while protecting live story/message URIs. */
+export async function cleanupStoryMedia(
+  stories: readonly Story[],
+  referencedUris: readonly string[] = [],
+) {
+  const livePrefixes = stories.map((story) => safeName(`story-${story.id}`));
+  // A story keeps its original and one file per responsive width, e.g.
+  // `story-<id>-w430.webp`; all of them belong to the live story.
+  const isLiveStory = (prefix: string) =>
+    livePrefixes.some((live) => prefix === live || prefix.startsWith(`${live}-`));
+  const protectedUris = new Set([
+    ...referencedUris,
+    ...stories.map((story) => story.image),
+  ]);
+  let entries: (Directory | File)[];
+  try {
+    entries = mediaDirectory().list();
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!(entry instanceof File)) continue;
+    const name = entry.name;
+    const staleTemporary =
+      isTemporaryName(name) &&
+      !temporaryMediaUris.has(entry.uri) &&
+      !protectedUris.has(entry.uri);
+    const staleStory =
+      isStoryCacheName(name) &&
+      !isLiveStory(cachePrefix(name)) &&
+      !protectedUris.has(entry.uri);
+    if (!staleTemporary && !staleStory) continue;
+    try {
+      if (entry.exists) entry.delete();
+      temporaryMediaUris.delete(entry.uri);
+    } catch {
+      // Cache cleanup is best effort and must not block remote sync.
+    }
+  }
 }
 
 /**
