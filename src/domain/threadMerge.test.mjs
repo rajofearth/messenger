@@ -145,6 +145,62 @@ test("merge keeps a cached preview without clearing the server's", () => {
   assert.equal(kept.previewWidth, 512);
 });
 
+test("a shorter server page keeps the older confirmed history", () => {
+  const local = [
+    confirmed({ id: "server-1", sequence: 1 }),
+    confirmed({ id: "server-2", sequence: 2 }),
+    confirmed({ id: "server-3", sequence: 3 }),
+  ];
+  const merged = mergeThread([confirmed({ id: "server-3", sequence: 3 })], local);
+  assert.deepEqual(
+    merged.map((message) => message.id),
+    ["server-1", "server-2", "server-3"],
+  );
+  assert.deepEqual(
+    merged.map((message) => message.sequence),
+    [1, 2, 3],
+  );
+});
+
+test("a confirmed row hidden inside the page range is not resurrected", () => {
+  const local = [
+    confirmed({ id: "server-1", sequence: 1 }),
+    confirmed({ id: "server-2", sequence: 2 }),
+    confirmed({ id: "server-3", sequence: 3 }),
+  ];
+  const remote = [
+    confirmed({ id: "server-1", sequence: 1 }),
+    confirmed({ id: "server-3", sequence: 3 }),
+  ];
+  assert.deepEqual(
+    mergeThread(remote, local).map((message) => message.id),
+    ["server-1", "server-3"],
+  );
+});
+
+test("a confirmed row newer than a stale page stays at the end", () => {
+  const local = [
+    confirmed({ id: "server-3", sequence: 3 }),
+    confirmed({ id: "server-4", sequence: 4 }),
+  ];
+  const remote = [
+    confirmed({ id: "server-2", sequence: 2 }),
+    confirmed({ id: "server-3", sequence: 3 }),
+  ];
+  assert.deepEqual(
+    mergeThread(remote, local).map((message) => message.id),
+    ["server-2", "server-3", "server-4"],
+  );
+});
+
+test("an empty server page keeps the local confirmed history", () => {
+  const local = [confirmed({ id: "server-1", sequence: 1 })];
+  assert.deepEqual(
+    mergeThread([], local).map((message) => message.id),
+    ["server-1"],
+  );
+});
+
 test("a matched optimistic bubble is replaced, an unmatched one stays", () => {
   const matched = optimistic();
   const second = optimistic({ id: "local-2", text: "Second" });

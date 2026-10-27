@@ -4,7 +4,9 @@ import type { Chat, Message, MessageStatus } from "./data";
 export const SERVER_MATCH_WINDOW_MS = 30 * 60 * 1000;
 
 /** True once the server has echoed the message with a sequence number. */
-export function isConfirmed(message: Message): boolean {
+export function isConfirmed(
+  message: Message,
+): message is Message & { sequence: number } {
   return message.sequence !== undefined;
 }
 
@@ -59,8 +61,35 @@ export function sameOptimistic(remote: Message, local: Message): boolean {
  * A cached preview for the chosen width survives too; an empty local preview
  * never replaces the server's copy. Failed bubbles stay because the server
  * page has no copy to replace them.
+ *
+ * The server page is only the newest slice of a thread, so confirmed rows
+ * outside its sequence range are older or newer history that the phone owns;
+ * dropping them would truncate the local copy on every refresh. A row missing
+ * from inside the range was hidden on purpose (delete-for-me, clear) and stays
+ * gone. An empty page keeps the local history for the same reason: the relay
+ * may have purged it, but the phone is the durable copy.
  */
 export function mergeThread(remote: Message[], local: Message[]): Message[] {
+  const remoteIds = new Set(remote.map((message) => message.id));
+  const sequences = remote.flatMap((message) =>
+    message.sequence === undefined ? [] : [message.sequence],
+  );
+  const oldest = sequences.length ? Math.min(...sequences) : undefined;
+  const newest = sequences.length ? Math.max(...sequences) : undefined;
+  // With no sequence range (an empty page) every confirmed local row is
+  // history the page cannot speak for.
+  const history = local
+    .filter(isConfirmed)
+    .filter((message) => !remoteIds.has(message.id))
+    .filter(
+      (message) =>
+        oldest === undefined ||
+        newest === undefined ||
+        message.sequence < oldest ||
+        message.sequence > newest,
+    )
+    .sort((a, b) => a.sequence - b.sequence);
+
   const localById = new Map(local.map((message) => [message.id, message]));
   const merged = remote.map((message) => {
     const cached = localById.get(message.id);
@@ -96,7 +125,15 @@ export function mergeThread(remote: Message[], local: Message[]): Message[] {
     }
     return true;
   });
-  return [...merged, ...optimistic];
+  const older =
+    oldest === undefined
+      ? history
+      : history.filter((message) => message.sequence < oldest);
+  const newer =
+    newest === undefined
+      ? []
+      : history.filter((message) => message.sequence > newest);
+  return [...older, ...merged, ...newer, ...optimistic];
 }
 
 /**
