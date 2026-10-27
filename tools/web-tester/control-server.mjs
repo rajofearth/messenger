@@ -159,7 +159,7 @@ async function handle(request, response) {
       url.searchParams.get("conversationId"),
       "conversationId",
     );
-    const messages = await agent.readMessages({
+    const { messages } = await agent.readMessages({
       conversationId,
       limit: numberFrom(url.searchParams.get("limit"), 50, "limit"),
     });

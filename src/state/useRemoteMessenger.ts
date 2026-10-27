@@ -33,6 +33,7 @@ import {
   createRemoteReplySender,
 } from "./remoteMessengerReads";
 import { createRemoteMessageActions } from "./remoteMessengerMessageActions";
+import { useThreadPaging } from "./useThreadPaging";
 
 export type { RemoteCallRecord, RemoteProfile } from "./remoteMessengerTypes";
 
@@ -92,10 +93,11 @@ export function useRemoteMessenger() {
   storiesRef.current = stories;
   gallerySavedRef.current = new Set(gallerySaved);
 
-  const remoteThreadRows = useQuery(
+  const remoteThreadPage = useQuery(
     api.chat.listMessages,
     selected ? { conversationId: selected, limit: 100 } : "skip",
   );
+  const remoteThreadRows = remoteThreadPage?.messages;
   const remoteThread = useMemo(
     () => remoteThreadRows?.map(mapMessage),
     [remoteThreadRows],
@@ -246,6 +248,11 @@ export function useRemoteMessenger() {
     messagesRef,
     chatsRef,
   });
+  const paging = useThreadPaging({
+    selectedRef,
+    messagesRef,
+    updateMessages,
+  });
   const sendTo = createRemoteReplySender({
     chatsRef,
     messagesRef,
@@ -301,6 +308,8 @@ export function useRemoteMessenger() {
   function openChat(chat: Chat) {
     selectedRef.current = chat.id;
     setSelected(chat.id);
+    paging.reset();
+    void paging.refresh(chat.id);
     updateChats((current) =>
       current.map((item) =>
         item.id === chat.id ? { ...item, unread: 0 } : item,
@@ -478,6 +487,9 @@ export function useRemoteMessenger() {
     addCall: (record: RemoteCallRecord) =>
       setHistory((current) => [record, ...current]),
     thread,
+    hasOlder: paging.hasOlder,
+    loadingOlder: paging.loadingOlder,
+    loadOlder: paging.loadOlder,
     setTyping,
     conversationVisible,
   };

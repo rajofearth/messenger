@@ -177,7 +177,7 @@ async function main() {
   }
 
   if (command === "read") {
-    const messages = await agent.readMessages({
+    const { messages } = await agent.readMessages({
       to: values.to ?? commandArgs[0],
       conversationId: values.conversation,
       limit: parseNumber(values.limit, 50, "--limit"),

@@ -381,6 +381,9 @@ function MessengerApp() {
               onForward={setForward}
               onSaveMedia={messenger.saveMedia}
               onTypingChange={messenger.setTyping}
+              hasOlder={messenger.hasOlder}
+              loadingOlder={messenger.loadingOlder}
+              onLoadOlder={messenger.loadOlder}
             />
           ) : compose ? (
             <NewConversationScreen

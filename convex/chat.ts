@@ -12,6 +12,11 @@ import {
   deleteMediaVariants,
   readMediaVariants,
 } from "./lib/mediaVariants";
+import {
+  CHAT_COMPONENT_PAGE_MAX,
+  messagePageMeta,
+  messagePageSize,
+} from "./lib/paging";
 
 const messageArgs = {
   conversationId: v.string(),
@@ -286,7 +291,26 @@ export const listMessages = query({
         q.eq("userId", actor.userId).eq("conversationId", args.conversationId),
       )
       .unique();
-    const messages = await readMessages(ctx, args);
+    // The component refuses a page above 100, so a larger request is served as
+    // 100 rows and the metadata below uses the size actually fetched.
+    const limit = Math.min(
+      messagePageSize(args.limit),
+      CHAT_COMPONENT_PAGE_MAX,
+    );
+    const rawPage = await readMessages(ctx, {
+      conversationId: args.conversationId,
+      beforeSequence: args.beforeSequence,
+      limit,
+    });
+    // The cursor describes the raw page, before the per-user filter: a page
+    // hidden entirely by delete-for-me rows or a clear still reports whether
+    // older history exists instead of looking like the start of the thread.
+    const page = messagePageMeta({
+      rawCount: rawPage.length,
+      limit,
+      oldestSequence: rawPage[0]?.sequence,
+      beforeSequence: args.beforeSequence,
+    });
     const hidden = await ctx.db
       .query("messageDeletes")
       .withIndex("by_user_conversation", (q) =>
@@ -294,15 +318,19 @@ export const listMessages = query({
       )
       .collect();
     const hiddenIds = new Set(hidden.map((item) => item.messageId));
-    const visible = messages.filter((message) => {
+    const visible = rawPage.filter((message) => {
       if (hiddenIds.has(message.id)) return false;
       return preference?.clearedThrough
         ? message.createdAt > preference.clearedThrough
         : true;
     });
-    return await Promise.all(
-      visible.map((message) => messageView(ctx, message, actor.subjectId)),
-    );
+    return {
+      messages: await Promise.all(
+        visible.map((message) => messageView(ctx, message, actor.subjectId)),
+      ),
+      hasMore: page.hasMore,
+      nextBeforeSequence: page.nextBeforeSequence,
+    };
   },
 });
 

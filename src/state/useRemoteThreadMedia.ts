@@ -41,14 +41,14 @@ export function useRemoteThreadMedia({
       messagesRef.current[selected] || [],
     );
     setMessages((current) => ({ ...current, [selected]: initial }));
-    // Only server-confirmed rows belong on disk; a killed process must not
-    // revive an optimistic bubble that never reached the server.
-    void messengerRepository
-      .saveMessages(
-        selected,
-        initial.filter((message) => isConfirmed(message)),
-      )
-      .catch(() => {});
+    // Only the page that just arrived belongs on disk; older confirmed rows
+    // are already there, and re-upserting the whole thread on every refresh
+    // grows the write cost with history.
+    const pageIds = new Set(remoteThread.map((message) => message.id));
+    const page = initial.filter(
+      (message) => isConfirmed(message) && pageIds.has(message.id),
+    );
+    void messengerRepository.saveMessages(selected, page).catch(() => {});
     void Promise.all(
       remoteThread.map(async (item) => {
         if (!item.uri || item.kind === "file") return item;
@@ -98,10 +98,14 @@ export function useRemoteThreadMedia({
           messagesRef.current[selected] || [],
         );
         setMessages((current) => ({ ...current, [selected]: merged }));
+        // Same page-only save: a killed process must not revive an optimistic
+        // bubble, and rows above the page are already durable.
         void messengerRepository
           .saveMessages(
             selected,
-            merged.filter((message) => isConfirmed(message)),
+            merged.filter(
+              (message) => isConfirmed(message) && pageIds.has(message.id),
+            ),
           )
           .catch(() => {});
         if (mediaVisibility !== "gallery") return;

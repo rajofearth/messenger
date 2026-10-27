@@ -27,10 +27,11 @@ function newClientId(): string {
 }
 
 export default function Thread({ chat }: { chat: ChatSummary }) {
-  const messages = useQuery(api.chat.listMessages, {
+  const messagePage = useQuery(api.chat.listMessages, {
     conversationId: chat.id,
     limit: 100,
   });
+  const messages = messagePage?.messages;
   const sendText = useMutation(api.chat.sendText);
   const sendAttachment = useMutation(api.chat.sendAttachment);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);

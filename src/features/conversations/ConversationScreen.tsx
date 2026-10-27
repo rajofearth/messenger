@@ -1,14 +1,7 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,9 +10,6 @@ import {
   Text,
   useWindowDimensions,
   View,
-  type ListRenderItemInfo,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from "react-native";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
@@ -28,10 +18,8 @@ import { palette } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
-import MessageRow from "./MessageRow";
 import AlbumViewer from "./AlbumViewer";
-import { groupMediaMessages, type MediaRow } from "../../domain/mediaAlbums";
-import { daySeparatorLabel, localDayKey } from "../../domain/time";
+import ConversationList from "./ConversationList";
 import VideoAttachment from "./VideoAttachment";
 import { useMessageMedia } from "./useMessageMedia";
 import { MediaPicker } from "../media/MediaPicker";
@@ -54,6 +42,10 @@ export type ConversationScreenProps = {
   onSaveMedia?: (message: Message) => Promise<boolean>;
   onTypingChange?: (typing: boolean) => void;
   onRetry: (messageId: string) => void;
+  /** True while the server may still hold rows older than the local page. */
+  hasOlder?: boolean;
+  loadingOlder?: boolean;
+  onLoadOlder?: () => void;
 };
 
 export default function ConversationScreen({
@@ -73,61 +65,23 @@ export default function ConversationScreen({
   onSaveMedia,
   onTypingChange,
   onRetry,
+  hasOlder = false,
+  loadingOlder = false,
+  onLoadOlder,
 }: ConversationScreenProps) {
-  const { bg, fg, muted, card, line, coralInk } = palette(dark);
+  const { bg, fg, muted, line } = palette(dark);
   const { width: windowWidth } = useWindowDimensions();
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
   const [target, setTarget] = useState<ActionTarget | null>(null);
   const [viewer, setViewer] = useState<Message | null>(null);
   const [album, setAlbum] = useState<{ ids: string[]; initialId: string } | null>(null);
-  const rows = useMemo(() => groupMediaMessages(messages), [messages]);
-  // One label per row: the first row of a local day gets a chip, later rows
-  // on the same day get none. A row without a timestamp never starts a day.
-  const dayLabels = useMemo(() => {
-    let previous: string | null = null;
-    return rows.map((row) => {
-      const first = row.type === "album" ? row.messages[0] : row.message;
-      const key = localDayKey(first.createdAt);
-      if (!key || key === previous) return null;
-      previous = key;
-      return daySeparatorLabel(first.createdAt);
-    });
-  }, [rows]);
-  const tail = messages.length
-    ? `${messages.length}:${messages[messages.length - 1].id}`
-    : "";
   const albumMessages = album
     ? messages.filter((message) => album.ids.includes(message.id) && !message.deleted)
     : [];
   const [reply, setReply] = useState<Message["replyTo"] | null>(null);
-  const list = useRef<FlatList<MediaRow>>(null);
-  const pinned = useRef(true);
   const currentChat = useRef(chat.id);
   currentChat.current = chat.id;
-  // A newly selected thread starts pinned; later content changes must not steal
-  // the reader's place when they have scrolled up.
-  useEffect(() => {
-    pinned.current = true;
-    list.current?.scrollToEnd({ animated: true });
-  }, [chat.id]);
-  useEffect(() => {
-    if (pinned.current) list.current?.scrollToEnd({ animated: true });
-  }, [tail]);
-  const onScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } =
-        event.nativeEvent;
-      pinned.current =
-        contentSize.height - contentOffset.y - layoutMeasurement.height < 120;
-    },
-    [],
-  );
-  // Rows report their height as they mount, so the tail is only chased while
-  // the newest message is already on screen.
-  const onContentSizeChange = useCallback(() => {
-    if (pinned.current) list.current?.scrollToEnd({ animated: true });
-  }, []);
   const send = (message: Partial<Message>) => {
     if (chat.blocked || currentChat.current !== chat.id) return;
     onSend(withReply(message, reply));
@@ -237,52 +191,6 @@ export default function ConversationScreen({
   const onOpenAlbum = useCallback((ids: string[], initialId: string) => {
     setAlbum({ ids, initialId });
   }, []);
-  const keyExtractor = useCallback(
-    (row: MediaRow) => (row.type === "album" ? row.id : row.message.id),
-    [],
-  );
-  const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<MediaRow>) => {
-      const message = item.type === "album" ? item.messages[0] : item.message;
-      const next = rows[index + 1];
-      const nextMine =
-        next?.type === "album" ? next.messages[0].mine : next?.message.mine;
-      const content = (
-        <MessageRow
-          row={item}
-          dark={dark}
-          visible={visible}
-          showTimestamp={index === rows.length - 1 || nextMine !== message.mine}
-          onActions={onActions}
-          onReact={onReact}
-          onViewMedia={setViewer}
-          onOpenAlbum={onOpenAlbum}
-          onRetry={onRetry}
-        />
-      );
-      const label = dayLabels[index];
-      if (!label) return content;
-      return (
-        <View>
-          <View style={s.dateChip}>
-            <Text style={[s.tiny, { color: muted }]}>{label}</Text>
-          </View>
-          {content}
-        </View>
-      );
-    },
-    [
-      rows,
-      dark,
-      visible,
-      onActions,
-      onReact,
-      onOpenAlbum,
-      onRetry,
-      dayLabels,
-      muted,
-    ],
-  );
 
   return (
     <KeyboardAvoidingView
@@ -356,33 +264,21 @@ export default function ConversationScreen({
         )}
       </View>
       <View style={s.root}>
-        <FlatList
-          ref={list}
-          style={s.root}
-          data={rows}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          contentContainerStyle={s.messageList}
-          keyboardShouldPersistTaps="handled"
+        <ConversationList
+          chatId={chat.id}
+          messages={messages}
+          dark={dark}
+          visible={visible}
+          typing={typing}
+          hasOlder={hasOlder}
+          loadingOlder={loadingOlder}
+          onLoadOlder={onLoadOlder}
           onScrollBeginDrag={() => setAttachmentOpen(false)}
-          onScroll={onScroll}
-          scrollEventThrottle={32}
-          onContentSizeChange={onContentSizeChange}
-          initialNumToRender={12}
-          maxToRenderPerBatch={8}
-          windowSize={9}
-          ListEmptyComponent={
-            <Text style={[s.emptyThread, { color: muted }]}>
-              No messages yet. Say hello to start the conversation.
-            </Text>
-          }
-          ListFooterComponent={
-            typing ? (
-              <View style={[s.typing, { backgroundColor: card }]}>
-                <Text style={{ color: coralInk, letterSpacing: 5 }}>● ● ●</Text>
-              </View>
-            ) : null
-          }
+          onActions={onActions}
+          onReact={onReact}
+          onViewMedia={setViewer}
+          onOpenAlbum={onOpenAlbum}
+          onRetry={onRetry}
         />
         {attachmentOpen && (
           <Pressable

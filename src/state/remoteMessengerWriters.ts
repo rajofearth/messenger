@@ -307,18 +307,14 @@ export function deleteLocalMessage(args: {
 }) {
   // A deleted bubble must not be revived by the outbox on the next launch.
   void forgetOutgoing(args.messageId);
+  // Upsert-only thread saves would bring this row back, so delete it directly.
+  void messengerRepository
+    .deleteMessage(args.chatId, args.messageId)
+    .catch(() => {});
   args.updateMessages((current) => {
     const next = (current[args.chatId] || []).filter(
       (item) => item.id !== args.messageId,
     );
-    // The thread cache keeps confirmed rows only; unconfirmed sends live in
-    // the outbox, and the row above stops this one from being revived.
-    void messengerRepository
-      .saveMessages(
-        args.chatId,
-        next.filter((item) => isConfirmed(item)),
-      )
-      .catch(() => {});
     return { ...current, [args.chatId]: next };
   });
 }

@@ -69,6 +69,27 @@ export function sameOptimistic(remote: Message, local: Message): boolean {
  * gone. An empty page keeps the local history for the same reason: the relay
  * may have purged it, but the phone is the durable copy.
  */
+/**
+ * Keeps the media this device already downloaded when the server row replaces
+ * its own copy: a `file://` original and a cached preview survive a refresh.
+ */
+function withLocalMedia(remote: Message, cached: Message): Message {
+  let next = remote;
+  const uri = cached.uri?.startsWith("file://") ? cached.uri : remote.uri;
+  if (uri && uri !== remote.uri) next = { ...next, uri };
+  const previewUri = cached.previewUri || remote.previewUri;
+  const previewWidth = cached.previewUri
+    ? (cached.previewWidth ?? remote.previewWidth)
+    : remote.previewWidth;
+  if (
+    previewUri &&
+    (previewUri !== remote.previewUri || previewWidth !== remote.previewWidth)
+  ) {
+    next = { ...next, previewUri, previewWidth };
+  }
+  return next;
+}
+
 export function mergeThread(remote: Message[], local: Message[]): Message[] {
   const remoteIds = new Set(remote.map((message) => message.id));
   const sequences = remote.flatMap((message) =>
@@ -94,21 +115,7 @@ export function mergeThread(remote: Message[], local: Message[]): Message[] {
   const merged = remote.map((message) => {
     const cached = localById.get(message.id);
     if (!cached) return message;
-    let next = message;
-    const uri = cached.uri?.startsWith("file://") ? cached.uri : message.uri;
-    if (uri && uri !== message.uri) next = { ...next, uri };
-    const previewUri = cached.previewUri || message.previewUri;
-    const previewWidth = cached.previewUri
-      ? (cached.previewWidth ?? message.previewWidth)
-      : message.previewWidth;
-    if (
-      previewUri &&
-      (previewUri !== message.previewUri ||
-        previewWidth !== message.previewWidth)
-    ) {
-      next = { ...next, previewUri, previewWidth };
-    }
-    return next;
+    return withLocalMedia(message, cached);
   });
   const used = new Set<string>();
   const optimistic = local.filter((message) => {
@@ -134,6 +141,30 @@ export function mergeThread(remote: Message[], local: Message[]): Message[] {
       ? []
       : history.filter((message) => message.sequence > newest);
   return [...older, ...merged, ...newer, ...optimistic];
+}
+
+/**
+ * Adds a page of older history to the thread without dropping local rows.
+ *
+ * An older page is additive. A row inside its sequence range that the page
+ * does not name is not a deletion: the relay may have purged delivered content
+ * the phone still owns, and the row may predate this device's membership. That
+ * is why the head page's range rule does not apply here. Page rows win over the
+ * local copy, except for media this device already downloaded.
+ */
+export function mergeOlderPage(page: Message[], local: Message[]): Message[] {
+  const byId = new Map<string, Message>();
+  for (const message of local) byId.set(message.id, message);
+  for (const message of page) {
+    const cached = byId.get(message.id);
+    byId.set(message.id, cached ? withLocalMedia(message, cached) : message);
+  }
+  const all = [...byId.values()];
+  const confirmed = all
+    .filter(isConfirmed)
+    .sort((a, b) => a.sequence - b.sequence);
+  const pending = all.filter((message) => !isConfirmed(message));
+  return [...confirmed, ...pending];
 }
 
 /**

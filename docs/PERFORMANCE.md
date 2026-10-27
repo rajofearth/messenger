@@ -4,11 +4,12 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-The current stacked build (A2 Ionicons subset, A3 density prune and C3
-deletion) is **12,702,235 bytes (12.11 MiB)**, 3.89 MiB below the 16 MiB gate
-and 2.89 MiB below the 15 MiB shipping line. `npm run release:check` passed all
-11 checks with no warnings. The per-change numbers are under "Measured APK
-size"; the historical narrative follows.
+The current storage build (SQLite history on top of A2 Ionicons subset, A3
+density prune and C3 deletion) is **13,609,672 bytes (12.98 MiB)**, 3.02 MiB
+below the 16 MiB gate and 2.02 MiB below the 15 MiB shipping line. It is a
+development APK, so the gate's package and version checks fail by design; its
+size, ABI, library and uncompressed-bundle checks pass. The per-change numbers
+are under "Measured APK size"; the historical narrative follows.
 
 Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,376,582 bytes
 (13.71 MiB) in v0.1.1** — 67.0% smaller, in nine measured stages. R8
@@ -210,6 +211,7 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.1.0 release (send/retry UX, dates and accessibility, `expo-image`, Fresco decoder trim, LogBox excluded; versionCode 7) | 14,375,470 bytes (13.71 MiB) | **-1,140,945 bytes, -7.4%** against the first Convex build, -4.0% against v0.0.6, -67.0% overall |
 | v0.1.1 release (missing-account sign-in copy and create-account shortcut; versionCode 8) | 14,376,582 bytes (13.71 MiB) local; 14,376,546 bytes published | **+1,112 bytes, +0.01%** against v0.1.0, -67.0% overall |
 | A2/A3/C3 stacked build (Ionicons subset, density prune, real deletion) | 12,702,235 bytes (12.11 MiB) | **-458,828 bytes, -3.5%** against the 13,161,063-byte R8 build, -70.8% overall |
+| Storage build (SQLite full history, local-first load older; dev variant) | 13,609,672 bytes (12.98 MiB) | **+677,577 bytes, +5.2%** against dev release `dev-1793068934` (12,932,095 bytes), -68.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -277,6 +279,23 @@ are ZIP metadata and alignment differences. `npm run release:check` reports
 17 native libraries, one dex (7.93 MiB unpacked), a 2.06 MiB JavaScript bundle
 stored uncompressed, a 0.16 MiB `resources.arsc`, English-only resources, and
 11 passing checks with no warnings.
+
+The storage build (`expo-sqlite` full history) is 13,609,672 bytes, 677,577
+bytes (+5.2%) above dev release `dev-1793068934` (12,932,095 bytes) and 68.7%
+below the pre-size-work APK. It adds one native library, so the count goes from
+17 to 18: `lib/arm64-v8a/libexpo-sqlite.so` is 1,431,992 bytes raw and 684,983
+bytes stored. The JavaScript bundle grows 182,020 bytes to 2,394,144 and stays
+stored uncompressed; the dex is 8,402,976 bytes in one file, about 69 KB more
+than the previous development build; `res/` is 605,315 bytes and
+`resources.arsc` 164,508 bytes. FTS is switched off in the `expo-sqlite` plugin
+(`enableFTS: false`). A same-source FTS-on measurement produced a 13,809,316-byte
+APK: 199,644 bytes (+1.5%) larger, with `libexpo-sqlite.so` at 1,830,192 raw
+and 884,117 stored bytes. The stored library delta is 199,134 bytes, so the
+FTS-off setting keeps almost the entire APK saving without affecting the
+SQLite features currently used. Both builds have 18 native libraries, one dex,
+a 2.28 MiB bundle stored uncompressed, English-only resources, and pass the
+size, ABI, library and bundle checks; the FTS-on comparison was run against the
+FTS-off baseline and therefore reports the expected size warning.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging
@@ -376,7 +395,7 @@ Downloads and files are keyed by the storage object (`storage-<id>`), not by the
 
 ### Lazy per-conversation history
 
-Only the selected conversation's thread is queried (`api.chat.listMessages`, newest 100 messages). `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while `useRemoteThreadMedia` stores an opened thread and its downloaded files. Persisted messages are split per chat id, so a send writes one thread key plus the chat list, not the whole app state.
+Only the selected conversation's thread is queried (`api.chat.listMessages`, newest 100 rows). `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while `useRemoteThreadMedia` stores an opened thread and its downloaded files. SQLite holds one row per message, so a send upserts that row and the conversation's inbox projection instead of rewriting a whole thread; opening a thread reads 100 rows plus pending sends, and older pages come from the table or the server on demand.
 
 ### Disk caches
 
@@ -384,12 +403,13 @@ Three libraries keep their own files outside the repository. `expo-video` uses a
 
 Sign-out calls each owner's own clear rather than deleting its files: `clearVideoCacheAsync()` releases the old `ExpoVideoCache` directory and rotates to a new one, and `Image.clearMemoryCache()` plus `Image.clearDiskCache()` empty the Glide layers. `clearLocalAccountFiles()` then deletes `Paths.document/messenger-media` and `message-media`, the avatar folder, and every remaining entry directly under `Paths.cache`, while leaving `ExpoVideoCache` and `image_manager_disk_cache` to their native owners. The sweep is what removes picker and recording copies that no API enumerates.
 
-`AsyncStorage` keeps its SQLite database in app data, not cache. Deleting keys frees pages inside the file but SQLite does not shrink it, so Android's "data" figure can stay above the size of the remaining rows until reused.
+Both `AsyncStorage` and `messenger.db` keep their databases in app data, not cache. Deleting rows frees pages inside the file but SQLite does not shrink it, so Android's "data" figure can stay above the size of the remaining rows until reused. Sign-out deletes every table in one transaction and checkpoints the WAL with `TRUNCATE`; the file stays for reuse. Media bytes live in `documents/messenger-media`, outside both databases.
 
 ## Startup and JavaScript
 
-- **Per-slice persistence.** The whole app state is never re-serialised. Each slice effect compares identity with the last value it wrote and returns early when nothing changed, and the message effect walks the per-thread map and writes only threads whose array identity changed. A send serialises one conversation and the chat list.
-- **Coalesced writes.** `createStore` queues writes in a `Map` keyed by the full storage key, so a burst of state changes for the same key collapses to the newest value and the queue drains in order. Memory is updated synchronously inside `save`, so no read ever waits for disk.
+- **Row-level persistence.** The whole app state is never re-serialised. SQLite writes one row per message or conversation, so a send does not rewrite a thread; the remaining AsyncStorage slices keep their per-slice effects.
+- **Serialized writes.** Every repository write joins one promise chain and runs inside a transaction, so concurrent refresh, send, media and delete operations cannot interleave statements or open a nested transaction. Reads take the same chain, which keeps a page read consistent with the write before it.
+- **Coalesced key-value writes.** For the few AsyncStorage slices, `createStore` queues writes in a `Map` keyed by the full storage key, so a burst of state changes for the same key collapses to the newest value and the queue drains in order.
 - **500-line modules.** The limit in `scripts/architecture.test.mjs` is a maintainability rule. Small files stay navigable and keep the layer checks meaningful. It is not a measured runtime win: imports compile away, and the only real cost of splitting a file is developer time.
 
 ## Build times
@@ -476,7 +496,7 @@ There is no automated performance harness here. No baseline for startup, frame t
 
 ## Why some things were not done
 
-- **FlashList was not added.** A new dependency and a new list API would not pay for themselves without measured jank, and the thread is capped at the newest 100 messages.
+- **FlashList was not added.** A new dependency and a new list API would not pay for themselves without measured jank; the thread paints 100 rows per page and loads older ones on demand.
 - **No deep virtualisation experiments.** No fixed row heights, no `getItemLayout`, no cell-recycling tricks beyond what `FlatList` and `expo-image` already provide. The reasons are in the `getItemLayout` section: variable font scale and content-dependent rows.
 - **Memory was not measured on device.** No phone was connected during setup, as the README states. Everything in the Memory section is structural reasoning, not a measurement. The avatar folder lives in `Paths.cache`, which Android can clear at any time, so even its disk size is not a fixed number.
 - **Bundle compression stays off.** Legacy packaging is now on and PNG crunching remains at its default on; both are described above. `enableBundleCompression` is the one size lever still unused: it would save roughly 1.0 MiB, but every start would decompress the JavaScript bundle instead of mapping it. With the APK at 13.71 MiB there is no reason to take that trade without on-device startup numbers.

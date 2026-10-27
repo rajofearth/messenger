@@ -53,9 +53,9 @@ Some dependency directions sit outside the ideal picture. `src/state/useRemoteCa
 
 Writes are optimistic. `remoteMessengerWriters.ts` updates the messages record and chat list through small shared helpers; `remoteMessengerPreferences.ts` applies mute, block, gallery visibility, clear and delete locally before calling the server; `remoteMessengerProfile.ts` uploads a newly picked avatar once and then updates the profile; `remoteMessengerSend.ts` owns text and attachment sends plus retries, while `remoteMessengerUploads.ts` holds the lower-level upload-and-send path. A text or attachment send that fails keeps its bubble with `status: "failed"`, its text (or local URI), its client message id and, once uploaded, its finalized storage id, and the row shows "Not sent. Tap to retry." A retry reuses the same client id, payload and storage id, so the server's `clientMessageId` deduplication still holds and the same blob is sent again. `src/domain/threadMerge.ts` matches a confirmed server row against the local bubble, keeps unmatched and failed bubbles across refreshes, and preserves a pending inbox row until a newer server message replaces it.
 
-Only server-confirmed messages reach the thread cache. Every optimistic send is recorded in a separate `outbox` slice first; an attachment is copied into `message-media/outbox-<clientId>.<ext>` before its row is written, so a missing picker source fails without queueing a retry that can never work. A killed process revives the row as a failed bubble and `useOutboxResume` retries it at launch, when the app returns to the foreground, when the Convex socket reconnects, and every 30 seconds (three automatic attempts per message per session, reset by a reconnect; the bubble's retry is unlimited). The confirmed cache still only holds rows with a `sequence`, so an outbox row is never mistaken for a server message. `markLocalMessageStatus` writes the inbox row once the server accepts the send, so the preview survives a restart even if the echoed message has not arrived yet. Other failures surface as an alert and leave the local copy in place.
+Confirmed history is the `messages` rows that carry a server `sequence`; every optimistic send is written as a sequence-less row plus an `outbox` entry first, and an attachment is copied into `message-media/outbox-<clientId>.<ext>` before its row is written, so a missing picker source fails without queueing a retry that can never work. A killed process revives the row as a failed bubble and `useOutboxResume` retries it at launch, when the app returns to the foreground, when the Convex socket reconnects, and every 30 seconds (three automatic attempts per message per session, reset by a reconnect; the bubble's retry is unlimited). Because a pending row never has a `sequence`, it is never mistaken for confirmed history, and a server echo replaces it in place. `markLocalMessageStatus` writes the inbox row once the server accepts the send, so the preview survives a restart even if the echoed message has not arrived yet. Other failures surface as an alert and leave the local copy in place.
 
-The app starts behind `StartupGate`, which loads the bundled DM Sans faces, and then `AuthGate`. While Convex Auth is restoring the stored session it shows a spinner; once the session is authenticated it renders the app even if `profiles.me` is still in flight, so cached content survives an offline start. Signing out invalidates the in-memory outbox and waits for its queued writes, then calls `devices.unregister`, `messengerRepository.clearAccountData()` and `clearLocalAccountFiles()` so the next account on the same installation cannot read the previous local cache, inherit its downloaded media, avatar files, picker and voice-recording caches, image and video library caches, or cached update APK, or have a late upload callback re-queue a previous account's message. The appearance slice is kept; chats, messages, the outbox, stories, history, settings, gallery markers and pending-call data are cleared.
+The app starts behind `StartupGate`, which loads the bundled DM Sans faces, and then `AuthGate`. While Convex Auth is restoring the stored session it shows a spinner; once the session is authenticated it renders the app even if `profiles.me` is still in flight, so cached content survives an offline start. Signing out invalidates the in-memory outbox and waits for its queued writes, then calls `devices.unregister`, `messengerRepository.clearAccountData()` and `clearLocalAccountFiles()` so the next account on the same installation cannot read the previous local database, inherit its downloaded media, avatar files, picker and voice-recording caches, image and video library caches, or cached update APK, or have a late upload callback re-queue a previous account's message. The theme, dismissed-release and pending-call keys live in the same namespace and are cleared too; the next start falls back to the default theme.
 
 ## Appearance and system bars
 
@@ -67,23 +67,63 @@ The device scheme does not come from `useColorScheme`. React Native reads it fro
 
 ## Storage
 
-### Keys
+### SQLite, not key-value
 
-`src/data/messengerRepository.ts` composes keys from `STORE_VERSION` in `src/data/store.ts`, currently `v2`, under the `messenger/` namespace. The keys are `messenger/v2/chats`, `stories`, `history`, `appearance`, `settings`, `gallery-saved`, `pending-call`, `outbox`, and one `messenger/v2/messages/<chatId>` per conversation. Clearing or deleting a conversation removes its messages key through `removeMessages`. The `appearance` value is `{ theme }`; `loadAppearance` normalizes the older `{ dark }` shape through `src/data/appearance.ts`.
+`messenger.db` (expo-sqlite) is the durable device copy: conversations,
+messages, message variants, media metadata, stories, the outbox, call history,
+settings and gallery markers are tables that mirror the Convex shapes. Media
+bytes stay in `documents/messenger-media`; the database only points at them.
+`src/data/sqlite` owns the schema, row mapping, migration and repository, and
+only `src/data/sqlite/database.ts` imports `expo-sqlite`.
 
-### Why slices instead of one blob
+The connection opens once with `useNewConnection: true` (the SDK has a teardown
+bug that can double-close a cached handle after a JavaScript restart) and sets
+WAL, `synchronous=NORMAL`, `foreign_keys=ON` and `busy_timeout=5000`. Every
+operation runs on one promise chain, so writes never interleave and
+`withTransactionAsync` never nests. Schema changes are additive through
+`PRAGMA user_version`.
 
-- A send rewrites `messages/<chatId>` and the chat list, not the whole app state.
-- A corrupt or unreadable slice loses only that slice. `store.load` deletes a key whose JSON cannot be parsed.
-- Reads after the first one are served from the store's memory map, so reopening a conversation does not touch storage.
+`saveChats` and `saveMessages` upsert: a row missing from a page is history the
+phone owns, not a deletion. Clearing a chat is an explicit `clearMessages`,
+which also stamps `cleared_through`; deleting a conversation cascades its
+messages, media index and queued sends.
+
+A newly opened thread reads the newest 100 confirmed rows plus this device's
+pending sends. Scrolling to the top asks for a page older than the oldest
+confirmed sequence: SQLite answers first, and only a short local page makes the
+client ask the server. The server's `hasMore`/`nextBeforeSequence` are computed
+from the raw page before per-user deletes and clears, so a hidden page cannot
+look like the start of the thread. The confirmed rows are written before they
+are painted, and the thread is marked exhausted only when the server proves the
+history ended. An older page is merged as a union, not as a replacement: a row
+the relay purged after delivery is still history the phone owns, so it stays.
+
+### AsyncStorage still owns a few slices
+
+The theme is read before the database opens (`appearance`), the dismissed
+release is one update record, and a pending incoming call must survive a kill
+before the UI mounts; the notification action ledger belongs to
+`system-notifications`. Everything else moved out of the old `messenger/v2/*`
+keys, which the one-time migration in `src/data/sqlite/migrate.ts` imports per
+chat, records in `migration_state`, and removes only after every chat has a
+marker. `src/data/store.ts` is now just the driver for those slices.
 
 ### Outgoing queue
 
-A send is written to the `outbox` slice before the network call; an attachment is copied byte-for-byte into `documents/message-media/outbox-<messageId>.<ext>` before its row is written. The confirmed thread cache still holds only rows with a server `sequence`; the outbox is what survives a kill between picking a file and the server echo. `src/services/outbox.ts` owns the in-memory queue and serializes writes through the repository. A cold-start read accepts only an array of records with a string `chatId` and message id, and merges rows queued while the read was in flight by message id, keeping the queued version. Signing out clears the in-memory queue and awaits its pending writes before the store is cleared.
+A send is written to the `outbox` table before the network call; an attachment
+is copied byte-for-byte into `documents/message-media/outbox-<messageId>.<ext>`
+before its row is written. Confirmed history is every message row with a server
+`sequence`; a pending send has no sequence and is rebuilt from the outbox entry,
+which is what survives a kill between picking a file and the server echo.
+`src/services/outbox.ts` owns the in-memory queue and serializes writes through
+the repository. A cold-start read accepts only an array of records with a string
+`chatId` and message id, and merges rows queued while the read was in flight by
+message id, keeping the queued version. Signing out clears the in-memory queue
+and awaits its pending writes before the database and store are cleared.
 
 The finalized Convex `_storage` id is written back to the row before `sendAttachment`, so a retry reuses the uploaded blob. A second upload would change the message parts, and `convex-chat` rejects a reused `clientMessageId` with `IDEMPOTENCY_CONFLICT`. If the finalized blob has disappeared server-side and the mutation answers `FILE_FORBIDDEN`, the durable copy is uploaded once more and the send retried. On cold start `src/domain/outbox.ts` appends the rows as `failed` bubbles and updates the inbox preview; `useOutboxResume` retries them immediately, on foreground, on reconnect and every 30 seconds while active, capped at three automatic attempts per message (a reconnect resets the cap).
 
-A send becomes `sent` only when the mutation returns the server view with a `sequence` (`isSendConfirmed`); that view replaces the optimistic bubble and is merged into the stored thread by message id, in sequence order, before it is written to the thread cache, and only then does the row leave the queue. A kill between the server accepting and the client receiving that view therefore leaves the row queued and the bubble pending, never a cached message without a sequence. A row also leaves when its bubble is deleted or the chat is cleared, and a late upload callback never re-inserts a row that is gone. Copies the queue no longer references are swept on the next launch or foreground once they are an hour old, so a sent attachment does not keep a second copy forever.
+A send becomes `sent` only when the mutation returns the server view with a `sequence` (`isSendConfirmed`); that view replaces the optimistic bubble and is merged into the stored thread by message id, in sequence order, before it is written to the messages table, and only then does the row leave the queue. A kill between the server accepting and the client receiving that view therefore leaves the row queued and the bubble pending, never a cached message without a sequence. A row also leaves when its bubble is deleted or the chat is cleared, and a late upload callback never re-inserts a row that is gone. Copies the queue no longer references are swept on the next launch or foreground once they are an hour old, so a sent attachment does not keep a second copy forever.
 
 ### Server retention
 
@@ -105,7 +145,7 @@ own objects and variants.
 
 ### Store behaviour
 
-`createStore(driver, namespace)` keeps a memory map, a per-key in-flight read map (single flight), and a write queue. `save` updates memory immediately, then puts the serialized value into a `Map` keyed by the full storage key and drains that map in insertion order. Because the queue is keyed by key, repeated writes to the same key before the queue drains collapse into a single write with the newest value. A `null` value removes the key and clears the memory entry. If a write rejects, `schedule()` catches it and runs the drain again, so the remaining queued keys are still attempted. A failed key is already out of the queue, and a persistent failure can make the `save` promise reject; callers such as `useRemoteCache` and `useRemoteServerSync` swallow that with an empty `catch`.
+`createStore(driver, namespace)` keeps a memory map, a per-key in-flight read map (single flight), and a write queue. `save` updates memory immediately, then puts the serialized value into a `Map` keyed by the full storage key and drains that map in insertion order. Because the queue is keyed by key, repeated writes to the same key before the queue drains collapse to the newest value. A `null` value removes the key and clears the memory entry. If a write rejects, `schedule()` catches it and runs the drain again, so the remaining queued keys are still attempted. A failed key is already out of the queue, and a persistent failure can make the `save` promise reject; callers swallow that with an empty `catch`. A save that lands between the last drain pass and the `finally` callback starts another pass, so a burst cannot leave a value queued forever. The store now serves only the theme, dismissed-release, pending-call and notification-ledger slices; messenger data goes through `src/data/sqlite`.
 
 ## Cache and avatars
 
@@ -218,7 +258,7 @@ Two checks stand between the feed and a replaced app: the digest must match the 
 
 - **A pure rule or type** goes in `src/domain/`. Domain code must not import React, React Native, Expo or anything under `features/`, `state/` or `ui/`.
 - **Server data** starts in `convex/schema.ts`: add the table and the indexes the queries will use, then write the functions in a `convex/` module. Every public function resolves the user through `requireUser`, conversation access through the `convex-chat` component's membership check, and storage access through an owner or membership check. Run `npx convex dev --once` to deploy and regenerate `convex/_generated`.
-- **A client field** needs the shape in `src/domain/data.ts` (or `src/data/records.ts` for cache-only data), a projection in `useRemoteServerSync.ts` or the matching `remoteMessenger*` helper, and an optimistic write if the UI must not wait. Keep cache keys under `messenger/v2`; bump `STORE_VERSION` when a persisted shape changes.
+- **A client field** needs the shape in `src/domain/data.ts` (or `src/data/records.ts` for cache-only data), a projection in `useRemoteServerSync.ts` or the matching `remoteMessenger*` helper, and an optimistic write if the UI must not wait. Add a column and a new `PRAGMA user_version` step in `src/data/sqlite/schema.ts` for persisted message data; the remaining AsyncStorage slices keep `messenger/v2` keys and bump `STORE_VERSION` when one of those shapes changes.
 - **A native call** needs a typed function in `src/services/`, gated by the availability check the module already exports. App behaviour stays in the caller.
 - **A screen** goes in `src/features/<area>/`, a shared control in `src/ui/`, and only composition in `App.tsx`.
 - **Size.** A file over 500 lines fails `npm test`; extract a focused module instead of growing the hook or screen.
@@ -227,7 +267,7 @@ Two checks stand between the feed and a replaced app: the digest must match the 
 
 `src/data/messengerRepository.ts` is the device cache seam, not the source of truth. `useRemoteCache` loads it once, and `useRemoteServerSync` writes fresh inbox and story snapshots back to it. `useRemoteThreadMedia` writes the opened thread and its downloaded files. Screens read the merged values from `useRemoteMessenger`; they never call Convex directly.
 
-Writes are optimistic. Small helpers (`remoteMessengerWriters.ts`, `remoteMessengerPreferences.ts`, `remoteMessengerMessageActions.ts`, `remoteMessengerUploads.ts`, `remoteMessengerSend.ts`) update the cache before the mutation resolves, and a failure keeps the local copy in place instead of rolling it back. There is no operation log: `src/domain/threadMerge.ts` reconciles pending rows with the next server snapshot, two devices editing the same conversation resolve last-write-wins, and the thread cache only holds server-confirmed rows. Unsent sends are the exception: they live in the separate outbox slice described above. The server's thread query pages backwards with `beforeSequence`; the client currently requests the newest 100 messages and does not yet offer "load older".
+Writes are optimistic. Small helpers (`remoteMessengerWriters.ts`, `remoteMessengerPreferences.ts`, `remoteMessengerMessageActions.ts`, `remoteMessengerUploads.ts`, `remoteMessengerSend.ts`) update the cache before the mutation resolves, and a failure keeps the local copy in place instead of rolling it back. There is no operation log: `src/domain/threadMerge.ts` reconciles pending rows with the next server snapshot, two devices editing the same conversation resolve last-write-wins, and SQLite stores confirmed rows plus this device's pending sends; the `outbox` table is what marks and resumes the pending ones. The server's thread query pages backwards with `beforeSequence`; opening a thread requests the newest 100 rows, and `src/state/useThreadPaging.ts` loads older pages from SQLite first and from the server only when the local page ends.
 
 Story uploads are the exception that stays outside the cache. `useRemoteStories` owns a local upload queue, reports byte progress into each row, and appends those rows after the server stories with `mergeStoryUploads`; a row disappears only when `stories.list` returns the same id. This keeps multi-video shares fully visible while their uploads run. The viewer's owner-only audience comes from `useStoryViewers`, which maps `stories.views` to the same `StoryView` shape as the rest of the domain.
 
@@ -243,6 +283,7 @@ Notification replies use `notice-<actionId>` as the client message id. The `conv
 - **Android-only native features.** `system-notifications` and `keyboard-media` do nothing on iOS and web, and neither exists in Expo Go; `device-scheme` falls back to React Native's `useColorScheme` where it is absent.
 - **Notification actions other than answer/open do not run while JavaScript is dead**; they are queued natively.
 - **Notification threads are capped at the newest 25 messages**, and the payload still uses the group name as the sender because it does not project per-message sender names.
-- **Failed sends survive a restart, with a capped resume.** Unsent text and attachment rows live in the `outbox` slice with a durable copy of the bytes, and resume automatically at launch, on foreground, on reconnect and every 30 seconds, capped at three automatic attempts per message per session (reset by a reconnect). A message the server already accepted but whose echo never arrived is retried with the same client id and storage id, so the server deduplicates it and the retry returns the same sequence. A row is only dropped after that confirmed view has replaced the local bubble, so a kill in the echo window leaves a retryable row rather than a cached message without a sequence. Copies no longer referenced by a row are swept at launch or foreground once they are an hour old.
-- **Thread history is capped at the newest 100 messages** in the client, with no "load older" control yet.
+- **Failed sends survive a restart, with a capped resume.** Unsent text and attachment rows live in the `outbox` table with a durable copy of the bytes, and resume automatically at launch, on foreground, on reconnect and every 30 seconds, capped at three automatic attempts per message per session (reset by a reconnect). A message the server already accepted but whose echo never arrived is retried with the same client id and storage id, so the server deduplicates it and the retry returns the same sequence. A row is only dropped after that confirmed view has replaced the local bubble, so a kill in the echo window leaves a retryable row rather than a cached message without a sequence. Copies no longer referenced by a row are swept at launch or foreground once they are an hour old.
+- **Thread history paints 100 rows per page.** The device keeps every delivered row, and scrolling to the top loads older ones from SQLite or, on a device that never received them, from `listMessages(beforeSequence)`. A fully hidden page is followed by its raw cursor, capped at four pages before the range is treated as history the user hid on purpose.
+- **Server retention is still unbounded.** Delivered content is not purged yet; the relay step adds acknowledgements and a 30-day purge.
 - **The architecture test's rules are narrow:** size, no App imports, domain purity, test registration, no `any`/`console.log`, bundled DM Sans faces declared in `StartupGate`, and images through `expo-image`. Layer boundaries between `features`, `state` and `services` are convention, as the exceptions above show.

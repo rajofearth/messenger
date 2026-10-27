@@ -49,6 +49,12 @@
         }
       ],
       "expo-video",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": false
+        }
+      ],
       "expo-sharing",
       "expo-image",
       [

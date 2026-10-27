@@ -5,6 +5,7 @@ import {
   isConfirmed,
   isPendingStatus,
   mergeChats,
+  mergeOlderPage,
   mergeThread,
   newestReadSequence,
   sameOptimistic,
@@ -282,4 +283,58 @@ test("the newest read sequence skips local-only sends and out-of-order rows", ()
   assert.equal(newestReadSequence(messages), 9);
   assert.equal(newestReadSequence([optimistic()]), undefined);
   assert.equal(newestReadSequence([]), undefined);
+});
+
+test("an older page never drops local history the server no longer has", () => {
+  const local = [
+    confirmed({ id: "m3", sequence: 3 }),
+    confirmed({ id: "m4", sequence: 4 }),
+    confirmed({ id: "m5", sequence: 5 }),
+  ];
+  // The relay purged sequence 3 after delivery; the phone still owns it.
+  const page = [
+    confirmed({ id: "m1", sequence: 1 }),
+    confirmed({ id: "m2", sequence: 2 }),
+    confirmed({ id: "m4", sequence: 4 }),
+  ];
+  assert.deepEqual(
+    mergeOlderPage(page, local).map((message) => message.id),
+    ["m1", "m2", "m3", "m4", "m5"],
+  );
+});
+
+test("an older page replaces the server fields but keeps downloaded media", () => {
+  const local = confirmed({
+    id: "m7",
+    sequence: 7,
+    text: "old text",
+    uri: "file:///media/m7.jpg",
+    previewUri: "file:///media/m7-256.jpg",
+    previewWidth: 256,
+  });
+  const page = confirmed({
+    id: "m7",
+    sequence: 7,
+    text: "edited text",
+    uri: "https://example.test/m7.jpg",
+    reaction: "👍",
+  });
+  const [merged] = mergeOlderPage([page], [local]);
+  assert.equal(merged.text, "edited text");
+  assert.equal(merged.reaction, "👍");
+  assert.equal(merged.uri, "file:///media/m7.jpg");
+  assert.equal(merged.previewUri, "file:///media/m7-256.jpg");
+  assert.equal(merged.previewWidth, 256);
+});
+
+test("an older page keeps pending sends at the end", () => {
+  const pending = optimistic({ id: "local-9" });
+  const merged = mergeOlderPage(
+    [confirmed({ id: "m8", sequence: 8 })],
+    [confirmed({ id: "m9", sequence: 9 }), pending],
+  );
+  assert.deepEqual(
+    merged.map((message) => message.id),
+    ["m8", "m9", "local-9"],
+  );
 });

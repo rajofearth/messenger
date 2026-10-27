@@ -10,6 +10,12 @@ and this project adheres to
 
 ### Added
 
+- Chats keep their full history on the phone in SQLite (`messenger.db`) instead
+  of the newest 100 messages in AsyncStorage. Scrolling to the top of a thread
+  loads the previous page from the device and only asks the server for rows this
+  installation never received; a thread shorter than the screen shows a "Load
+  older messages" control. An existing installation imports its `messenger/v2`
+  cache once, per chat, and resumes the import if the process is killed.
 - Unsent text and attachments now survive a process kill. Every send is
   recorded in a durable outbox first, an attachment is copied into app
   documents before upload, and a finalized upload id is reused on retry so the
@@ -42,6 +48,15 @@ and this project adheres to
 
 ### Changed
 
+- The device cache is now `messenger.db` (expo-sqlite) with WAL, foreign keys
+  and additive `user_version` migrations; media bytes stay in app documents.
+  Opening or refreshing a chat upserts rows instead of re-serialising a whole
+  thread, and confirming a short server page can no longer drop older history
+  the phone already owns. The dev APK grows 677,577 bytes (+5.2%) to
+  13,609,672 bytes: the SQLite library adds 684,983 stored bytes (1,431,992
+  raw, with FTS disabled) and the JavaScript bundle adds 182,020; the dex, `res/`
+  and `resources.arsc` account for the rest. `docs/PERFORMANCE.md` has the
+  entry-level measurements.
 - Settings keeps account controls at the bottom, directly above Information.
   The Android permission, call-notification and message-notification rows are
   gone because they all opened the same system page; only the app's own

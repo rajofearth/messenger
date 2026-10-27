@@ -97,7 +97,7 @@ export function createChatPreferences({
           : item,
       ),
     );
-    void messengerRepository.saveMessages(id, []).catch(() => {});
+    void messengerRepository.clearMessages(id).catch(() => {});
     void clearPreference({
       conversationId: id,
       through: Date.now(),
