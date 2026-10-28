@@ -3,7 +3,8 @@
  *
  * A thread is two queries: the newest confirmed page (server rows own their
  * sequence) and the pending sends that only live on this device. Reads never
- * return a deleted row or one the user cleared past.
+ * return a deleted row, one the user cleared past, or one they deleted for
+ * themselves.
  */
 
 import type { MessageRecord } from "../records";
@@ -27,23 +28,59 @@ ON CONFLICT(id) DO UPDATE SET ${MESSAGE_COLUMNS.filter((column) => column !== "i
   .map((column) => `${column} = excluded.${column}`)
   .join(", ")}`;
 
+/** Usable in any `messages` query; the tombstone table names its own column. */
+const HIDDEN = `id NOT IN (SELECT message_id FROM hidden_messages)`;
+
 const CONFIRMED_FILTER = `conversation_id = ?
   AND sequence IS NOT NULL
   AND deleted = 0
+  AND ${HIDDEN}
   AND (created_at_ms IS NULL OR ? IS NULL OR created_at_ms > ?)`;
 
 const PENDING_FILTER = `conversation_id = ?
   AND sequence IS NULL
   AND local_status IS NOT NULL
   AND deleted = 0
+  AND ${HIDDEN}
   AND (created_at_ms IS NULL OR ? IS NULL OR created_at_ms > ?)`;
+
+type ThreadState = {
+  /** False for a deleted chat: it stays empty until the inbox brings it back. */
+  writable: boolean;
+  hidden: Set<string>;
+};
+
+/** One read per write: the conversation tombstone and the per-message ones. */
+async function threadState(
+  database: SqlDatabase,
+  chatId: string,
+): Promise<ThreadState> {
+  const conversation = await database.getFirstAsync<{
+    hidden_at: number | null;
+  }>("SELECT hidden_at FROM conversations WHERE id = ?", chatId);
+  const rows = await database.getAllAsync<{ message_id: string }>(
+    "SELECT message_id FROM hidden_messages WHERE conversation_id = ?",
+    chatId,
+  );
+  return {
+    writable: !conversation || conversation.hidden_at === null,
+    hidden: new Set(rows.map((row) => row.message_id)),
+  };
+}
 
 async function upsertMessage(
   database: SqlDatabase,
   chatId: string,
   message: MessageRecord,
   pendingOnly = false,
+  state?: ThreadState,
 ): Promise<number> {
+  const current = state ?? (await threadState(database, chatId));
+  // A deleted chat is a tombstone, not a thread: a page or a queue snapshot
+  // that lands afterwards must not store anything under it. A per-message
+  // tombstone is permanent too, so no stale page, late receipt or kept
+  // snapshot can revive the row.
+  if (!current.writable || current.hidden.has(message.id)) return 0;
   await ensureConversation(database, chatId);
   const result = await database.runAsync(
     pendingOnly ? `${UPSERT} WHERE messages.sequence IS NULL` : UPSERT,
@@ -79,8 +116,10 @@ export async function writeThread(
   chatId: string,
   messages: readonly MessageRecord[],
 ): Promise<void> {
+  const state = await threadState(database, chatId);
+  if (!state.writable) return;
   for (const message of messages) {
-    await upsertMessage(database, chatId, message);
+    await upsertMessage(database, chatId, message, false, state);
   }
 }
 
@@ -207,6 +246,12 @@ export async function resetThread(
     "DELETE FROM messages WHERE conversation_id = ?",
     chatId,
   );
+  // A hidden id from before the clear is behind `cleared_through` now, so the
+  // per-message record has nothing left to protect.
+  await database.runAsync(
+    "DELETE FROM hidden_messages WHERE conversation_id = ?",
+    chatId,
+  );
   await database.runAsync(
     `UPDATE conversations SET
        cleared_through = ?,
@@ -221,21 +266,43 @@ export async function resetThread(
   );
 }
 
+/**
+ * Delete-for-me: the row goes and a tombstone stays. Deleting only the row was
+ * not enough, because the next page that still contained the message (a cached
+ * query, a media pass, a queued snapshot) would upsert it straight back.
+ */
 export async function removeMessage(
   database: SqlDatabase,
   chatId: string,
   messageId: string,
 ): Promise<void> {
   await database.runAsync(
+    `INSERT INTO hidden_messages (message_id, conversation_id, hidden_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(message_id) DO UPDATE SET
+       conversation_id = excluded.conversation_id,
+       hidden_at = excluded.hidden_at`,
+    messageId,
+    chatId,
+    Date.now(),
+  );
+  // Media files, variants and a pending outbox row cascade from the message.
+  await database.runAsync(
     "DELETE FROM messages WHERE conversation_id = ? AND id = ?",
     chatId,
     messageId,
   );
+  await database.runAsync("DELETE FROM outbox WHERE message_id = ?", messageId);
 }
 
 /**
  * Whether the server is likely to have rows older than the local page: false
  * once the thread is known to start at sequence 1 or was marked exhausted.
+ *
+ * A deleted chat has nothing to page through, and a cleared thread with no
+ * confirmed row left must not offer history either: the server cleared the
+ * same range, so asking again would empty the thread and, worse, let it
+ * advertise history forever.
  */
 export async function hasOlderThread(
   database: SqlDatabase,
@@ -243,16 +310,23 @@ export async function hasOlderThread(
 ): Promise<boolean> {
   const row = await database.getFirstAsync<{
     exhausted: number | null;
+    hidden: number | null;
+    cleared: number | null;
     oldest: number | null;
   }>(
     `SELECT
        history_exhausted_at AS exhausted,
+       hidden_at AS hidden,
+       cleared_through AS cleared,
        (SELECT MIN(sequence) FROM messages
-         WHERE conversation_id = conversations.id AND sequence IS NOT NULL) AS oldest
+         WHERE conversation_id = conversations.id
+           AND sequence IS NOT NULL
+           AND ${HIDDEN}) AS oldest
      FROM conversations WHERE id = ?`,
     chatId,
   );
-  if (!row || row.exhausted != null) return false;
+  if (!row || row.exhausted != null || row.hidden != null) return false;
+  if (row.cleared != null && row.oldest === null) return false;
   return row.oldest === null || row.oldest > 1;
 }
 

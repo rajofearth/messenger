@@ -110,7 +110,7 @@ test("a repeated or non-advancing cursor cannot loop", async () => {
   assert.equal(result.hasMore, false);
 });
 
-test("a long run of hidden pages is bounded", async () => {
+test("a long run of hidden pages is bounded without ending the thread", async () => {
   let calls = 0;
   const result = await readOlderServerPages({
     beforeSequence: 500,
@@ -126,7 +126,11 @@ test("a long run of hidden pages is bounded", async () => {
     },
   });
   assert.equal(calls, 3);
-  assert.deepEqual(result, { rows: [], hasMore: false });
+  assert.deepEqual(result, {
+    rows: [],
+    hasMore: true,
+    exhaustedByBudget: true,
+  });
 });
 
 
@@ -213,7 +217,7 @@ test("a short local page asks the server for the rows this device never saw", as
     save: async (rows) => { saved.push(...rows.map((item) => item.sequence)); },
     markExhausted: async () => { exhausted += 1; },
   });
-  assert.deepEqual(saved, [399, 398]);
+  assert.deepEqual(saved, [398, 399, 400]);
   assert.deepEqual(result.rows.map((item) => item.sequence), [398, 399, 400]);
   assert.equal(result.hasMore, true);
   assert.equal(exhausted, 0);

@@ -45,6 +45,8 @@ export type ConversationScreenProps = {
   /** True while the server may still hold rows older than the local page. */
   hasOlder?: boolean;
   loadingOlder?: boolean;
+  /** The last older-page read failed; the control offers a retry. */
+  loadOlderFailed?: boolean;
   onLoadOlder?: () => void;
 };
 
@@ -67,6 +69,7 @@ export default function ConversationScreen({
   onRetry,
   hasOlder = false,
   loadingOlder = false,
+  loadOlderFailed = false,
   onLoadOlder,
 }: ConversationScreenProps) {
   const { bg, fg, muted, line } = palette(dark);
@@ -272,6 +275,7 @@ export default function ConversationScreen({
           typing={typing}
           hasOlder={hasOlder}
           loadingOlder={loadingOlder}
+          loadOlderFailed={loadOlderFailed}
           onLoadOlder={onLoadOlder}
           onScrollBeginDrag={() => setAttachmentOpen(false)}
           onActions={onActions}

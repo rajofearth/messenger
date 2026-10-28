@@ -10,7 +10,7 @@
 
 import type { SqlDatabase } from "./types";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** Statements for version 1, in dependency order. */
 const VERSION_1: readonly string[] = [
@@ -171,8 +171,35 @@ const VERSION_1: readonly string[] = [
   )`,
 ];
 
+/**
+ * Statements for version 2: delete-for-me tombstones.
+ *
+ * A hidden id outlives its message row on purpose, so it carries no foreign
+ * key: no writer may ever put that message back, and the record is what says
+ * so. `conversation_id` is kept for the cheap per-thread lookups.
+ */
+const VERSION_2: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS hidden_messages (
+    message_id TEXT PRIMARY KEY NOT NULL,
+    conversation_id TEXT NOT NULL,
+    hidden_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS hidden_messages_conversation
+    ON hidden_messages(conversation_id)`,
+];
+
+/** Every version and its statements, applied in order. */
+export const SCHEMA_MIGRATIONS: readonly {
+  version: number;
+  statements: readonly string[];
+}[] = [
+  { version: 1, statements: VERSION_1 },
+  { version: 2, statements: VERSION_2 },
+];
+
 /** Tables wiped on sign-out, children before their parents. */
 export const SCHEMA_TABLES: readonly string[] = [
+  "hidden_messages",
   "media_files",
   "message_variants",
   "messages",
@@ -188,7 +215,9 @@ export const SCHEMA_TABLES: readonly string[] = [
 
 /**
  * Applies every migration the database has not seen yet. A database written by
- * a newer build is left alone rather than downgraded.
+ * a newer build is left alone rather than downgraded, and an upgrade only runs
+ * the statements of the versions above the one already stored, so existing
+ * rows are never rewritten.
  */
 export async function applySchema(database: SqlDatabase): Promise<void> {
   const row = await database.getFirstAsync<{ user_version: number }>(
@@ -197,7 +226,12 @@ export async function applySchema(database: SqlDatabase): Promise<void> {
   const current = row?.user_version ?? 0;
   if (current >= SCHEMA_VERSION) return;
   await database.withTransactionAsync(async () => {
-    for (const statement of VERSION_1) await database.execAsync(statement);
+    for (const migration of SCHEMA_MIGRATIONS) {
+      if (migration.version <= current) continue;
+      for (const statement of migration.statements) {
+        await database.execAsync(statement);
+      }
+    }
     await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
 }

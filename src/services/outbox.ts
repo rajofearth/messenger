@@ -117,13 +117,23 @@ export async function keepOutgoingCopy(
 }
 
 let records: OutboxRecord[] | null = null;
+/**
+ * True only once the persisted queue was actually read. A send can start while
+ * that read is in flight, or after it failed, so `records` being non-null says
+ * nothing about what storage holds. Writes stay closed until a read succeeds:
+ * `saveOutbox` replaces the whole stored queue, so a snapshot taken from
+ * `records ?? []` would delete every pending row and message this process never
+ * saw. Rows queued in the meantime stay in memory and are persisted by the next
+ * successful load.
+ */
 let loaded = false;
 let generation = 0;
 let writes: Promise<void> = Promise.resolve();
 
 /** Persists the full in-memory list, one write at a time. */
 function queueWrite() {
-  const snapshot = records ? [...records] : [];
+  if (!loaded) return Promise.resolve();
+  const snapshot = [...(records ?? [])];
   writes = writes
     .catch(() => undefined)
     .then(() => messengerRepository.saveOutbox(snapshot))
@@ -131,6 +141,12 @@ function queueWrite() {
   return writes;
 }
 
+/**
+ * Adds or replaces one row in memory, then persists the queue. Before a
+ * successful read the write is a no-op: the stored rows are unknown, so
+ * persisting now would replace them with this list. The next successful
+ * `loadOutbox` persists the merged queue instead.
+ */
 function put(chatId: string, message: Message) {
   const list = (records ??= []);
   const index = list.findIndex((record) => record.message.id === message.id);
@@ -156,6 +172,10 @@ function isOutboxRecord(value: unknown): value is OutboxRecord {
  * queued while the read was in flight. Called once with the rest of the
  * cold-start cache; signing out clears storage first, so the next account
  * cannot inherit the previous one's pending sends.
+ *
+ * Mutations that happened before this read skipped their write (see `loaded`),
+ * so a successful read persists the merged queue once. A failed read leaves the
+ * queue unloaded and writes stay closed until a later read succeeds.
  */
 export async function loadOutbox(): Promise<OutboxRecord[]> {
   try {
@@ -171,8 +191,13 @@ export async function loadOutbox(): Promise<OutboxRecord[]> {
       ...queued,
     ];
     loaded = true;
+    // Those queued rows have no durable copy yet; persist them with the queue
+    // they belong to instead of letting their next mutation do it.
+    if (queued.length) await queueWrite();
   } catch {
-    // A failed read must not drop sends already queued in this session.
+    // A failed read must not drop sends already queued in this session, and it
+    // must not set `loaded`: the stored queue is unknown, so any snapshot would
+    // delete rows this process never read.
     records ??= [];
   }
   return records;
@@ -181,7 +206,8 @@ export async function loadOutbox(): Promise<OutboxRecord[]> {
 /**
  * Whether the persisted slice was read successfully. Cleanup only runs then:
  * a failed read must not be mistaken for an empty outbox and delete the
- * durable copies of rows that are still on disk.
+ * durable copies of rows that are still on disk. Persistence is also closed
+ * until then, for the same reason: a write would replace rows never read.
  */
 export function outboxLoaded(): boolean {
   return loaded;
@@ -211,7 +237,8 @@ export function outboxGeneration(): number {
 /**
  * Seeds the queue from the slice loaded with the rest of the cold-start cache.
  * Replacing is deliberate: signing out clears storage, and the next account
- * must not inherit the previous one's pending sends.
+ * must not inherit the previous one's pending sends. This does not mark the
+ * queue loaded; only a read that succeeded may open persistence.
  */
 export function initializeOutbox(stored: readonly OutboxRecord[]) {
   records = [...stored];
@@ -224,7 +251,8 @@ export function outboxSnapshot(): OutboxRecord[] {
 /**
  * Adds an outgoing message to the queue before its upload starts. A send that
  * began in an earlier queue generation is ignored, so a sign-out during an
- * attachment copy cannot re-enqueue the old account's message.
+ * attachment copy cannot re-enqueue the old account's message. Before the
+ * cold-start read succeeds the row is kept in memory only; see `put`.
  */
 export function rememberOutgoing(
   chatId: string,

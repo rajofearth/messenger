@@ -383,6 +383,7 @@ function MessengerApp() {
               onTypingChange={messenger.setTyping}
               hasOlder={messenger.hasOlder}
               loadingOlder={messenger.loadingOlder}
+              loadOlderFailed={messenger.loadOlderFailed}
               onLoadOlder={messenger.loadOlder}
             />
           ) : compose ? (

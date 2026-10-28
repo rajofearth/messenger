@@ -2,6 +2,12 @@
 
 A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger. Accounts, profiles, contacts, conversations, messages, reactions, unread counts, presence, typing, conversation preferences and 24-hour stories live in a Convex deployment. The client keeps a device cache in front of every read, so the inbox and previously opened threads paint before the network answers and an offline start still shows the last known state. The production and development release feeds are separate HTTP endpoints on separate deployments.
 
+## Direction: relay-only
+
+Decided 2026-10-28. The target is the WhatsApp shape: Convex authenticates and relays, each phone owns history in SQLite, undelivered items wait in a queue for at most 30 days, and delivered content is deleted from the server. Large-file transfer and the encrypted Google Drive backup are on hold; FCM push wakes are in scope.
+
+None of that is built yet. The code still stores every message in the `convex-chat` component, and `docs/RELAY.md` is the living state, phase order and decision log. The storage review and the relay constraints are in `P:\Projects\messenger-research\11-storage-reality.md` §2–§3.
+
 ## Layers and allowed dependency direction
 
 Intended direction: `features` and `state` depend on `domain`, `data`, `services` and `ui`; nothing depends on `App.tsx`; `domain` depends on nothing. The Convex functions in `convex/` are the server, and the client reaches them through `src/services/convexClient.ts` and the state hooks, never directly from a screen.
@@ -275,7 +281,7 @@ Notification replies use `notice-<actionId>` as the client message id. The `conv
 
 ## Deliberate non-goals and known limitations
 
-- **No push.** Notifications are posted by the running app. There is no FCM or APNs integration, so a stopped process hears nothing until Android starts it again, and actions other than answer/open wait for the next launch. Message notifications also only cover threads whose messages are already in memory or on disk, because the inbox query carries a preview rather than the full thread.
+- **No push yet.** Notifications are posted by the running app. There is no FCM or APNs integration today, so a stopped process hears nothing until Android starts it again, and actions other than answer/open wait for the next launch. Message notifications also only cover threads whose messages are already in memory or on disk, because the inbox query carries a preview rather than the full thread. Planned: opaque FCM wakes, setup in `docs/PUSH.md`.
 - **Calls are simulated.** They connect on a timer and show the local camera preview; there is no call signalling server, call audio or remote video. Group calls are disabled in the header, the profile and the `startCall` guard.
 - **No OTA JavaScript updates yet.** A release is offered as a whole APK, so every update downloads the full package.
 - **No end-to-end encryption.** Convex stores profiles, message text and media, and the deployment operator can read them. The local cache is not encrypted either: auth tokens and the device id live in SecureStore, but message rows and downloaded attachments do not. Treat the deployment's database and the device as trusted.

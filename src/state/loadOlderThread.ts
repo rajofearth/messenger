@@ -3,10 +3,18 @@ import { mergeOlderPage } from "../domain/threadMerge";
 import {
   oldestConfirmedSequence,
   readOlderServerPages,
+  type OlderServerPage,
   type RemoteOlderPage,
 } from "./threadPaging";
 
 export const OLDER_PAGE_SIZE = 100;
+
+export type OlderThreadPage = {
+  rows: Message[];
+  hasMore: boolean;
+  /** The server read failed; the disk page stands and a tap can retry. */
+  failed?: boolean;
+};
 
 /**
  * Loads one page of history older than what the screen already holds.
@@ -18,8 +26,10 @@ export const OLDER_PAGE_SIZE = 100;
  * that migrated from the old newest-100 cache).
  *
  * Confirmed server rows are saved before they reach the screen, so killing the
- * app right after a page arrives keeps it. Only the server can prove the
- * history ended; that is when the thread is marked exhausted.
+ * app right after a page arrives keeps it. The save uses the merged page so a
+ * `file://` original this device already downloaded survives the server copy.
+ * Only the server can prove the history ended; a failed request or the hidden
+ * page budget is never treated as the end.
  */
 export async function loadOlderThread({
   messages,
@@ -42,7 +52,7 @@ export async function loadOlderThread({
   save: (rows: Message[]) => Promise<void>;
   markExhausted: () => Promise<void>;
   limit?: number;
-}): Promise<{ rows: Message[]; hasMore: boolean }> {
+}): Promise<OlderThreadPage> {
   const oldest = oldestConfirmedSequence(messages);
   // Nothing confirmed to page from; an optimistic-only thread has no history.
   if (oldest === undefined) return { rows: [], hasMore: false };
@@ -56,16 +66,33 @@ export async function loadOlderThread({
 
   if (!(await canReadRemote())) return { rows: local, hasMore: false };
 
-  const page = await readOlderServerPages({
-    beforeSequence: oldest,
-    limit,
-    fetchPage: readRemote,
-  });
-  if (page.rows.length > 0) await save(page.rows);
-  if (!page.hasMore) await markExhausted();
+  let page: OlderServerPage;
+  try {
+    page = await readOlderServerPages({
+      beforeSequence: oldest,
+      limit,
+      fetchPage: readRemote,
+    });
+  } catch {
+    // Offline or the request failed. The rows already on disk still belong on
+    // screen, and the control has to stay so the next tap can retry.
+    return { rows: local, hasMore: true, failed: true };
+  }
+
+  if (page.exhaustedByBudget) {
+    // A wide delete-for-me range ran out the hidden-page budget; the server has
+    // not said the history ended, so nothing is marked exhausted.
+    return { rows: local, hasMore: true };
+  }
+  if (!page.rows.length) {
+    if (!page.hasMore) await markExhausted();
+    return { rows: local, hasMore: page.hasMore };
+  }
 
   // A row can be both on disk and in the server page; retain local media while
   // letting the fetched server row provide the current message fields.
   const rows = mergeOlderPage(page.rows, local);
+  await save(rows);
+  if (!page.hasMore) await markExhausted();
   return { rows, hasMore: page.hasMore };
 }

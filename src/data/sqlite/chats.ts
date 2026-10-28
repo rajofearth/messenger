@@ -4,6 +4,11 @@
  * `saveChats` only ever upserts. The server owns the inbox snapshot, but the
  * phone owns history, so a conversation missing from one snapshot is never
  * removed by a write; only clearing, deleting or signing out removes rows.
+ * Deleting is a tombstone, not a delete: the row keeps `hidden_at` and
+ * `cleared_through`, so a page or receipt that lands afterwards cannot recreate
+ * the chat with default columns. Only a snapshot whose newest message is
+ * younger than the tombstone brings it back, which is the point of deleting a
+ * chat: new messages start it again from empty.
  */
 
 import type { ChatRecord } from "../records";
@@ -43,16 +48,49 @@ ON CONFLICT(id) DO UPDATE SET
     WHEN excluded.unread = 0 THEN conversations.unread_ordinal
     ELSE conversations.last_read_unread_ordinal
   END,
-  position = excluded.position`;
+  position = excluded.position,
+  -- A deleted chat stays hidden until the inbox snapshot names a message that
+  -- is newer than the deletion; that is a genuine incoming message, never a
+  -- late page or a queued save.
+  hidden_at = CASE
+    WHEN conversations.hidden_at IS NULL THEN NULL
+    WHEN excluded.last_message_at IS NOT NULL
+      AND excluded.last_message_at > conversations.hidden_at
+      THEN NULL
+    ELSE conversations.hidden_at
+  END`;
 
 /** A conversation row for a message write when the inbox has not seen it yet. */
 export async function ensureConversation(
   database: SqlDatabase,
   chatId: string,
 ): Promise<void> {
+  // An existing row is left exactly as it is: a tombstoned or cleared
+  // conversation must never be recreated with default columns by a late write.
   await database.runAsync(
     "INSERT INTO conversations (id) VALUES (?) ON CONFLICT(id) DO NOTHING",
     chatId,
+  );
+}
+
+/**
+ * A named conversation for a thread that arrived without its inbox entry, such
+ * as a legacy thread whose chat the old store never listed. A nameless
+ * placeholder (a message write that beat the inbox) is upgraded, because
+ * `listChats` leaves those out and the thread would be unreachable.
+ */
+export async function ensureNamedConversation(
+  database: SqlDatabase,
+  chatId: string,
+  name: string,
+): Promise<void> {
+  await database.runAsync(
+    `INSERT INTO conversations (id, name, position)
+     VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM conversations))
+     ON CONFLICT(id) DO UPDATE SET name = excluded.name
+     WHERE conversations.name = ''`,
+    chatId,
+    name,
   );
 }
 
@@ -61,9 +99,12 @@ export async function listChats(
 ): Promise<ChatRecord[] | undefined> {
   // A message write creates a placeholder conversation before the inbox has
   // seen it. Those rows have no name and are not threads the reader can open,
-  // so the cached inbox leaves them out until `saveChats` fills them in.
+  // so the cached inbox leaves them out until `saveChats` fills them in. A
+  // deleted chat keeps its row but is hidden the same way.
   const rows = await database.getAllAsync<ConversationRow>(
-    "SELECT * FROM conversations WHERE name <> '' ORDER BY position ASC, id ASC",
+    `SELECT * FROM conversations
+     WHERE name <> '' AND hidden_at IS NULL
+     ORDER BY position ASC, id ASC`,
   );
   return rows.length ? rows.map(chatFromRow) : undefined;
 }
@@ -91,9 +132,42 @@ export async function writeChat(
   await database.runAsync(UPSERT, ...chatParams(chat, position, ordinal));
 }
 
+/**
+ * Deletes a chat the way the app shows it: the history and the queue go, the
+ * row stays as a tombstone. Hard-deleting the row would let the next
+ * `ensureConversation` recreate it with defaults and no `cleared_through`, and
+ * a page that was already in flight would put the deleted messages back.
+ */
 export async function deleteConversation(
   database: SqlDatabase,
   chatId: string,
 ): Promise<void> {
-  await database.runAsync("DELETE FROM conversations WHERE id = ?", chatId);
+  const now = Date.now();
+  await ensureConversation(database, chatId);
+  await database.runAsync(
+    `UPDATE conversations SET
+       hidden_at = ?,
+       cleared_through = ?,
+       unread = 0,
+       last_message_status = NULL
+     WHERE id = ?`,
+    now,
+    now,
+    chatId,
+  );
+  // The thread and its queue are what "delete" removes locally; media and
+  // variants cascade from the message rows.
+  await database.runAsync(
+    "DELETE FROM messages WHERE conversation_id = ?",
+    chatId,
+  );
+  await database.runAsync(
+    "DELETE FROM outbox WHERE conversation_id = ?",
+    chatId,
+  );
+  // Per-message hides below the clear timestamp are already covered by it.
+  await database.runAsync(
+    "DELETE FROM hidden_messages WHERE conversation_id = ?",
+    chatId,
+  );
 }

@@ -24,6 +24,8 @@ export type ConversationListProps = {
   typing: boolean;
   hasOlder: boolean;
   loadingOlder: boolean;
+  /** The last "load older" failed; the control offers a retry. */
+  loadOlderFailed?: boolean;
   onLoadOlder?: () => void;
   onScrollBeginDrag: () => void;
   onActions: (target: ActionTarget) => void;
@@ -46,6 +48,7 @@ export default function ConversationList({
   typing,
   hasOlder,
   loadingOlder,
+  loadOlderFailed = false,
   onLoadOlder,
   onScrollBeginDrag,
   onActions,
@@ -70,9 +73,15 @@ export default function ConversationList({
   }, [rows]);
   const list = useRef<FlatList<MediaRow>>(null);
   const pinned = useRef(true);
-  const tail = messages.length
-    ? `${messages.length}:${messages[messages.length - 1].id}`
-    : "";
+  // Only a new newest message moves the view. Keying on the length too would
+  // treat a prepended page as "new message" and jump to the bottom.
+  const tail = messages.length ? messages[messages.length - 1].id : "";
+  // A page can only start from a confirmed row; an optimistic-only thread has
+  // no cursor, so the control would be a dead end.
+  const canLoadOlder =
+    hasOlder &&
+    rows.length > 0 &&
+    messages.some((message) => message.sequence !== undefined);
   // A newly selected thread starts pinned; later content changes must not steal
   // the reader's place when they have scrolled up.
   useEffect(() => {
@@ -89,10 +98,20 @@ export default function ConversationList({
       pinned.current =
         contentSize.height - contentOffset.y - layoutMeasurement.height < 120;
       // The list is not inverted, so older rows sit above the viewport.
-      if (hasOlder && !loadingOlder && contentOffset.y < 80) onLoadOlder?.();
+      if (hasOlder && !loadingOlder && contentOffset.y < 80) {
+        // The reader is at the top on purpose; the page that arrives must not
+        // pull them back to the newest row.
+        pinned.current = false;
+        onLoadOlder?.();
+      }
     },
     [hasOlder, loadingOlder, onLoadOlder],
   );
+  const loadOlder = useCallback(() => {
+    // The header control prepends rows as well, so stop following the tail.
+    pinned.current = false;
+    onLoadOlder?.();
+  }, [onLoadOlder]);
   // Rows report their height as they mount, so the tail is only chased while
   // the newest message is already on screen.
   const onContentSizeChange = useCallback(() => {
@@ -164,22 +183,30 @@ export default function ConversationList({
       maxToRenderPerBatch={8}
       windowSize={9}
       ListHeaderComponent={
-        loadingOlder ? (
-          <Text style={[s.emptyThread, { color: muted }]}>
-            Loading older messages…
-          </Text>
-        ) : hasOlder && rows.length > 0 ? (
-          // A thread shorter than the viewport cannot scroll, so the top-edge
-          // trigger never fires; this keeps older history reachable. An empty
-          // thread has no confirmed row to page from, so the control would be
-          // a dead end there.
+        canLoadOlder ? (
+          // Kept mounted so its busy state can be announced, and shown even on
+          // a thread shorter than the viewport where the top-edge trigger
+          // cannot fire.
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Load older messages"
-            onPress={onLoadOlder}
+            accessibilityLabel={
+              loadOlderFailed
+                ? "Couldn't load older messages. Tap to retry."
+                : "Load older messages"
+            }
+            accessibilityState={{ busy: loadingOlder }}
+            disabled={loadingOlder}
+            onPress={loadOlder}
           >
-            <Text style={[s.emptyThread, { color: coralInk }]}>
-              Load older messages
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[s.emptyThread, { color: loadingOlder ? muted : coralInk }]}
+            >
+              {loadingOlder
+                ? "Loading older messages…"
+                : loadOlderFailed
+                  ? "Couldn't load older messages. Tap to retry."
+                  : "Load older messages"}
             </Text>
           </Pressable>
         ) : null

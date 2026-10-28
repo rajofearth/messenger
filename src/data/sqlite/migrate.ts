@@ -4,9 +4,10 @@
  * The old store wrote one key per slice under `messenger/v2/`. Migration reads
  * those keys, writes the same shapes through the SQLite writers, and only then
  * removes the old keys. Markers in `migration_state` make every step resumable:
- * a kill after a chat import leaves that chat's marker committed, and a kill
- * after the main import leaves the cleanup to the next launch. Appearance,
- * update dismissal and the pending call stay in AsyncStorage.
+ * the inbox slice and the per-chat threads are separate phases, each chat's
+ * import leaves its own marker committed, and a kill after the main import
+ * leaves the cleanup to the next launch. Appearance, update dismissal and the
+ * pending call stay in AsyncStorage.
  */
 
 import { STORE_NAMESPACE } from "../asyncStorage";
@@ -19,7 +20,7 @@ import type {
   StoryRecord,
 } from "../records";
 import type { Store } from "../store";
-import { writeChats } from "./chats";
+import { ensureNamedConversation, writeChats } from "./chats";
 import { writeThread } from "./messages";
 import { writeOutbox } from "./outbox";
 import {
@@ -31,10 +32,16 @@ import {
 import type { SqlDatabase } from "./types";
 
 export const LEGACY_IMPORTED_KEY = "legacy:imported";
+export const LEGACY_THREADS_KEY = "legacy:threads";
 export const LEGACY_COMPLETE_KEY = "legacy:complete";
 
 export function legacyChatKey(chatId: string): string {
   return `chat:${chatId}`;
+}
+
+/** The inbox name for a thread whose chat the old store never listed. */
+export function orphanChatName(chatId: string): string {
+  return `Chat ${chatId}`;
 }
 
 const PREFIX = `${STORE_NAMESPACE}/`;
@@ -128,6 +135,10 @@ async function importChats(
     const stored = await store.load<unknown>(`${MESSAGE_PREFIX}${chatId}`);
     const messages = arrayOf(stored, isMessage) ?? [];
     await database.withTransactionAsync(async () => {
+      // A thread can exist for a chat the inbox slice never listed. It still
+      // needs a reachable conversation row before the legacy keys are removed,
+      // or the only copy of its messages stays invisible and then gets deleted.
+      await ensureNamedConversation(database, chatId, orphanChatName(chatId));
       await writeThread(database, chatId, messages);
       await setMarker(database, legacyChatKey(chatId));
     });
@@ -193,9 +204,16 @@ export async function migrateLegacy(
 ): Promise<void> {
   if (await hasMarker(database, LEGACY_COMPLETE_KEY)) return;
 
+  // The inbox slice lands first: a thread written before its chat would become
+  // a nameless conversation that `listChats` filters out.
   if (!(await hasMarker(database, LEGACY_IMPORTED_KEY))) {
-    await importChats(database, store);
     await importSlices(database, store);
+  }
+  // Threads are their own phase, so a kill between the two never skips them;
+  // each chat still has its own marker inside.
+  if (!(await hasMarker(database, LEGACY_THREADS_KEY))) {
+    await importChats(database, store);
+    await setMarker(database, LEGACY_THREADS_KEY);
   }
 
   await deleteLegacyKeys(store);

@@ -7,6 +7,7 @@ import {
   migrate,
   pending,
   repository,
+  schema,
   seed,
   setup,
 } from "./testSupport.mjs";
@@ -195,4 +196,74 @@ test("per-chat markers survive a restart and skip imported threads", async () =>
     migrate.LEGACY_COMPLETE_KEY,
   );
   assert.ok(complete);
+});
+
+test("a legacy thread without its chat still becomes a reachable chat", async () => {
+  const { database, driver, store, repository: repo } = await setup();
+  seed(driver, "chats", [chat("a")]);
+  // The old store listed a thread for a chat its inbox slice never held.
+  seed(driver, "messages/orphan-chat", [message("m1", 3), message("m2", 4)]);
+
+  await migrate.migrateLegacy(database, store);
+
+  const chats = await repo.loadChats();
+  const orphan = chats.find((item) => item.id === "orphan-chat");
+  assert.ok(orphan, "an orphaned thread must stay reachable");
+  assert.equal(orphan.name, migrate.orphanChatName("orphan-chat"));
+  assert.deepEqual(
+    (await repo.loadMessages("orphan-chat")).map((item) => item.id),
+    ["m1", "m2"],
+  );
+  // The old keys only go after both copies are safe.
+  assert.equal(driver.data.has(`${NAMESPACE}/messages/orphan-chat`), false);
+  const count = await database.getFirstAsync(
+    "SELECT COUNT(*) AS count FROM messages",
+  );
+  assert.equal(count.count, 2);
+});
+
+test("a kill between the inbox and the threads still imports the threads", async () => {
+  const { database, driver, store, repository: repo } = await setup();
+  seed(driver, "chats", [chat("a")]);
+  seed(driver, "messages/a", [message("m1", 1)]);
+  // The slice phase committed and the process died before the threads ran.
+  await database.runAsync(
+    "INSERT INTO migration_state (key, value) VALUES (?, '1')",
+    migrate.LEGACY_IMPORTED_KEY,
+  );
+
+  await migrate.migrateLegacy(database, store);
+
+  assert.deepEqual(
+    (await repo.loadMessages("a")).map((item) => item.id),
+    ["m1"],
+  );
+  assert.equal(driver.data.has(`${NAMESPACE}/messages/a`), false);
+  const threads = await database.getFirstAsync(
+    "SELECT value FROM migration_state WHERE key = ?",
+    migrate.LEGACY_THREADS_KEY,
+  );
+  assert.ok(threads);
+});
+
+test("upgrading a version 1 database adds tombstones and keeps its rows", async () => {
+  const { database, repository: repo } = await setup();
+  await repo.saveChats([chat("a")]);
+  await repo.saveMessages("a", [message("m1", 1)]);
+
+  // Put the file back in the shape version 1 left on disk.
+  await database.execAsync("DROP TABLE hidden_messages");
+  await database.execAsync("PRAGMA user_version = 1");
+  await schema.applySchema(database);
+
+  const version = await database.getFirstAsync("PRAGMA user_version");
+  assert.equal(version.user_version, schema.SCHEMA_VERSION);
+  assert.deepEqual(
+    (await repo.loadMessages("a")).map((item) => item.id),
+    ["m1"],
+  );
+
+  await repo.deleteMessage("a", "m1");
+  await repo.saveMessages("a", [message("m1", 1)]);
+  assert.deepEqual(await repo.loadMessages("a"), []);
 });

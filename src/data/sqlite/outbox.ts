@@ -23,11 +23,15 @@ function queuedAt(message: OutboxRecord["message"]): number {
 export async function listOutbox(
   database: SqlDatabase,
 ): Promise<OutboxRecord[]> {
+  // A queued send the user deleted for themselves is not pending any more; the
+  // next queue write drops the row through `writePendingMessage` returning 0.
   const rows = await database.getAllAsync<OutboxRow>(
     `SELECT m.*, o.conversation_id AS outbox_conversation_id
      FROM outbox AS o
      JOIN messages AS m ON m.id = o.message_id
-     WHERE m.sequence IS NULL AND m.local_status IS NOT NULL
+     WHERE m.sequence IS NULL
+       AND m.local_status IS NOT NULL
+       AND m.id NOT IN (SELECT message_id FROM hidden_messages)
      ORDER BY o.queued_at ASC, o.message_id ASC`,
   );
   return rows.map((row) => ({

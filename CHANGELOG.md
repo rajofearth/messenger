@@ -103,6 +103,25 @@ and this project adheres to
 - Signing out now deletes `messenger-media`, `message-media`, the avatar cache
   and the cached update APK, so the next account on the same installation
   cannot inherit the previous account's files.
+- Deleting or clearing a chat is now durable. The conversation row stays as a
+  tombstone (`hidden_at`, `cleared_through`), so a page or receipt that was
+  already queued can no longer recreate the chat with default columns and put
+  the deleted messages back; only a genuinely newer incoming message reopens
+  it. Delete-for-me writes a per-message tombstone (`user_version` 2,
+  `hidden_messages`) that `readThread`, `readOlderThread` and `hasOlderThread`
+  honour, so the message cannot return after a relaunch or a stale server page.
+- The legacy import now runs in two phases, inbox first and threads second, so
+  a thread whose chat the old store never listed still becomes a reachable
+  conversation before the old keys are deleted; a kill between the phases
+  resumes instead of skipping the threads.
+- A failed cold-start read of the outbox can no longer be persisted as an empty
+  queue. Writes stay closed until a read succeeds, and rows queued in the
+  meantime are persisted by that successful read instead of being wiped.
+- Load-older no longer offers a dead control on a short thread, jumps to the
+  bottom when a page is prepended, drops the rows already on disk when the
+  network read fails, leaks its spinner into the next chat, or treats the
+  hidden-page budget as the end of history. A failure now shows "Couldn't load
+  older messages. Tap to retry." with a polite accessibility announcement.
 
 The stacked A2/A3/C3 local gate build is 12,702,235 bytes (12.11 MiB),
 458,828 bytes (-3.5%) below the 13,161,063-byte R8 build and 3.89 MiB below

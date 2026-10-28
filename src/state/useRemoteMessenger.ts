@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message } from "../domain/data";
-import { newestReadSequence } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { deviceIdentity } from "../services/deviceIdentity";
 import { useAvatarReferenceSync } from "./useAvatarReferenceSync";
@@ -190,16 +189,6 @@ export function useRemoteMessenger() {
     (item) => item.id === selected,
   )?.mediaVisibility;
 
-  useRemoteThreadMedia({
-    selected,
-    remoteThread,
-    mediaVisibility: selectedMediaVisibility,
-    messagesRef,
-    setMessages,
-    setGallerySaved,
-    gallerySavedRef,
-  });
-
   useRemotePresence({
     selected,
     onlineSession,
@@ -249,9 +238,21 @@ export function useRemoteMessenger() {
     chatsRef,
   });
   const paging = useThreadPaging({
+    selected,
+    remoteHasMore: remoteThreadPage?.hasMore,
     selectedRef,
     messagesRef,
     updateMessages,
+  });
+  useRemoteThreadMedia({
+    selected,
+    remoteThread,
+    mediaVisibility: selectedMediaVisibility,
+    messagesRef,
+    setMessages,
+    setGallerySaved,
+    gallerySavedRef,
+    onHeadPageSaved: paging.refresh,
   });
   const sendTo = createRemoteReplySender({
     chatsRef,
@@ -309,22 +310,11 @@ export function useRemoteMessenger() {
     selectedRef.current = chat.id;
     setSelected(chat.id);
     paging.reset();
-    void paging.refresh(chat.id);
-    updateChats((current) =>
-      current.map((item) =>
-        item.id === chat.id ? { ...item, unread: 0 } : item,
-      ),
-    );
+    void paging.refresh(chat.id); // local fallback until the head page seeds it
+    // Mark read from the persisted page, not from the optimistic rows: a
+    // local-only send can sit above the newest server sequence.
     void thread(chat)
-      .then((items) => {
-        const sequence = newestReadSequence(items);
-        if (sequence) {
-          void markReadMutation({
-            conversationId: chat.id,
-            sequence,
-          }).catch(() => {});
-        }
-      })
+      .then(() => markRead(chat.id))
       .catch(() => {});
   }
 
@@ -335,16 +325,7 @@ export function useRemoteMessenger() {
 
   function setConversationVisible(visible: boolean) {
     setConversationVisibleState(visible);
-    if (visible && selectedRef.current) {
-      const items = messagesRef.current[selectedRef.current] || [];
-      const sequence = newestReadSequence(items);
-      if (sequence) {
-        void markReadMutation({
-          conversationId: selectedRef.current,
-          sequence,
-        }).catch(() => {});
-      }
-    }
+    if (visible && selectedRef.current) markRead(selectedRef.current);
   }
 
   const { send, retryMessage } = createRemoteSend({
@@ -489,6 +470,7 @@ export function useRemoteMessenger() {
     thread,
     hasOlder: paging.hasOlder,
     loadingOlder: paging.loadingOlder,
+    loadOlderFailed: paging.loadOlderFailed,
     loadOlder: paging.loadOlder,
     setTyping,
     conversationVisible,

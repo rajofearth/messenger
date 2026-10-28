@@ -10,6 +10,7 @@ Messenger is a local-first Android app built with Expo SDK 57 and React Native
 backend-ready: screens read through one typed repository
 (`src/data/messengerRepository.ts`) and one cache, and `src/domain` is pure.
 Read `docs/ARCHITECTURE.md` and `docs/PERFORMANCE.md` before touching code;
+`docs/RELAY.md` holds the live relay scope, phase order and decision log;
 `CONTRIBUTING.md` has setup, code rules and pull-request expectations.
 
 The standing bias is smaller and faster: when two designs are close, pick the

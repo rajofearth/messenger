@@ -123,9 +123,14 @@ export function createMessengerRepository(
       write((connection) => exhaustThread(connection, chatId)),
     clearMessages: (chatId: string) =>
       write((connection) => resetThread(connection, chatId)),
+    /** Delete-for-me: the row goes and a durable tombstone keeps it gone. */
     deleteMessage: (chatId: string, messageId: string) =>
       write((connection) => removeMessage(connection, chatId, messageId)),
-    /** Deleting a conversation cascades its messages, media and queue rows. */
+    /**
+     * Deleting a conversation empties its thread and queue but keeps the row
+     * as a tombstone, so a page or receipt already in flight cannot recreate
+     * the chat with default columns.
+     */
     removeMessages: (chatId: string) =>
       write((connection) => deleteConversation(connection, chatId)),
 

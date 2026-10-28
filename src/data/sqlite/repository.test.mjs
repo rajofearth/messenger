@@ -266,6 +266,139 @@ test("removing a conversation deletes its thread and queue rows", async () => {
   assert.deepEqual(remaining, []);
 });
 
+test("a deleted conversation stays deleted when a late write lands", async () => {
+  const { database, repository: repo } = await setup();
+  await repo.saveChats([chat("a"), chat("b")]);
+  await repo.saveMessages("a", [message("m1", 1), message("m2", 2)]);
+
+  await repo.removeMessages("a");
+
+  assert.deepEqual(
+    (await repo.loadChats()).map((item) => item.id),
+    ["b"],
+  );
+  assert.deepEqual(await repo.loadMessages("a"), []);
+  assert.equal(await repo.threadHasOlder("a"), false);
+  // The row is kept as a tombstone so the clear mark survives.
+  const tombstone = await database.getFirstAsync(
+    "SELECT hidden_at, cleared_through FROM conversations WHERE id = ?",
+    "a",
+  );
+  assert.ok(tombstone.hidden_at > 0);
+  assert.ok(tombstone.cleared_through > 0);
+
+  // A queued page and an inbox snapshot that were already in flight land after
+  // the delete. Neither may resurrect the chat or its messages.
+  await repo.saveMessages("a", [message("m1", 1), message("m2", 2)]);
+  await repo.saveChats([chat("a")]);
+  assert.deepEqual(
+    (await repo.loadChats()).map((item) => item.id),
+    ["b"],
+  );
+  assert.deepEqual(await repo.loadMessages("a"), []);
+
+  // A queue snapshot for the deleted chat must not park a send there either.
+  await repo.saveOutbox([{ chatId: "a", message: pending("p1") }]);
+  assert.deepEqual(await repo.loadOutbox(), []);
+  assert.deepEqual(await repo.loadMessages("a"), []);
+
+  // Only a snapshot whose newest message is younger than the deletion is a
+  // genuine incoming message, and it starts the chat over from empty.
+  await repo.saveChats([
+    chat("a", { preview: "new", lastMessageAt: Date.now() + 1000 }),
+  ]);
+  assert.deepEqual(
+    (await repo.loadChats()).map((item) => item.id),
+    ["a", "b"],
+  );
+  await repo.saveMessages("a", [
+    message("m1", 1),
+    message("m3", 3, { createdAt: new Date(Date.now() + 2000).toISOString() }),
+  ]);
+  assert.deepEqual(
+    (await repo.loadMessages("a")).map((item) => item.id),
+    ["m3"],
+  );
+});
+
+test("delete-for-me survives a stale page, an older read and a relaunch", async () => {
+  const { database, repository: repo } = await setup();
+  const variant = {
+    name: "small",
+    uri: "file:///media/small.jpg",
+    width: 360,
+    height: 480,
+  };
+  await repo.saveMessages("a", [
+    message("m1", 1),
+    message("m2", 2, { variants: [variant], reaction: "fire" }),
+    message("m3", 3),
+  ]);
+
+  await repo.deleteMessage("a", "m2");
+
+  assert.deepEqual(
+    (await repo.loadMessages("a")).map((item) => item.id),
+    ["m1", "m3"],
+  );
+  assert.deepEqual(
+    (await repo.loadOlderMessages("a", 3)).map((item) => item.id),
+    ["m1"],
+  );
+  // The message went with its variants, so nothing is left to re-download.
+  assert.deepEqual(
+    await database.getAllAsync("SELECT name FROM message_variants"),
+    [],
+  );
+
+  // The page that still names the deleted row, from a cached query or a media
+  // pass, must not put it back.
+  await repo.saveMessages("a", [
+    message("m1", 1),
+    message("m2", 2, { variants: [variant] }),
+    message("m3", 3),
+  ]);
+
+  assert.deepEqual(
+    (await repo.loadMessages("a")).map((item) => item.id),
+    ["m1", "m3"],
+  );
+  assert.deepEqual(
+    (await repo.loadOlderMessages("a", 3)).map((item) => item.id),
+    ["m1"],
+  );
+  const rows = await database.getAllAsync("SELECT id FROM messages ORDER BY id");
+  assert.deepEqual(rows.map((row) => row.id), ["m1", "m3"]);
+  const hidden = await database.getAllAsync(
+    "SELECT message_id FROM hidden_messages",
+  );
+  assert.deepEqual(hidden.map((row) => row.message_id), ["m2"]);
+});
+
+test("a deleted pending send is not revived by a stale queue snapshot", async () => {
+  const { repository: repo } = await setup();
+  await repo.saveOutbox([{ chatId: "a", message: pending("p1") }]);
+
+  await repo.deleteMessage("a", "p1");
+  assert.deepEqual(await repo.loadOutbox(), []);
+
+  await repo.saveOutbox([{ chatId: "a", message: pending("p1") }]);
+  assert.deepEqual(await repo.loadOutbox(), []);
+  assert.deepEqual(await repo.loadMessages("a"), []);
+});
+
+test("a cleared thread stops advertising older history", async () => {
+  const { repository: repo } = await setup();
+  await repo.saveChats([chat("a")]);
+  await repo.saveMessages("a", [message("m1", 5), message("m2", 6)]);
+  assert.equal(await repo.threadHasOlder("a"), true);
+
+  // The server cleared the same range, so there is nothing older to page in;
+  // offering the control would empty the thread on every scroll.
+  await repo.clearMessages("a");
+  assert.equal(await repo.threadHasOlder("a"), false);
+});
+
 test("story snapshots replace the previous set and keep variants", async () => {
   const { repository: repo } = await setup();
   await repo.saveStories([
@@ -317,7 +450,7 @@ test("story snapshots replace the previous set and keep variants", async () => {
 });
 
 test("signing out wipes every table and the messenger store namespace", async () => {
-  const { driver, repository: repo } = await setup();
+  const { database, driver, repository: repo } = await setup();
   await repo.saveAppearance("dark");
   await repo.savePendingCall({
     callId: "c1",
@@ -327,7 +460,8 @@ test("signing out wipes every table and the messenger store namespace", async ()
     timeoutMs: 30_000,
   });
   await repo.saveChats([chat("a")]);
-  await repo.saveMessages("a", [message("m1", 1)]);
+  await repo.saveMessages("a", [message("m1", 1), message("m2", 2)]);
+  await repo.deleteMessage("a", "m2");
   await repo.saveStories([
     {
       id: "s1",
@@ -371,6 +505,10 @@ test("signing out wipes every table and the messenger store namespace", async ()
   assert.equal(await repo.loadGallerySaved(), undefined);
   assert.deepEqual(await repo.loadMessages("a"), []);
   assert.deepEqual(await repo.loadOutbox(), []);
+  const tombstones = await database.getFirstAsync(
+    "SELECT COUNT(*) AS count FROM hidden_messages",
+  );
+  assert.equal(tombstones.count, 0);
   assert.equal(await repo.loadAppearance(), undefined);
   assert.equal(await repo.loadPendingCall(), undefined);
 

@@ -15,6 +15,8 @@ type Args = {
   setMessages: Dispatch<SetStateAction<Record<string, Message[]>>>;
   setGallerySaved: Dispatch<SetStateAction<string[]>>;
   gallerySavedRef: MutableRefObject<Set<string>>;
+  /** Called after the head page is durable, so "older" can be re-read. */
+  onHeadPageSaved?: (chatId: string) => void;
 };
 
 /**
@@ -30,6 +32,7 @@ export function useRemoteThreadMedia({
   setMessages,
   setGallerySaved,
   gallerySavedRef,
+  onHeadPageSaved,
 }: Args) {
   useEffect(() => {
     if (!selected || !remoteThread) return;
@@ -48,7 +51,12 @@ export function useRemoteThreadMedia({
     const page = initial.filter(
       (message) => isConfirmed(message) && pageIds.has(message.id),
     );
-    void messengerRepository.saveMessages(selected, page).catch(() => {});
+    // Re-derive "older" only once the head page is durable: before this write
+    // the database cannot tell a short thread from a page that never arrived.
+    void messengerRepository
+      .saveMessages(selected, page)
+      .then(() => onHeadPageSaved?.(selected))
+      .catch(() => {});
     void Promise.all(
       remoteThread.map(async (item) => {
         if (!item.uri || item.kind === "file") return item;
@@ -129,6 +137,7 @@ export function useRemoteThreadMedia({
     gallerySavedRef,
     mediaVisibility,
     messagesRef,
+    onHeadPageSaved,
     remoteThread,
     selected,
     setGallerySaved,

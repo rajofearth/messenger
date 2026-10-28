@@ -3,6 +3,13 @@ import type { Message } from "../domain/data";
 /** Raw server pages one "load older" may walk while every row is hidden. */
 export const OLDER_HIDDEN_PAGE_BUDGET = 4;
 
+export type OlderServerPage = {
+  rows: Message[];
+  hasMore: boolean;
+  /** True when the hidden-page budget, not the server, stopped the walk. */
+  exhaustedByBudget?: boolean;
+};
+
 export type RemoteOlderPage = {
   /** Rows that survived the server's per-user delete/clear filter. */
   rows: Message[];
@@ -36,7 +43,8 @@ export function oldestConfirmedSequence(
  * was not full reports `hasMore: false`.
  *
  * A run of fully hidden pages means the user hid that range on purpose, so the
- * walk stops after a few pages and reports the end rather than looping.
+ * walk stops after a few pages rather than looping. That stop is not proof from
+ * the server, so the caller keeps the control and can continue later.
  */
 export async function readOlderServerPages({
   beforeSequence,
@@ -51,7 +59,7 @@ export async function readOlderServerPages({
     limit: number,
   ) => Promise<RemoteOlderPage>;
   maxHiddenPages?: number;
-}): Promise<{ rows: Message[]; hasMore: boolean }> {
+}): Promise<OlderServerPage> {
   let cursor = beforeSequence;
   for (let attempt = 0; attempt < maxHiddenPages; attempt += 1) {
     const page = await fetchPage(cursor, limit);
@@ -69,5 +77,7 @@ export async function readOlderServerPages({
     }
     cursor = page.nextBeforeSequence;
   }
-  return { rows: [], hasMore: false };
+  // The budget ran out, so the server may still hold rows. Never report this
+  // as the end of the thread.
+  return { rows: [], hasMore: true, exhaustedByBudget: true };
 }

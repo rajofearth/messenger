@@ -307,7 +307,8 @@ export function deleteLocalMessage(args: {
 }) {
   // A deleted bubble must not be revived by the outbox on the next launch.
   void forgetOutgoing(args.messageId);
-  // Upsert-only thread saves would bring this row back, so delete it directly.
+  // Upsert-only thread saves would bring this row back, so the repository
+  // deletes it and records a tombstone that later pages and receipts honour.
   void messengerRepository
     .deleteMessage(args.chatId, args.messageId)
     .catch(() => {});
