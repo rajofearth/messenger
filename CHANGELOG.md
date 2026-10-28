@@ -52,11 +52,13 @@ and this project adheres to
   and additive `user_version` migrations; media bytes stay in app documents.
   Opening or refreshing a chat upserts rows instead of re-serialising a whole
   thread, and confirming a short server page can no longer drop older history
-  the phone already owns. The dev APK grows 677,577 bytes (+5.2%) to
-  13,609,672 bytes: the SQLite library adds 684,983 stored bytes (1,431,992
-  raw, with FTS disabled) and the JavaScript bundle adds 182,020; the dex, `res/`
-  and `resources.arsc` account for the rest. `docs/PERFORMANCE.md` has the
-  entry-level measurements.
+  the phone already owns. The dev APK grows 678,113 bytes (+5.2%) to
+  13,610,208 bytes: the SQLite library adds 684,983 stored bytes (1,431,992
+  raw, with FTS disabled) and the JavaScript bundle adds 169,140, while the dex
+  is about 18 KB larger. The Ionicons subset in the same build removes 194,959
+  bytes of font (`res/CU.ttf` 210,672 to 15,713 stored), so SQLite's own cost is
+  about +873 KB (+6.7%) and the net growth is +678 KB. `docs/PERFORMANCE.md` has
+  the entry-level measurements.
 - Settings keeps account controls at the bottom, directly above Information.
   The Android permission, call-notification and message-notification rows are
   gone because they all opened the same system page; only the app's own

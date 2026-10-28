@@ -5,7 +5,7 @@ This file records what was changed for size and runtime, why, and how to re-meas
 ## APK size
 
 The current storage build (SQLite history on top of A2 Ionicons subset, A3
-density prune and C3 deletion) is **13,609,672 bytes (12.98 MiB)**, 3.02 MiB
+density prune and C3 deletion) is **13,610,208 bytes (12.98 MiB)**, 3.02 MiB
 below the 16 MiB gate and 2.02 MiB below the 15 MiB shipping line. It is a
 development APK, so the gate's package and version checks fail by design; its
 size, ABI, library and uncompressed-bundle checks pass. The per-change numbers
@@ -211,7 +211,7 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.1.0 release (send/retry UX, dates and accessibility, `expo-image`, Fresco decoder trim, LogBox excluded; versionCode 7) | 14,375,470 bytes (13.71 MiB) | **-1,140,945 bytes, -7.4%** against the first Convex build, -4.0% against v0.0.6, -67.0% overall |
 | v0.1.1 release (missing-account sign-in copy and create-account shortcut; versionCode 8) | 14,376,582 bytes (13.71 MiB) local; 14,376,546 bytes published | **+1,112 bytes, +0.01%** against v0.1.0, -67.0% overall |
 | A2/A3/C3 stacked build (Ionicons subset, density prune, real deletion) | 12,702,235 bytes (12.11 MiB) | **-458,828 bytes, -3.5%** against the 13,161,063-byte R8 build, -70.8% overall |
-| Storage build (SQLite full history, local-first load older; dev variant) | 13,609,672 bytes (12.98 MiB) | **+677,577 bytes, +5.2%** against dev release `dev-1793068934` (12,932,095 bytes), -68.7% overall |
+| Storage build (SQLite full history, local-first load older; dev variant) | 13,610,208 bytes (12.98 MiB) | **+678,113 bytes, +5.2%** against dev release `dev-1793068934` (12,932,095 bytes), -68.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -280,22 +280,33 @@ are ZIP metadata and alignment differences. `npm run release:check` reports
 stored uncompressed, a 0.16 MiB `resources.arsc`, English-only resources, and
 11 passing checks with no warnings.
 
-The storage build (`expo-sqlite` full history) is 13,609,672 bytes, 677,577
+The storage build (`expo-sqlite` full history) is 13,610,208 bytes, 678,113
 bytes (+5.2%) above dev release `dev-1793068934` (12,932,095 bytes) and 68.7%
 below the pre-size-work APK. It adds one native library, so the count goes from
 17 to 18: `lib/arm64-v8a/libexpo-sqlite.so` is 1,431,992 bytes raw and 684,983
-bytes stored. The JavaScript bundle grows 182,020 bytes to 2,394,144 and stays
-stored uncompressed; the dex is 8,402,976 bytes in one file, about 69 KB more
-than the previous development build; `res/` is 605,315 bytes and
-`resources.arsc` 164,508 bytes. FTS is switched off in the `expo-sqlite` plugin
-(`enableFTS: false`). A same-source FTS-on measurement produced a 13,809,316-byte
-APK: 199,644 bytes (+1.5%) larger, with `libexpo-sqlite.so` at 1,830,192 raw
-and 884,117 stored bytes. The stored library delta is 199,134 bytes, so the
-FTS-off setting keeps almost the entire APK saving without affecting the
-SQLite features currently used. Both builds have 18 native libraries, one dex,
-a 2.28 MiB bundle stored uncompressed, English-only resources, and pass the
-size, ABI, library and bundle checks; the FTS-on comparison was run against the
-FTS-off baseline and therefore reports the expected size warning.
+bytes stored, and the `lib/` group grows 684,984 stored bytes. The JavaScript
+bundle grows 169,140 bytes to 2,394,680 and stays stored uncompressed; `assets/`
+grows 169,440 with it (that bundle, 12 bytes of `app.config` and 287 bytes of
+baseline profile). The dex is 8,402,976 bytes raw in one file, about 18 KB more
+than the previous development build (+18,511 compressed). `res/` shrinks
+194,959 bytes to 605,315 because the Ionicons subset (`res/CU.ttf`, 210,672 to
+15,713 stored) landed in this same build, and `resources.arsc` is unchanged at
+164,508. Those groups add 677,976 bytes and the extra entry's ZIP metadata the
+other 137. The Ionicons subset is unrelated to SQLite, so once its 194,959-byte
+saving is excluded the SQLite-attributable cost is about 873,072 bytes (+6.7%);
+the net APK growth is 678,113 bytes only because the font shrank in the same
+build. FTS is switched off in the `expo-sqlite` plugin (`enableFTS: false`). A
+same-source FTS-on measurement produced a 13,809,316-byte APK: 199,108 bytes
+(+1.5%) larger than the shipped 13,610,208-byte build, with `libexpo-sqlite.so`
+at 1,830,192 raw and 884,117 stored bytes. That stored library delta is 199,134
+bytes, and the 26-byte gap between it and the APK delta is build-to-build
+variation. The FTS-off setting therefore keeps almost the entire APK saving
+without affecting the SQLite features currently used. Both builds have 18 native
+libraries, one dex, a 2.28 MiB bundle stored uncompressed, English-only
+resources, and pass the size, ABI, library and bundle checks; the FTS-on
+comparison was run against the FTS-off baseline and therefore reports the
+expected size warning. No FTS-on artifact is published, so that figure stays a
+local measurement.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging
