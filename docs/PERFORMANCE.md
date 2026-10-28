@@ -4,12 +4,12 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-The current storage build (SQLite history on top of A2 Ionicons subset, A3
-density prune and C3 deletion) is **13,610,208 bytes (12.98 MiB)**, 3.02 MiB
-below the 16 MiB gate and 2.02 MiB below the 15 MiB shipping line. It is a
-development APK, so the gate's package and version checks fail by design; its
-size, ABI, library and uncompressed-bundle checks pass. The per-change numbers
-are under "Measured APK size"; the historical narrative follows.
+The current durability build (C4b tombstones and paging fixes on top of the
+SQLite history build) is **13,617,512 bytes (12.99 MiB)**, 3.01 MiB below the
+16 MiB gate and 2.01 MiB below the 15 MiB shipping line. It is a development
+APK, so the gate's package and version checks fail by design; its size, ABI,
+library and uncompressed-bundle checks pass. The per-change numbers are under
+"Measured APK size"; the historical narrative follows.
 
 Measured: **43,537,847 bytes (41.52 MiB) before any size work, 14,376,582 bytes
 (13.71 MiB) in v0.1.1** — 67.0% smaller, in nine measured stages. R8
@@ -212,6 +212,7 @@ Each figure is the same working tree, the same Expo config and the same
 | v0.1.1 release (missing-account sign-in copy and create-account shortcut; versionCode 8) | 14,376,582 bytes (13.71 MiB) local; 14,376,546 bytes published | **+1,112 bytes, +0.01%** against v0.1.0, -67.0% overall |
 | A2/A3/C3 stacked build (Ionicons subset, density prune, real deletion) | 12,702,235 bytes (12.11 MiB) | **-458,828 bytes, -3.5%** against the 13,161,063-byte R8 build, -70.8% overall |
 | Storage build (SQLite full history, local-first load older; dev variant) | 13,610,208 bytes (12.98 MiB) | **+678,113 bytes, +5.2%** against dev release `dev-1793068934` (12,932,095 bytes), -68.7% overall |
+| C4b durability build (chat and message tombstones, guarded outbox, load-older fixes; dev variant) | 13,617,512 bytes (12.99 MiB) | **+7,304 bytes, +0.05%** against the storage build, -68.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -307,6 +308,14 @@ resources, and pass the size, ABI, library and bundle checks; the FTS-on
 comparison was run against the FTS-off baseline and therefore reports the
 expected size warning. No FTS-on artifact is published, so that figure stays a
 local measurement.
+
+The C4b durability build is 13,617,512 bytes, 7,304 bytes (+0.05%) above the
+storage build. The whole delta is the JavaScript bundle, 2,394,680 to 2,401,984
+bytes; `classes.dex` is byte-identical at 8,402,976 raw, and `res/`,
+`resources.arsc`, `lib/` and the 840-entry count are unchanged. Nothing native
+was added: the growth is the tombstone SQL, the outbox read guard and the
+load-older state, all shipped as source in the bundle that is stored
+uncompressed. Headroom is now 3,159,704 bytes under the 16 MiB gate.
 
 The same figures are worth quoting with their caveats: this is APK file size,
 not installed size, and it says nothing about startup time. Legacy packaging

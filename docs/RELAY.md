@@ -58,7 +58,7 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
 | Phase | What | State |
 |---|---|---|
 | C4 | SQLite local history, load-older, migration | **Shipped** `e9a8dc6`, dev release `dev-1793076743`, APK 13,610,208 B |
-| C4b | Durability and paging fixes (outbox guard, tombstones, migration order, cached media, five paging edges) | **In progress** 2026-10-28 |
+| C4b | Durability and paging fixes (outbox guard, tombstones, migration order, cached media, five paging edges) | **Shipped** `b78c42e`, dev release `dev-1793178141`, APK 13,617,512 B |
 | R1 | Push wakes + delivery acknowledgements, no deletion | Not started |
 | R2 | Relay queue for text and small media, report-only sweeps | Not started |
 | R3 | Enable 30-day + all-acked purge, with the reinstall warning | Not started |
@@ -124,7 +124,8 @@ Detailed, verified steps live in `docs/PUSH.md`. The short version:
    (`FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` or a base64 JSON
    blob). Never in the repo, never in the APK.
 6. Add `expo-notifications` through CNG, regenerate `android/`, then measure the
-   APK before keeping it. Headroom is 3,167,008 B under the 16 MiB gate.
+   APK before keeping it. Headroom is 3,159,704 B under the 16 MiB gate
+   (13,617,512 B used).
 
 The `google-services.json` client API key is not a secret, but restrict it to the
 Android package and the FCM API. The service-account private key is a secret: it

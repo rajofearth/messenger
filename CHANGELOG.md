@@ -58,7 +58,9 @@ and this project adheres to
   is about 18 KB larger. The Ionicons subset in the same build removes 194,959
   bytes of font (`res/CU.ttf` 210,672 to 15,713 stored), so SQLite's own cost is
   about +873 KB (+6.7%) and the net growth is +678 KB. `docs/PERFORMANCE.md` has
-  the entry-level measurements.
+  the entry-level measurements. The follow-up durability build is 13,617,512
+  bytes (+7,304, +0.05%): the whole delta is the JavaScript bundle, and the dex,
+  resources and native libraries are unchanged.
 - Settings keeps account controls at the bottom, directly above Information.
   The Android permission, call-notification and message-notification rows are
   gone because they all opened the same system page; only the app's own

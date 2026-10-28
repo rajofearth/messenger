@@ -4,7 +4,7 @@ Plan only. Nothing here is implemented and no dependency is installed. The app h
 
 Checked against live docs on 2026-10-28: the Expo SDK 57 notifications reference, the Expo push setup / sending / FCM-credentials / notification-behaviour guides, FCM HTTP v1 send, FCM error codes, the FCM `AndroidConfigV2` preview, and the Convex environment-variable page. Anything not checked there is marked **unverified**.
 
-Facts assumed: Expo SDK 57, React Native 0.86, one arm64-v8a APK of **13,610,208 B** (**3,167,008 B** under the 16 MiB gate), local builds through Continuous Native Generation (`android/` is generated and gitignored), `app.config.js` wrapping `app.json`, Convex backend, no EAS build pipeline.
+Facts assumed: Expo SDK 57, React Native 0.86, one arm64-v8a APK of **13,617,512 B** (**3,159,704 B** under the 16 MiB gate), local builds through Continuous Native Generation (`android/` is generated and gitignored), `app.config.js` wrapping `app.json`, Convex backend, no EAS build pipeline.
 
 ## 1. Two routes, one recommendation
 
@@ -174,7 +174,7 @@ export const sendWake = internalAction({
 
 - FCM has no charge, data messages included. Convex actions count against deployment usage: one action per recipient batch.
 - Client cost is `expo-notifications` plus the Firebase Messaging and Play Services libraries it pulls, their dex, and google-services resources. **Growth is unknown until measured**; no byte number is claimed here.
-- Budget: 16,777,216 B − 13,610,208 B = **3,167,008 B (3.02 MiB)**. Record the real delta in `docs/PERFORMANCE.md`, and in `CHANGELOG.md` for a release change. Measure with `npm run android:build` then `npm run release:check`; R8 and resource shrinking are on, so also confirm on a release install that a token is issued, because a stripped `FirebaseMessagingService` fails silently.
+- Budget: 16,777,216 B − 13,617,512 B = **3,159,704 B (3.01 MiB)**. Record the real delta in `docs/PERFORMANCE.md`, and in `CHANGELOG.md` for a release change. Measure with `npm run android:build` then `npm run release:check`; R8 and resource shrinking are on, so also confirm on a release install that a token is issued, because a stripped `FirebaseMessagingService` fails silently.
 
 ## 9. Test plan
 
