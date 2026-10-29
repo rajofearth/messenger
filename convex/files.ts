@@ -275,6 +275,14 @@ export const sweepOrphans = internalMutation({
     let variants = 0;
     const kept: Array<{ storageId: Id<"_storage"> }> = [];
 
+    // A relay upload carries no message refs until it is delivered, so the
+    // unused check below would reap it a day after it was queued and leave the
+    // recipient with a row whose blob can never be fetched.
+    const queuedStorageIds = new Set<string>();
+    for (const queued of await ctx.db.query("relayQueue").collect()) {
+      if (queued.storageId) queuedStorageIds.add(queued.storageId);
+    }
+
     for (const row of await ctx.db.query("files").collect()) {
       const metadata = await ctx.db.system.get("_storage", row.storageId);
       if (!metadata) {
@@ -294,7 +302,7 @@ export const sweepOrphans = internalMutation({
         row.messageRefs !== undefined &&
         row.messageRefs.length === 0 &&
         now - row.createdAt > ORPHAN_GRACE_MS;
-      if (isMessageUpload && unused) {
+      if (isMessageUpload && unused && !queuedStorageIds.has(row.storageId)) {
         await deleteMediaVariants(ctx, row.storageId);
         await ctx.db.delete(row._id);
         await ctx.storage.delete(row.storageId);

@@ -377,6 +377,10 @@ export default function SettingsScreen({
               )}
             </View>
             <AccountSection colors={colors} />
+            <Text style={[styles.note, { color: colors.muted }]}>
+              Chats live on this phone. Uninstalling Messenger or clearing its
+              data deletes them permanently.
+            </Text>
             {section("INFORMATION")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {row(

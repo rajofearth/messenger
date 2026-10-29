@@ -33,9 +33,10 @@ Explicitly out of scope for now:
   not forgotten.
 - Voice and video calls.
 
-Consequence to state plainly in the UI: until backup ships, **reinstalling or
+Consequence stated plainly in the UI: until backup ships, **reinstalling or
 clearing app data loses history**, because the server no longer keeps it. That is
-the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
+the WhatsApp trade, not a bug. Settings carries that warning now, next to the
+account section.
 
 ## 2. Invariants
 
@@ -59,10 +60,10 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
 |---|---|---|
 | C4 | SQLite local history, load-older, migration | **Shipped** `e9a8dc6`, dev release `dev-1793076743`, APK 13,610,208 B |
 | C4b | Durability and paging fixes (outbox guard, tombstones, migration order, cached media, five paging edges) | **Shipped** `b78c42e`, dev release `dev-1793178141`, APK 13,617,512 B |
-| R1a | Push wakes: FCM HTTP v1 sender, per-device token registry, data-only wake, background task, dev-gated test wake | **Implemented**, not yet verified on a phone |
-| R1b | Delivery acknowledgements: `pending_ack` row, per-device watermark, drain on launch and foreground | Not started |
-| R2 | Relay queue for text and small media, report-only sweeps | Not started |
-| R3 | Enable 30-day + all-acked purge, with the reinstall warning | Not started |
+| R1a | Push wakes: FCM HTTP v1 sender, per-device token registry, data-only wake, background task, dev-gated test wake | **Implemented**, real wake verified server-side, phone check pending |
+| R1b | Delivery acknowledgements: `pending_ack` row in the same transaction, drain on launch, foreground and a visible-app timer | Implemented |
+| R2 | Relay queue for text and small media: `relayQueue`, send/react/remove, pull, per-recipient caps, sequence continuation | **Implemented** |
+| R3 | Deletion: ack deletes the row and releases the blob, 30-day purge, reinstall warning in Settings | **Implemented** |
 | R4 | Groups, multi-device, end-to-end encryption | Later |
 | C5 | Encrypted Drive backup | **On hold** (design ready in research §4) |
 
@@ -99,29 +100,71 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
 - Verification still owed: a real wake on a phone in each app state. See
   `docs/PUSH.md` §10.
 
-### R1b — acknowledgements (next)
+### R1b — acknowledgements (implemented)
 
-- Drain pending threads on launch, foreground and after a wake: fetch, save to
-  SQLite, then ack a per-device watermark.
-- One SQLite transaction writes the message and a `pending_ack` row; sending
-  the ack clears it, so a process kill between commit and ack is safe.
-- No purge. This phase is safe to ship with the current server storage.
+- `src/data/sqlite/schema.ts` version 3 adds `pending_ack`
+  (`queue_id`, `conversation_id`, `received_at`), with no foreign key so the
+  ack survives even if the message row is removed locally.
+- `saveRelayBatch` in `src/data/sqlite/relay.ts` writes the messages and the
+  `pending_ack` rows in one transaction. The ack mutation runs only after that
+  commit, and the pending rows are cleared after the server answers. A process
+  kill between the commit and the ack leaves the row, and the next drain acks it
+  before pulling anything new.
+- `src/services/relayDrain.ts` runs the loop, `src/state/useRelayDrain.ts`
+  triggers it on launch, on every return to the foreground, and every 20 seconds
+  while the app is visible. The timer exists because the relay has no live
+  subscription: a peer's message would otherwise wait for a background and
+  resume cycle.
+- An attachment is downloaded to app documents before its row is saved. A failed
+  download leaves the queue row unacknowledged, so the server keeps the bytes
+  and the next drain retries.
 
-### R2 — relay queue (report-only sweeps)
+### R2 — relay queue (implemented)
 
-- Queue row per recipient with `expiresAt`, caps, and an envelope.
-- Media: one ciphertext blob plus an envelope, 2 MiB cap; larger files are
-  refused with an explicit message.
-- Purge sweeps run and log what they *would* delete. Nothing is deleted.
-- UI states: queued, delivered, read. "Waiting for their phone" on the newest
-  queued message; no clock that never resolves.
+- `relayQueue` in `convex/schema.ts`: one row per recipient, holding a JSON
+  envelope, an optional `storageId`, `sequence`, `createdAt` and
+  `expiresAt = createdAt + 30 days`.
+- `convex/relay.ts` exposes `send`, `react`, `remove`, `pull`, `ack` and the
+  internal `purgeExpired`. `send` writes one row per other member, schedules
+  `push:wakeUser` per recipient, and returns a receipt the client maps exactly
+  like a component message.
+- Caps: 200 rows and 10 MiB of queued attachments per recipient, 2 MiB per
+  attachment, 8000 characters per text. The queue checks both numbers before it
+  inserts and answers `QUEUE_FULL` with the recipient's last-seen time.
+- `sequence` is per conversation and continues after the newest `convex-chat`
+  component sequence, so a thread that still has component history orders
+  correctly in `mergeThread` and in the existing paging cursors.
+- A retry that reuses `clientMessageId` returns the existing row instead of
+  queueing a duplicate.
+- Blocking is enforced on the relay path the same way `chat.canWrite` enforces
+  it: own block, and a direct peer's block.
+- Image widths are not relayed. The server releases the variant blobs with the
+  source on the last ack, so a relayed row keeps only the one local copy. A
+  component-history row keeps its full set.
 
-### R3 — enable deletion
+### R3 — deletion (implemented)
 
-- Purge when every blocking device has acked, or at 30 days, whichever is first.
-- Delete the row, its refs, variants and blob in one pass; reset the inbox
-  preview when the head row goes.
-- Show the reinstall warning in Settings before this ships.
+- `ack` deletes the recipient's row. When no queue row still references the
+  attachment, the `files` row, its variants and the storage blob go too. The
+  sender keeps its own durable copy, so its bubble never depends on the server
+  blob.
+- `purgeExpired` deletes rows past `expiresAt` in batches of 200 and schedules
+  another sweep when a batch is full, so a backlog cannot outlive the cap.
+- The daily cron `purge relay queue` runs at 03:47 UTC.
+- Settings carries the warning: chats live on this phone, and uninstalling the
+  app or clearing its data deletes them.
+
+### Known gaps after this phase
+
+1. A killed app cannot drain. The headless task has no Convex auth session, so a
+   wake records itself and delivery waits for the app to open. Wakes currently
+   cut latency only while the app is alive.
+2. Forwarding still writes through `convex/chat`, so forwarded media and text are
+   stored on the server like legacy messages. Route it through the relay next.
+3. Read receipts and presence stay on the component. Unread counts are local.
+4. One history device per account. A second device starts empty.
+5. Reactions and deletes are relayed, but a reaction that arrives before its
+   target message is applied once and not retried.
 
 ## 5. Firebase / push: current state
 
@@ -149,8 +192,8 @@ private key is a secret: it can send pushes to every install.
    one live device in v1. Needed before real E2E, not before R1.
 2. **Caps:** 2 MiB queued media, 200 entries / 10 MiB per recipient, per-sender
    daily limits, `QUEUE_FULL` with a last-seen time.
-3. **Deletion without backup:** accepted for now, but the warning must ship with
-   R3 and the option to keep the server copy for 30 days must stay honest.
+3. **Deletion without backup:** accepted, and the Settings warning ships with the
+   purge. Reinstall or Clear data still loses history until C5 lands.
 4. **Groups:** one ciphertext, per-member key envelopes, one queue row per group
    message plus per-member acks, rotate on removal.
 5. **Multi-device:** one history owner in v1; a second device starts empty.
@@ -165,6 +208,9 @@ private key is a secret: it can send pushes to every install.
 - Dev delivery: `npm run dev:ship -- --notes "..."`, then confirm the GitHub
   prerelease, the APK digest, and
   `GET <dev-feed>/updates/manifest?versionCode=0`.
+- A relay round trip still needs two accounts: send from one, then confirm the
+  second phone shows the row only after its drain, and that `relayQueue` is empty
+  for that recipient afterwards.
 - No production tag without explicit approval.
 
 ## 8. Landmarks
@@ -179,6 +225,9 @@ private key is a secret: it can send pushes to every install.
   `src/state/useOutboxResume.ts`.
 - Server: `convex/chat.ts`, `convex/files.ts`, `convex/schema.ts`,
   `convex/stories.ts`, `convex/crons.ts`, `convex/lib/paging.ts`.
+- Relay: `convex/relay.ts`, `convex/lib/relay.ts`, `convex/lib/relayStore.ts`,
+  `src/services/relayDrain.ts`, `src/state/useRelayDrain.ts`,
+  `src/data/sqlite/relay.ts`, `src/services/relayConfig.ts`.
 - Push: `convex/push.ts`, `convex/devices.ts`, `src/services/pushTokens.ts`,
   `src/services/pushPayload.ts`, `src/services/backgroundWake.ts`,
   `src/state/usePushRegistration.ts`, `docs/PUSH.md`.

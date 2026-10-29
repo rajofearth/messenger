@@ -1,7 +1,12 @@
+import { File } from "expo-file-system";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Message, Story } from "../domain/data";
 import { convexClient } from "../services/convexClient";
+import {
+  RELAY_ENABLED,
+  RELAY_MEDIA_LIMIT_BYTES,
+} from "../services/relayConfig";
 import { uploadLocalFile } from "../services/remoteFiles";
 import {
   discardPreparedImage,
@@ -47,6 +52,19 @@ function positive(value: number | undefined) {
   return value && value > 0 ? value : undefined;
 }
 
+/**
+ * The relay queue costs bytes until delivery, so refuse an oversized source
+ * before uploading anything. A retry with a finalized storage id skips this:
+ * its bytes are already in Convex and the send is the only step left.
+ */
+function refuseRelayOversize(uri: string) {
+  if (!RELAY_ENABLED) return;
+  const size = new File(uri).size ?? 0;
+  if (size > RELAY_MEDIA_LIMIT_BYTES) {
+    throw new Error("QUEUE_MEDIA_TOO_LARGE");
+  }
+}
+
 export function attachmentErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("FILE_TOO_LARGE")) return "Choose a file up to 25 MiB.";
@@ -81,6 +99,7 @@ export async function sendAttachmentMessage({
 }) {
   const { uri, kind } = message;
   if (!uri || !kind) throw new Error("MISSING_ATTACHMENT");
+  if (!message.storageId) refuseRelayOversize(uri);
   const upload = async () => {
     let prepared: PreparedImage | undefined;
     try {

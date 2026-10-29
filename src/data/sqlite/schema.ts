@@ -10,7 +10,7 @@
 
 import type { SqlDatabase } from "./types";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Statements for version 1, in dependency order. */
 const VERSION_1: readonly string[] = [
@@ -188,6 +188,24 @@ const VERSION_2: readonly string[] = [
     ON hidden_messages(conversation_id)`,
 ];
 
+/**
+ * Statements for version 3: relay delivery acknowledgements.
+ *
+ * A pending row deliberately has no foreign key. The message it names can be
+ * deleted locally before the next drain, and the ack must still survive so the
+ * server is allowed to drop the envelope. `conversation_id` is kept for the
+ * cheap per-thread lookup.
+ */
+const VERSION_3: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS pending_ack (
+    queue_id TEXT PRIMARY KEY NOT NULL,
+    conversation_id TEXT NOT NULL,
+    received_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS pending_ack_conversation
+    ON pending_ack(conversation_id)`,
+];
+
 /** Every version and its statements, applied in order. */
 export const SCHEMA_MIGRATIONS: readonly {
   version: number;
@@ -195,10 +213,12 @@ export const SCHEMA_MIGRATIONS: readonly {
 }[] = [
   { version: 1, statements: VERSION_1 },
   { version: 2, statements: VERSION_2 },
+  { version: 3, statements: VERSION_3 },
 ];
 
 /** Tables wiped on sign-out, children before their parents. */
 export const SCHEMA_TABLES: readonly string[] = [
+  "pending_ack",
   "hidden_messages",
   "media_files",
   "message_variants",

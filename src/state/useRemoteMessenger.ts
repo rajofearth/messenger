@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message } from "../domain/data";
 import { messengerRepository } from "../data/messengerRepository";
+import { RELAY_ENABLED } from "../services/relayConfig";
 import { deviceIdentity } from "../services/deviceIdentity";
 import { useAvatarReferenceSync } from "./useAvatarReferenceSync";
 import type { ThemePreference } from "../ui/theme";
@@ -17,22 +18,26 @@ import {
 } from "./remoteMessengerTypes";
 import { useRemoteCache } from "./useRemoteCache";
 import { useRemotePresence } from "./useRemotePresence";
-import { useRemoteServerSync } from "./useRemoteServerSync";
+import { syncRelayRows, useRemoteServerSync } from "./useRemoteServerSync";
 import { useRemoteStories } from "./useRemoteStories";
 import { useRemoteThreadMedia } from "./useRemoteThreadMedia";
 import { useOutboxResume } from "./useOutboxResume";
 import { usePushRegistration } from "./usePushRegistration";
+import { useRelayDrain } from "./useRelayDrain";
 import { createRemoteContact } from "./remoteMessengerContacts";
 import { saveTrackedMedia } from "./remoteMessengerMedia";
 import { createChatPreferences } from "./remoteMessengerPreferences";
 import { saveRemoteProfile } from "./remoteMessengerProfile";
 import { createRemoteWriters } from "./remoteMessengerWriters";
-import { createRemoteSend } from "./remoteMessengerSend";
+import { createRemoteSend, relaySendPath } from "./remoteMessengerSend";
 import {
   createRemoteReadMarker,
   createRemoteReplySender,
 } from "./remoteMessengerReads";
-import { createRemoteMessageActions } from "./remoteMessengerMessageActions";
+import {
+  createRemoteMessageActions,
+  relayDeleteForEveryone,
+} from "./remoteMessengerMessageActions";
 import { useThreadPaging } from "./useThreadPaging";
 
 export type { RemoteCallRecord, RemoteProfile } from "./remoteMessengerTypes";
@@ -51,6 +56,9 @@ export function useRemoteMessenger() {
   const reactionMutation = useMutation(api.chat.setReaction);
   const deleteMessageMutation = useMutation(api.chat.deleteOwnMessage);
   const deleteForMeMutation = useMutation(api.chat.deleteForMe);
+  const relaySendMutation = useMutation(api.relay.send);
+  const relayReactMutation = useMutation(api.relay.react);
+  const relayRemoveMutation = useMutation(api.relay.remove);
   const forwardMessageMutation = useMutation(api.chat.forwardMessage);
   const heartbeatOnlineMutation = useMutation(api.chat.heartbeatOnline);
   const heartbeatPresenceMutation = useMutation(api.chat.heartbeatPresence);
@@ -150,6 +158,11 @@ export function useRemoteMessenger() {
     setMessages,
     markReadThrough: markReadMutation,
   });
+  useRelayDrain({
+    enabled: localReady && !!remoteProfile?.userId,
+    selfId: remoteProfile?.userId,
+    onSync: (chatIds) => syncRelayRows(chatIds, setMessages, setCachedChats),
+  });
 
   const {
     stories: visibleStories,
@@ -160,8 +173,7 @@ export function useRemoteMessenger() {
   } = useRemoteStories({ stories, setStories });
 
   const chats = useMemo(() => {
-    // The cache is the single source of truth on screen. The server sync writes
-    // remoteChats into it, so optimistic edits survive until the next sync.
+    // The cache is what the screen shows; server sync writes into it.
     const base = cachedChats;
     const active =
       selected && conversationVisible
@@ -222,8 +234,13 @@ export function useRemoteMessenger() {
         : [],
     [presence, remoteProfile?.userId, selected],
   );
-  const loaded = localReady;
-
+  // Every relay call site reads the rollback flag here.
+  const relayed = relaySendPath(relaySendMutation);
+  const sendText = RELAY_ENABLED ? relayed.sendText : sendTextMutation;
+  const sendAttachment = RELAY_ENABLED
+    ? relayed.sendAttachment
+    : sendAttachmentMutation;
+  const reaction = RELAY_ENABLED ? relayReactMutation : reactionMutation;
   const {
     updateMessages,
     updateChats,
@@ -261,7 +278,7 @@ export function useRemoteMessenger() {
     appendLocal,
     confirmLocalMessage,
     markLocalMessageStatus,
-    sendText: sendTextMutation,
+    sendText,
   });
   const markRead = createRemoteReadMarker({
     messagesRef,
@@ -274,7 +291,9 @@ export function useRemoteMessenger() {
     updateMessages,
     updateChats,
     deleteForMe: deleteForMeMutation,
-    deleteForEveryone: deleteMessageMutation,
+    deleteForEveryone: RELAY_ENABLED
+      ? relayDeleteForEveryone(relayRemoveMutation)
+      : deleteMessageMutation,
     forward: forwardMessageMutation,
   });
 
@@ -338,8 +357,8 @@ export function useRemoteMessenger() {
     confirmLocalMessage,
     markLocalMessageStatus,
     markLocalMessageProgress,
-    sendText: sendTextMutation,
-    sendAttachment: sendAttachmentMutation,
+    sendText,
+    sendAttachment,
   });
   useOutboxResume(localReady, retryMessage);
   usePushRegistration();
@@ -358,7 +377,7 @@ export function useRemoteMessenger() {
           : item,
       ),
     }));
-    void reactionMutation({
+    void reaction({
       conversationId: chatId,
       messageId,
       reactionKey: message.reaction === emoji ? undefined : emoji,
@@ -438,7 +457,7 @@ export function useRemoteMessenger() {
     theme,
     setTheme,
     systemDark,
-    loaded,
+    loaded: localReady,
     profile,
     setProfile,
     selected,

@@ -2,6 +2,7 @@ import { Alert } from "react-native";
 import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
 import { localChatPreview } from "../domain/messageActions";
+import { RELAY_ENABLED } from "../services/relayConfig";
 import { deleteLocalMessage } from "./remoteMessengerWriters";
 import { remoteUid } from "./remoteMessengerTypes";
 
@@ -31,6 +32,19 @@ type Forward = (args: {
   messageId: string;
   clientMessageId: string;
 }) => Promise<unknown>;
+
+type RelayRemove = (args: {
+  conversationId: string;
+  messageId: string;
+}) => Promise<unknown>;
+
+/** relay.remove has no expected revision, so drop that component-only field. */
+export function relayDeleteForEveryone(
+  remove: RelayRemove,
+): DeleteForEveryone {
+  return ({ conversationId, messageId }) =>
+    remove({ conversationId, messageId });
+}
 
 /**
  * Delete and forward keep the same optimistic/device-local behaviour as the
@@ -75,12 +89,16 @@ export function createRemoteMessageActions({
           ),
         false,
       );
-      void deleteForMe({ conversationId: chatId, messageId: id }).catch(
-        () => {},
-      );
+      // A relayed message never existed in the component, so delete-for-me is
+      // only a local tombstone; the old server call has nothing to hide.
+      if (!RELAY_ENABLED) {
+        void deleteForMe({ conversationId: chatId, messageId: id }).catch(
+          () => {},
+        );
+      }
       return;
     }
-    if (!message.mine || !message.revision) {
+    if (!message.mine || (!RELAY_ENABLED && !message.revision)) {
       Alert.alert(
         "Not deleted",
         "Only the sender can delete this message for everyone.",
@@ -90,8 +108,27 @@ export function createRemoteMessageActions({
     void deleteForEveryone({
       conversationId: chatId,
       messageId: id,
-      expectedRevision: message.revision,
-    }).catch(() => Alert.alert("Message not deleted", "Please try again."));
+      expectedRevision: message.revision ?? 0,
+    })
+      .then(() => {
+        // The relay has no server copy to echo a delete back to the sender, so
+        // the sender applies the tombstone locally as soon as the queue took it.
+        if (!RELAY_ENABLED) return;
+        const remaining = (messagesRef.current[chatId] || []).filter(
+          (item) => item.id !== id,
+        );
+        deleteLocalMessage({ chatId, messageId: id, updateMessages });
+        updateChats(
+          (current) =>
+            current.map((item) =>
+              item.id === chatId
+                ? { ...item, ...localChatPreview(remaining) }
+                : item,
+            ),
+          false,
+        );
+      })
+      .catch(() => Alert.alert("Message not deleted", "Please try again."));
   }
 
   async function forwardMessage(message: Message, targetChatId: string) {

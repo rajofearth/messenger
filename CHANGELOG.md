@@ -10,6 +10,26 @@ and this project adheres to
 
 ### Added
 
+- New messages travel through a relay queue instead of the server copy. A send
+  writes one envelope per recipient to `relayQueue`, wakes that recipient, and
+  the phone commits the envelope to SQLite in one transaction with a
+  `pending_ack` row before acknowledging it. The acknowledgement deletes the
+  queue row, and the attachment blob, its file row and its stored widths go when
+  the last recipient acknowledges. Undelivered rows expire after 30 days, and a
+  daily sweep deletes them in resumable batches. Caps are 200 rows and 10 MiB of
+  queued attachments per recipient, 2 MiB per attachment, and 8000 characters
+  per message; a full queue answers with the recipient's last-seen time.
+  Reactions and delete-for-everyone use the same queue. Message order continues
+  after the legacy component sequence, so old threads keep paging. The dev APK
+  grows 26,764 bytes (+0.19%) to 14,074,187 bytes (13.42 MiB), 2.58 MiB under
+  the 16 MiB gate; the relay adds no dependency and no native library.
+- Settings now says that chats live on this phone and that uninstalling
+  Messenger or clearing its data deletes them permanently.
+- The server keeps no delivered message. A message that is not acknowledged
+  within 30 days expires with its attachment, and a recorded reply carries only
+  the quoted id because retired envelopes leave no text to quote.
+- Forwarding, read receipts and presence still use the chat component, so a
+  forwarded message still has a server copy for now.
 - Push wakes arrive through Firebase Cloud Messaging. Each device registers its
   FCM token against its own `devices` row, and the server sends a data-only
   message that carries no content, only an opaque queue id. A wake reaches the

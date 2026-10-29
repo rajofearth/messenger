@@ -1,8 +1,10 @@
 import { Alert } from "react-native";
 import type { MutableRefObject } from "react";
+import type { Id } from "../../convex/_generated/dataModel";
 import type { Chat, Message } from "../domain/data";
 import { messagePreview } from "../domain/messageActions";
 import { isSendConfirmed } from "../domain/outbox";
+import { relayErrorMessage } from "../services/relayConfig";
 import {
   forgetOutgoing,
   keepOutgoingCopy,
@@ -35,6 +37,48 @@ type SendText = (args: {
   text: string;
   replyToMessageId?: string;
 }) => Promise<RemoteMessage>;
+
+type RelaySendArgs = {
+  conversationId: string;
+  clientMessageId: string;
+  text?: string;
+  replyToMessageId?: string;
+  storageId?: Id<"_storage">;
+};
+
+/** The relay receipt omits `mine`; the adapter adds it back. */
+type RelaySend = (args: RelaySendArgs) => Promise<Omit<RemoteMessage, "mine">>;
+/** A relay send after the adapter, carrying the sender flag both senders need. */
+type RelayConfirm = (args: RelaySendArgs) => Promise<RemoteMessage>;
+
+/** relay.send spells an attachment caption `text`; the upload path says `caption`. */
+function relayAttachmentSender(relay: RelayConfirm): SendAttachment {
+  return (args) =>
+    relay({
+      conversationId: args.conversationId,
+      clientMessageId: args.clientMessageId,
+      text: args.caption,
+      replyToMessageId: args.replyToMessageId,
+      storageId: args.storageId,
+    });
+}
+
+/**
+ * The relay receipt carries no sender flag, so stamp this device's send as
+ * `mine` before the receipt replaces the optimistic bubble. Both send shapes
+ * come from the same relay mutation so the rollback flag has one owner.
+ */
+export function relaySendPath(relay: RelaySend): {
+  sendText: SendText;
+  sendAttachment: SendAttachment;
+} {
+  const send: RelayConfirm = (args) =>
+    relay(args).then((receipt) => ({ ...receipt, mine: true }));
+  return {
+    sendText: send,
+    sendAttachment: relayAttachmentSender(send),
+  };
+}
 
 type Args = {
   selectedRef: MutableRefObject<string | null>;
@@ -91,15 +135,28 @@ export function createRemoteSend({
    */
   function applyReceipt(chatId: string, message: Message, view: RemoteMessage) {
     if (!isSendConfirmed(view)) throw new Error("SEND_UNCONFIRMED");
+    const confirmed = mapMessage(view);
+    // A relay receipt points at the Convex blob, and the recipient's ack deletes
+    // that blob once it is delivered. The upload path already keeps a durable
+    // copy on this phone, so the confirmed row keeps that copy instead. The
+    // stored widths go with the blob, so they are dropped here too.
+    const kept =
+      message.kind && message.uri?.startsWith("file:")
+        ? { ...confirmed, uri: message.uri, variants: undefined }
+        : confirmed;
     confirmLocalMessage({
       chatId,
       messageId: message.id,
-      confirmed: mapMessage(view),
+      confirmed: kept,
     });
     return forgetOutgoing(message.id);
   }
 
-  async function deliverText(chatId: string, message: Message) {
+  async function deliverText(
+    chatId: string,
+    message: Message,
+    silent = false,
+  ) {
     try {
       await rememberOutgoing(chatId, message);
       const view = await sendText({
@@ -109,13 +166,15 @@ export function createRemoteSend({
         replyToMessageId: message.replyTo?.id,
       });
       await applyReceipt(chatId, message, view);
-    } catch {
+    } catch (error) {
       // The outbox row stays so the next launch can retry the same client id.
       markLocalMessageStatus({
         chatId,
         messageId: message.id,
         status: "failed",
       });
+      const notice = relayErrorMessage(error);
+      if (!silent && notice) Alert.alert("Message not sent", notice);
     }
   }
 
@@ -173,7 +232,10 @@ export function createRemoteSend({
         status: "failed",
       });
       if (!silent) {
-        Alert.alert("Attachment not sent", attachmentErrorMessage(error));
+        Alert.alert(
+          "Attachment not sent",
+          relayErrorMessage(error) ?? attachmentErrorMessage(error),
+        );
       }
     }
   }
@@ -238,7 +300,7 @@ export function createRemoteSend({
     if (message.kind) {
       void deliverAttachment(chat.id, sending, options?.silent).finally(done);
     } else {
-      void deliverText(chat.id, sending).finally(done);
+      void deliverText(chat.id, sending, options?.silent).finally(done);
     }
     return true;
   }

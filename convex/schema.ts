@@ -61,8 +61,7 @@ export default defineSchema({
     pushUpdatedAt: v.optional(v.number()),
     /** Set when the token is cleared; a device with this set is never woken. */
     pushRevokedAt: v.optional(v.number()),
-  })
-    .index("by_user", ["userId"])
+  })    .index("by_user", ["userId"])
     .index("by_session", ["authSessionId"])
     .index("by_user_device", ["userId", "deviceId"])
     .index("by_pushToken", ["pushToken"]),
@@ -73,7 +72,36 @@ export default defineSchema({
     memberSubjectIds: v.array(v.string()),
     createdBy: v.string(),
     createdAt: v.number(),
+    /**
+     * The last sequence handed out for this conversation. Seeded once from the
+     * chat component so relay messages continue the history that already exists.
+     */
+    nextSequence: v.optional(v.number()),
   }).index("by_conversationId", ["conversationId"]),
+  /**
+   * One row per recipient per relayed item. The envelope is the whole message;
+   * the row is deleted when the recipient's phone acknowledges its local
+   * commit, or at `expiresAt`, whichever comes first.
+   */
+  relayQueue: defineTable({
+    recipientUserId: v.id("users"),
+    senderUserId: v.id("users"),
+    conversationId: v.string(),
+    queueId: v.string(),
+    /** Client message id for a message, empty for an op. Deduplicates retries. */
+    messageId: v.string(),
+    op: v.union(v.literal("message"), v.literal("reaction"), v.literal("delete")),
+    sequence: v.number(),
+    envelope: v.string(),
+    bytes: v.number(),
+    storageId: v.optional(v.id("_storage")),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_recipient", ["recipientUserId", "createdAt"])
+    .index("by_expiresAt", ["expiresAt"])
+    .index("by_storageId", ["storageId"])
+    .index("by_conversation_message", ["conversationId", "messageId"]),
   conversationPreferences: defineTable({
     userId: v.id("users"),
     conversationId: v.string(),

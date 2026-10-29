@@ -4,10 +4,11 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-The current development build (C4b durability plus push wakes) is
-**14,047,423 bytes (13.40 MiB)**, 2.60 MiB below the 16 MiB gate and 1.60 MiB
-below the 15 MiB shipping line. It is a development APK, so the gate runs with
-`--variant dev`, which expects the dev package and version; all 11 checks pass.
+The current development build (C4b durability plus push wakes plus the relay
+queue) is **14,074,187 bytes (13.42 MiB)**, 2.58 MiB below the 16 MiB gate and
+1.58 MiB below the 15 MiB shipping line. It is a development APK, so the gate
+runs with `--variant dev`, which expects the dev package and version; all 11
+checks pass.
 The per-change numbers are under "Measured APK size"; the historical narrative
 follows.
 
@@ -49,6 +50,16 @@ Enabling `googleServicesFile` and adding the client push code added the other
 initialisation path. The bundle grew to 2,491,180 bytes (2.38 MiB) and is still
 stored uncompressed; the APK still has one ABI, 19 native libraries and one
 dex, and passes all 11 dev checks.
+
+The 2026-10-29 relay **development** APK `0.1.1-dev.20261029.104740` is
+**14,074,187 bytes (13.42 MiB)**, up **26,764 bytes (+0.19%)** from the push
+build (14,047,423 bytes), with **2,703,029 bytes** left under the 16 MiB gate.
+The relay is JavaScript and SQLite only: no dependency, no native library and no
+new ABI. `android:dev:build` copies its APK to `artifacts/messenger-dev.apk` and
+records the byte size and SHA-256 in `artifacts/messenger-dev.json`; the bundle
+the gate measured is 2.40 MiB and still stored uncompressed, and all 11 dev
+checks pass. This is a local build measurement, not a claim that device
+acceptance has passed.
 
 ### Build configuration in `app.json`
 
@@ -225,6 +236,8 @@ Each figure is the same working tree, the same Expo config and the same
 | A2/A3/C3 stacked build (Ionicons subset, density prune, real deletion) | 12,702,235 bytes (12.11 MiB) | **-458,828 bytes, -3.5%** against the 13,161,063-byte R8 build, -70.8% overall |
 | Storage build (SQLite full history, local-first load older; dev variant) | 13,610,208 bytes (12.98 MiB) | **+678,113 bytes, +5.2%** against dev release `dev-1793068934` (12,932,095 bytes), -68.7% overall |
 | C4b durability build (chat and message tombstones, guarded outbox, load-older fixes; dev variant) | 13,617,512 bytes (12.99 MiB) | **+7,304 bytes, +0.05%** against the storage build, -68.7% overall |
+| Push wake build (FCM sends, device token registry, data-only wake; dev variant) | 14,047,423 bytes (13.40 MiB) | **+429,911 bytes, +3.2%** against the C4b build, -67.7% overall |
+| Relay build (queue, acknowledgements, 30-day purge, Settings warning; dev variant) | 14,074,187 bytes (13.42 MiB) | **+26,764 bytes, +0.19%** against the push build, -67.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build

@@ -2,9 +2,11 @@
 
 Push wakes are implemented for the Android app and wired into the device
 registry. Nothing in the app posts a visible notification from a push: a wake
-carries no content and only tells the phone to drain the relay queue. The
-queue itself is R2 in `docs/RELAY.md`, so until it lands the only caller is a
-development-gated test wake.
+carries no content and only tells the phone to drain the relay queue. The queue
+shipped in `docs/RELAY.md` R2, so `send` is now the real caller of `wakeUser`.
+The background task itself still only records the wake, because a headless
+launch has no Convex auth session; the app drains on its next launch, foreground
+or visible-app tick.
 
 Checked against live docs on 2026-10-28: the Expo SDK 57 notifications
 reference, the Expo push setup, sending, FCM-credentials and notification
@@ -282,8 +284,8 @@ Verified in this repo or against live docs:
 Not verified, and impossible to verify without the phone:
 
 - A real wake in each app state, and the recorded `push/v1/lastWake` marker.
-  The marker is written but has no reader in the UI yet; R2 makes wakes visible
-  end to end, because a wake will then add a row to a thread.
+  The queue consumes wakes on the next drain, but a wake that arrives while the
+  app is killed cannot drain by itself: the task has no auth session.
 - Wake latency per OEM; battery managers differ.
 - That R8 kept the Firebase service classes on the installed build, which the
   first real wake proves.
@@ -291,8 +293,9 @@ Not verified, and impossible to verify without the phone:
 
 ## 10. Device check plan
 
-One phone is enough until R2 can send. Two accounts on two phones are needed
-once a real message is what triggers the wake.
+Two accounts on two phones are needed for the full round trip: the sender's
+`relay.send` wakes the recipient, and the recipient's drain acks the row. One
+phone can verify the FCM path with the CLI wake below.
 
 1. Install the dev APK, sign in, and confirm `devices` has a `pushToken` for
    that row. Nothing is shown to the user.
@@ -301,8 +304,7 @@ once a real message is what triggers the wake.
    with the app killed and expect `{ sent: 1, failed: 0 }`; `failed: 1` with a
    404 in the Convex log means the token was already dead. Foreground,
    background and swiped-from-recents should each overwrite
-   `push/v1/lastWake`; that key has no UI yet, so R2 is the first place a wake
-   becomes visible as a new message row.
+   `push/v1/lastWake`. Reopening the app then drains any queued envelope.
 3. Force-stop the app and repeat: expect no wake for at least five minutes.
    That is Android behaving as documented.
 4. Deny notification permission and repeat the wake: the marker still updates,

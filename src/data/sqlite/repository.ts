@@ -34,6 +34,13 @@ import {
   writeThread,
 } from "./messages";
 import { listOutbox, writeOutbox } from "./outbox";
+import {
+  listPendingAcks,
+  removePendingAcks,
+  writeRelayBatch,
+  writeRelayDelete,
+  writeRelayReaction,
+} from "./relay";
 import { SCHEMA_TABLES } from "./schema";
 import {
   listGallerySaved,
@@ -133,6 +140,33 @@ export function createMessengerRepository(
      */
     removeMessages: (chatId: string) =>
       write((connection) => deleteConversation(connection, chatId)),
+
+    /**
+     * One pulled relay batch: the message rows, the inbox head and one ack row
+     * per queue id commit together, so the ack can follow the commit safely.
+     */
+    saveRelayBatch: (
+      chatId: string,
+      messages: MessageRecord[],
+      queueIds: string[],
+    ) =>
+      write((connection) =>
+        writeRelayBatch(connection, chatId, messages, queueIds),
+      ),
+    applyRelayReaction: (
+      chatId: string,
+      messageId: string,
+      reaction: string | undefined,
+    ) =>
+      write((connection) =>
+        writeRelayReaction(connection, chatId, messageId, reaction),
+      ),
+    applyRelayDelete: (chatId: string, messageId: string) =>
+      write((connection) => writeRelayDelete(connection, chatId, messageId)),
+    /** Envelopes committed locally but not acknowledged to the server yet. */
+    loadPendingAcks: () => read(listPendingAcks),
+    clearPendingAcks: (queueIds: string[]) =>
+      write((connection) => removePendingAcks(connection, queueIds)),
 
     /** Unsent outgoing messages, separate from the confirmed thread cache. */
     loadOutbox: () => read(listOutbox),

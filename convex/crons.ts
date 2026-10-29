@@ -9,5 +9,10 @@ crons.daily(
   { hourUTC: 3, minuteUTC: 17 },
   internal.files.sweepOrphans,
 );
+crons.daily(
+  "purge relay queue",
+  { hourUTC: 3, minuteUTC: 47 },
+  internal.relay.purgeExpired,
+);
 
 export default crons;
