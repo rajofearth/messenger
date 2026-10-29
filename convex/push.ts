@@ -1,11 +1,10 @@
 "use node";
 
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { GoogleAuth } from "google-auth-library";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
-import { action, internalAction } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 const FCM_BASE_URL = "https://fcm.googleapis.com/v1/projects";
@@ -234,24 +233,26 @@ export const wakeUser = internalAction({
 });
 
 /**
- * DEVELOPMENT AID — not part of the relay contract: wakes the caller's own
- * devices with the placeholder queue id `test`, so the FCM path (credentials,
- * token registration, native receive) can be verified before the queue exists.
- * Refuses unless `PUSH_ALLOW_TEST_WAKE=1` is set on the deployment, because a
- * public action that spends FCM quota on demand is not production surface.
- * Delete it once `wakeUser` has a real caller.
+ * DEVELOPMENT AID - not part of the relay contract: wakes one user's devices
+ * with the placeholder queue id `test`, so the FCM path (credentials, token
+ * registry, native receive) can be checked from the CLI:
+ *
+ *   npx convex run push:sendTestWakeForUser '{"userId":"<id>"}'
+ *
+ * The CLI targets the development deployment unless `--prod` is passed.
+ * Internal, so no client can spend FCM quota, and gated so a production
+ * deployment refuses it unless PUSH_ALLOW_TEST_WAKE=1 is set there. Delete it
+ * once `wakeUser` has a real caller.
  */
-export const sendTestWake = action({
-  args: {},
-  handler: async (ctx): Promise<SendResult> => {
+export const sendTestWakeForUser = internalAction({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args): Promise<SendResult> => {
     if (process.env.PUSH_ALLOW_TEST_WAKE !== "1") {
       throw new ConvexError("TEST_WAKE_DISABLED");
     }
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError("AUTH_REQUIRED");
     const tokens: Array<{ token: string }> = await ctx.runQuery(
       internal.devices.tokensForUser,
-      { userId },
+      { userId: args.userId },
     );
     return await deliver(
       ctx,

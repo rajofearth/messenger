@@ -58,6 +58,14 @@ SHA-1 of the certificate that signs each APK. That restriction is not applied
 yet. A mismatch fails token retrieval with `403 PERMISSION_DENIED` and the app
 silently has no push.
 
+Because the file is committed, GitHub secret scanning raises a `google_api_key`
+alert whenever the key appears in a new commit. Alert 1 was dismissed on
+2026-10-29 as a false positive: the key is public by design, it ships inside
+every APK, and rotating it would only produce another flagged public key. Do
+not delete `google-services.json` to silence the alert, because CI would build
+an APK that never receives a token. The API and Android app restrictions are
+the real control.
+
 ## 3. App configuration
 
 `app.json` carries two additions, both inherited by the dev variant:
@@ -205,9 +213,13 @@ the phone commits it to SQLite.
 - `wakeUser({ userId, queueId })` is an internal action that resolves tokens
   through `tokensForUser` and sends them. It is the seam R2 calls from the
   queue insert; nothing calls it yet.
-- `sendTestWake({})` is a development aid: it wakes the caller's own devices
-  with `queueId: "test"` and refuses unless `PUSH_ALLOW_TEST_WAKE=1` is set on
-  the deployment. Delete it once `wakeUser` has a caller.
+- `sendTestWakeForUser({ userId })` is an internal development aid: it wakes
+  that user's devices with `queueId: "test"` and refuses unless
+  `PUSH_ALLOW_TEST_WAKE=1` is set on the deployment. It is internal, so no
+  client can spend FCM quota, and it is callable only from the CLI:
+  `npx convex run push:sendTestWakeForUser '{"userId":"<id>"}'`, which targets
+  the development deployment unless `--prod` is passed.
+  Delete it once `wakeUser` has a caller.
 
 Retry classification, per token:
 
@@ -264,9 +276,8 @@ Verified in this repo or against live docs:
   cannot post anything.
 - The payload parser and its rejection cases, in
   `src/services/pushPayload.test.mjs`.
-- The dev deployment runs `push:sendTestWake` and stops at `AUTH_REQUIRED`
-  without a session, so the action, the env gate and the token query are
-  deployed.
+- The dev deployment accepts `push:sendTestWakeForUser` from the CLI and
+  refuses it, with `TEST_WAKE_DISABLED`, when the env gate is unset.
 
 Not verified, and impossible to verify without the phone:
 
@@ -280,15 +291,18 @@ Not verified, and impossible to verify without the phone:
 
 ## 10. Device check plan
 
-Two phones, different accounts, A sends to B.
+One phone is enough until R2 can send. Two accounts on two phones are needed
+once a real message is what triggers the wake.
 
 1. Install the dev APK, sign in, and confirm `devices` has a `pushToken` for
    that row. Nothing is shown to the user.
-2. Call `api.push.sendTestWake` from a signed-in dev build and expect
-   `{ sent: 1, failed: 0 }`; `failed: 1` with a 404 in the Convex log means the
-   token was already dead. Foreground, background and swiped-from-recents
-   should each overwrite `push/v1/lastWake`; that key has no UI yet, so R2 is
-   the first place a wake becomes visible as a new message row.
+2. From the repo, run
+   `npx convex run push:sendTestWakeForUser '{"userId":"<id>"}'`
+   with the app killed and expect `{ sent: 1, failed: 0 }`; `failed: 1` with a
+   404 in the Convex log means the token was already dead. Foreground,
+   background and swiped-from-recents should each overwrite
+   `push/v1/lastWake`; that key has no UI yet, so R2 is the first place a wake
+   becomes visible as a new message row.
 3. Force-stop the app and repeat: expect no wake for at least five minutes.
    That is Android behaving as documented.
 4. Deny notification permission and repeat the wake: the marker still updates,
