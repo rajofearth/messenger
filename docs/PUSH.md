@@ -13,7 +13,7 @@ message-priority pages, and the Convex environment-variable page. Anything not
 checked there is marked **unverified**.
 
 Facts: Expo SDK 57, React Native 0.86, Android only, one arm64-v8a APK of
-14,047,427 bytes (13.40 MiB), local builds through Continuous Native Generation
+14,047,423 bytes (13.40 MiB), local builds through Continuous Native Generation
 (`android/` is generated and gitignored), `app.config.js` wrapping `app.json`,
 Convex backend, no EAS build pipeline.
 
@@ -227,10 +227,11 @@ message. A wake that never arrives is recovered by the next foreground drain.
 
 ## 8. APK impact
 
-The dev APK `0.1.1-dev.20261029.094425` (version code 1793247265) is
-**14,047,427 bytes (13.40 MiB)**, up **429,915 bytes (+3.2%)** from the C4b
-build at 13,617,512 bytes. Headroom under the 16 MiB gate is **2,729,789
-bytes**, and under the 15 MiB shipping line **1,681,213 bytes**.
+The published dev APK `0.1.1-dev.20261029.100328` (version code 1793248408,
+SHA-256 `fb4baaa55220396b147b02e163437a252020c93039f862b9b26b3997b2412837`) is
+**14,047,423 bytes (13.40 MiB)**, up **429,911 bytes (+3.2%)** from the C4b
+build at 13,617,512 bytes. Headroom under the 16 MiB gate is **2,729,793
+bytes**, and under the 15 MiB shipping line **1,681,217 bytes**.
 
 The growth came in two measured steps. Adding `expo-notifications` and the
 Firebase Messaging libraries took the same source to 13,942,403 bytes
@@ -238,7 +239,7 @@ Firebase Messaging libraries took the same source to 13,942,403 bytes
 `libdatastore_shared_counter.so`, 7,112 bytes on disk and 2,630 stored; the
 rest is dex for Firebase and Play Services classes. Enabling
 `googleServicesFile` and adding the client push code took the build to
-14,047,427 bytes (+105,024): once an app id exists, R8 can no longer remove the
+14,047,423 bytes (+105,020): once an app id exists, R8 can no longer remove the
 Firebase initialisation path, so classes and resources it previously shrank
 away are kept.
 

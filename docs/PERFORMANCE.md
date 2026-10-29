@@ -5,7 +5,7 @@ This file records what was changed for size and runtime, why, and how to re-meas
 ## APK size
 
 The current development build (C4b durability plus push wakes) is
-**14,047,427 bytes (13.40 MiB)**, 2.60 MiB below the 16 MiB gate and 1.60 MiB
+**14,047,423 bytes (13.40 MiB)**, 2.60 MiB below the 16 MiB gate and 1.60 MiB
 below the 15 MiB shipping line. It is a development APK, so the gate runs with
 `--variant dev`, which expects the dev package and version; all 11 checks pass.
 The per-change numbers are under "Measured APK size"; the historical narrative
@@ -38,14 +38,14 @@ and a compact update prompt; native dependencies and ABIs are unchanged. The
 APK passed all 11 slim-build checks and remains below the 16 MiB budget. This is
 a local build measurement, not a claim that device acceptance has passed.
 
-The 2026-10-29 push **development** APK `0.1.1-dev.20261029.094425` is
-**14,047,427 bytes (13.40 MiB)**, up **429,915 bytes (+3.2%)** from the C4b
-build (13,617,512 bytes), with **2,729,789 bytes** left under the 16 MiB gate.
+The 2026-10-29 push **development** APK `0.1.1-dev.20261029.100328` is
+**14,047,423 bytes (13.40 MiB)**, up **429,911 bytes (+3.2%)** from the C4b
+build (13,617,512 bytes), with **2,729,793 bytes** left under the 16 MiB gate.
 Adding `expo-notifications` and Firebase Messaging accounted for 324,891 bytes
 of that; the only new native library is `libdatastore_shared_counter.so`
 (7,112 bytes, 2,630 stored), and the rest is Firebase and Play Services dex.
 Enabling `googleServicesFile` and adding the client push code added the other
-105,024 bytes, because an app id stops R8 from removing the Firebase
+105,020 bytes, because an app id stops R8 from removing the Firebase
 initialisation path. The bundle grew to 2,491,180 bytes (2.38 MiB) and is still
 stored uncompressed; the APK still has one ABI, 19 native libraries and one
 dex, and passes all 11 dev checks.

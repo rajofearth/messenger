@@ -18,11 +18,11 @@ and this project adheres to
   token is cleared on sign-out and whenever FCM reports it dead, and signing in
   as a different account detaches it from the previous row. Nothing is rendered
   from a push: the local notification module owns every notification. The dev
-  APK grows 429,915 bytes (+3.2%) to 14,047,427 bytes (13.40 MiB), 2.60 MiB
+  APK grows 429,911 bytes (+3.2%) to 14,047,423 bytes (13.40 MiB), 2.60 MiB
   under the 16 MiB gate. `expo-notifications` and Firebase Messaging are
   324,891 bytes of that (one new native library, `libdatastore_shared_counter.so`,
   at 2,630 stored bytes, plus Firebase dex); `googleServicesFile` and the client
-  push code are 105,024, because an app id keeps the Firebase initialisation
+  push code are 105,020, because an app id keeps the Firebase initialisation
   path that R8 previously removed.
 - Chats keep their full history on the phone in SQLite (`messenger.db`) instead
   of the newest 100 messages in AsyncStorage. Scrolling to the top of a thread
