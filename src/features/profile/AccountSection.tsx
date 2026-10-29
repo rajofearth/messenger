@@ -21,6 +21,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { messengerRepository } from "../../data/messengerRepository";
 import { clearLocalAccountFiles } from "../../services/accountCleanup";
 import { clearOutbox } from "../../services/outbox";
+import { releasePushToken } from "../../services/pushTokens";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 
 type Dialog = "password" | "devices" | null;
@@ -55,6 +56,7 @@ export default function AccountSection({
   const changePassword = useAction(api.security.changePassword);
   const revokeDevice = useMutation(api.devices.revokeDevice);
   const unregister = useMutation(api.devices.unregister);
+  const clearPushToken = useMutation(api.devices.clearPushToken);
   const devices = useQuery(api.devices.list, {});
   const [dialog, setDialog] = useState<Dialog>(null);
   const [current, setCurrent] = useState("");
@@ -124,8 +126,13 @@ export default function AccountSection({
                 // late upload callback cannot re-queue a previous account's
                 // message after the local store is cleared.
                 await clearOutbox();
+                // Revoke the server row before the session goes away, then
+                // delete the device token; a token deleted first could never
+                // be cleared from the server.
+                await clearPushToken({}).catch(() => {});
                 await unregister({}).catch(() => {});
                 await signOut();
+                await releasePushToken();
               } catch {
                 Alert.alert(
                   "Sign out failed",

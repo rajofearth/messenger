@@ -21,6 +21,7 @@ import { useRemoteServerSync } from "./useRemoteServerSync";
 import { useRemoteStories } from "./useRemoteStories";
 import { useRemoteThreadMedia } from "./useRemoteThreadMedia";
 import { useOutboxResume } from "./useOutboxResume";
+import { usePushRegistration } from "./usePushRegistration";
 import { createRemoteContact } from "./remoteMessengerContacts";
 import { saveTrackedMedia } from "./remoteMessengerMedia";
 import { createChatPreferences } from "./remoteMessengerPreferences";
@@ -341,6 +342,7 @@ export function useRemoteMessenger() {
     sendAttachment: sendAttachmentMutation,
   });
   useOutboxResume(localReady, retryMessage);
+  usePushRegistration();
 
   function react(messageId: string, emoji: string) {
     const chatId = selectedRef.current;

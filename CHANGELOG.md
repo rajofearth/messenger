@@ -10,6 +10,20 @@ and this project adheres to
 
 ### Added
 
+- Push wakes arrive through Firebase Cloud Messaging. Each device registers its
+  FCM token against its own `devices` row, and the server sends a data-only
+  message that carries no content, only an opaque queue id. A wake reaches the
+  app in the foreground, in the background, and after the app is swiped away;
+  Android delivers nothing to a force-stopped app until it is reopened. The
+  token is cleared on sign-out and whenever FCM reports it dead, and signing in
+  as a different account detaches it from the previous row. Nothing is rendered
+  from a push: the local notification module owns every notification. The dev
+  APK grows 429,915 bytes (+3.2%) to 14,047,427 bytes (13.40 MiB), 2.60 MiB
+  under the 16 MiB gate. `expo-notifications` and Firebase Messaging are
+  324,891 bytes of that (one new native library, `libdatastore_shared_counter.so`,
+  at 2,630 stored bytes, plus Firebase dex); `googleServicesFile` and the client
+  push code are 105,024, because an app id keeps the Firebase initialisation
+  path that R8 previously removed.
 - Chats keep their full history on the phone in SQLite (`messenger.db`) instead
   of the newest 100 messages in AsyncStorage. Scrolling to the top of a thread
   loads the previous page from the device and only asks the server for rows this

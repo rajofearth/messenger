@@ -9,7 +9,7 @@ It is written to survive context loss. If you are picking this up cold, read thi
 file first, then `docs/ARCHITECTURE.md`, then
 `P:\Projects\messenger-research\11-storage-reality.md` §2–§3.
 
-Last updated: 2026-10-28.
+Last updated: 2026-10-29.
 
 ## 1. Scope decided on 2026-10-28
 
@@ -59,7 +59,8 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
 |---|---|---|
 | C4 | SQLite local history, load-older, migration | **Shipped** `e9a8dc6`, dev release `dev-1793076743`, APK 13,610,208 B |
 | C4b | Durability and paging fixes (outbox guard, tombstones, migration order, cached media, five paging edges) | **Shipped** `b78c42e`, dev release `dev-1793178141`, APK 13,617,512 B |
-| R1 | Push wakes + delivery acknowledgements, no deletion | Not started |
+| R1a | Push wakes: FCM HTTP v1 sender, per-device token registry, data-only wake, background task, dev-gated test wake | **Implemented**, not yet verified on a phone |
+| R1b | Delivery acknowledgements: `pending_ack` row, per-device watermark, drain on launch and foreground | Not started |
 | R2 | Relay queue for text and small media, report-only sweeps | Not started |
 | R3 | Enable 30-day + all-acked purge, with the reinstall warning | Not started |
 | R4 | Groups, multi-device, end-to-end encryption | Later |
@@ -84,13 +85,26 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
   one message, relaunch, scroll to row one and it does not return; seed only
   `messages/ghost` and migrate, the thread is reachable.
 
-### R1 — push and acknowledgement (no deletion yet)
+### R1a — push wakes (implemented)
 
-- Register a push token per device/session; delete it on sign-out and on
-  `UNREGISTERED`.
-- Wake the app when a queue entry lands; payload is `{type:"wake", queueId}`.
-- On launch and foreground, drain pending threads: fetch, save to SQLite, then
-  ack a per-device watermark.
+- Firebase project `messenger-e9f54`, HTTP v1 enabled, both packages
+  registered, `google-services.json` committed.
+- Server: `convex/devices.ts` stores one token per device row
+  (`pushToken`, `pushUpdatedAt`, `pushRevokedAt`, `by_pushToken`);
+  `convex/push.ts` sends a data-only `{v, type, queueId}` wake and clears
+  tokens FCM reports as dead.
+- Client: `src/services/pushTokens.ts` (token fetch, rotation, delete),
+  `src/services/pushPayload.ts` (parser), `src/services/backgroundWake.ts`
+  (module-scope task) and `src/state/usePushRegistration.ts`.
+- Verification still owed: a real wake on a phone in each app state. See
+  `docs/PUSH.md` §10.
+
+### R1b — acknowledgements (next)
+
+- Drain pending threads on launch, foreground and after a wake: fetch, save to
+  SQLite, then ack a per-device watermark.
+- One SQLite transaction writes the message and a `pending_ack` row; sending
+  the ack clears it, so a process kill between commit and ack is safe.
 - No purge. This phase is safe to ship with the current server storage.
 
 ### R2 — relay queue (report-only sweeps)
@@ -109,27 +123,25 @@ the WhatsApp trade, not a bug. Settings must say so before the first purge runs.
   preview when the head row goes.
 - Show the reinstall warning in Settings before this ships.
 
-## 5. Firebase / push: what to fetch
+## 5. Firebase / push: current state
 
-Detailed, verified steps live in `docs/PUSH.md`. The short version:
+Detailed, verified steps and the wire contract live in `docs/PUSH.md`. Short
+version:
 
-1. In the Firebase console, create or pick a project.
-2. Add an Android app for `com.yashraj.messenger` (and `com.yashraj.messenger.dev`
-   for the dev build if it will receive pushes).
-3. Download `google-services.json`, place it where `app.json` points
-   (`android.googleServicesFile`), never commit the service-account key.
-4. Enable the Cloud Messaging HTTP v1 API, and create a service account with the
-   Firebase Cloud Messaging sender role.
-5. Put the service-account values in Convex environment variables only
-   (`FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` or a base64 JSON
-   blob). Never in the repo, never in the APK.
-6. Add `expo-notifications` through CNG, regenerate `android/`, then measure the
-   APK before keeping it. Headroom is 3,159,704 B under the 16 MiB gate
-   (13,617,512 B used).
+1. Firebase project `messenger-e9f54`, with Android apps for
+   `com.yashraj.messenger` and `com.yashraj.messenger.dev`.
+2. `google-services.json` is committed at the repo root and named by
+   `android.googleServicesFile` in `app.json`.
+3. The FCM HTTP v1 API is enabled; the legacy server key was never created.
+4. `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY` and the
+   development-only `PUSH_ALLOW_TEST_WAKE` are set on the dev Convex
+   deployment. They exist nowhere else.
+5. `expo-notifications`, `expo-task-manager` and `google-auth-library` are
+   installed; the measured APK impact is in `docs/PUSH.md` §8.
 
-The `google-services.json` client API key is not a secret, but restrict it to the
-Android package and the FCM API. The service-account private key is a secret: it
-can send pushes to every install.
+The `google-services.json` client API key is not a secret, but it should be
+restricted to the two Android packages and the FCM APIs. The service-account
+private key is a secret: it can send pushes to every install.
 
 ## 6. Open decisions still owed
 
@@ -167,5 +179,8 @@ can send pushes to every install.
   `src/state/useOutboxResume.ts`.
 - Server: `convex/chat.ts`, `convex/files.ts`, `convex/schema.ts`,
   `convex/stories.ts`, `convex/crons.ts`, `convex/lib/paging.ts`.
+- Push: `convex/push.ts`, `convex/devices.ts`, `src/services/pushTokens.ts`,
+  `src/services/pushPayload.ts`, `src/services/backgroundWake.ts`,
+  `src/state/usePushRegistration.ts`, `docs/PUSH.md`.
 - Reviews and decisions: `P:\Projects\messenger-research\11-storage-reality.md`,
   `plan.html`, and `P:\Projects\messenger\Messenger relay architecture.html`.

@@ -53,10 +53,19 @@ export default defineSchema({
     registeredAt: v.number(),
     lastSeenAt: v.number(),
     revokedAt: v.optional(v.number()),
+    /** FCM registration token for this device; absent until it registers one. */
+    pushToken: v.optional(v.string()),
+    /** Push platform reported by the client, currently always `android`. */
+    pushPlatform: v.optional(v.string()),
+    /** When the token was last registered or refreshed. */
+    pushUpdatedAt: v.optional(v.number()),
+    /** Set when the token is cleared; a device with this set is never woken. */
+    pushRevokedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_session", ["authSessionId"])
-    .index("by_user_device", ["userId", "deviceId"]),
+    .index("by_user_device", ["userId", "deviceId"])
+    .index("by_pushToken", ["pushToken"]),
   conversationMeta: defineTable({
     conversationId: v.string(),
     kind: v.union(v.literal("direct"), v.literal("group")),

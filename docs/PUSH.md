@@ -1,205 +1,308 @@
-# Push wakes: Firebase Cloud Messaging plan
+# Push wakes: Firebase Cloud Messaging
 
-Plan only. Nothing here is implemented and no dependency is installed. The app has no push today: `docs/ARCHITECTURE.md` states there is no FCM or APNs integration, and notifications are posted only while the app runs, through `src/services/systemNotifications.ts`. This is the verified next step for relay phase R1 in `docs/RELAY.md`.
+Push wakes are implemented for the Android app and wired into the device
+registry. Nothing in the app posts a visible notification from a push: a wake
+carries no content and only tells the phone to drain the relay queue. The
+queue itself is R2 in `docs/RELAY.md`, so until it lands the only caller is a
+development-gated test wake.
 
-Checked against live docs on 2026-10-28: the Expo SDK 57 notifications reference, the Expo push setup / sending / FCM-credentials / notification-behaviour guides, FCM HTTP v1 send, FCM error codes, the FCM `AndroidConfigV2` preview, and the Convex environment-variable page. Anything not checked there is marked **unverified**.
+Checked against live docs on 2026-10-28: the Expo SDK 57 notifications
+reference, the Expo push setup, sending, FCM-credentials and notification
+behaviour guides, the FCM HTTP v1 send reference, the FCM error codes and
+message-priority pages, and the Convex environment-variable page. Anything not
+checked there is marked **unverified**.
 
-Facts assumed: Expo SDK 57, React Native 0.86, one arm64-v8a APK of **13,617,512 B** (**3,159,704 B** under the 16 MiB gate), local builds through Continuous Native Generation (`android/` is generated and gitignored), `app.config.js` wrapping `app.json`, Convex backend, no EAS build pipeline.
+Facts: Expo SDK 57, React Native 0.86, Android only, one arm64-v8a APK of
+14,047,427 bytes (13.40 MiB), local builds through Continuous Native Generation
+(`android/` is generated and gitignored), `app.config.js` wrapping `app.json`,
+Convex backend, no EAS build pipeline.
 
-## 1. Two routes, one recommendation
+## 1. Route decision
 
-**Route A — Expo Push Service.** The app calls `Notifications.getExpoPushTokenAsync({ projectId })`; the server POSTs to `https://exp.host/--/api/v2/push/send`. It needs an Expo account and an EAS project id (the token is attributed to it; `eas init` creates one without an EAS build), and Expo needs the FCM V1 service-account JSON uploaded to that project's Android credentials, because Expo delivers to Android through FCM.
+**Route A, the Expo Push Service**, would call
+`Notifications.getExpoPushTokenAsync({ projectId })` and POST to
+`https://exp.host/--/api/v2/push/send`. It needs an EAS project id in the APK
+and the FCM service account uploaded to Expo.
 
-**Route B — FCM HTTP v1 directly.** The app calls `Notifications.getDevicePushTokenAsync()` and registers the FCM token in Convex; an action signs a JWT as the service account and POSTs one message per token to `https://fcm.googleapis.com/v1/projects/<project-id>/messages:send`.
+**Route B, FCM HTTP v1 directly**, calls
+`Notifications.getDevicePushTokenAsync()` and stores the FCM token in Convex.
+An action signs as the service account and POSTs one message per token to
+`https://fcm.googleapis.com/v1/projects/<project-id>/messages:send`.
 
-- **Builds and identity**: A needs an EAS project id in the APK and a credential upload to Expo; B needs nothing outside Firebase and Convex.
-- **Credential custody**: A hands the service account to Expo; B keeps it in Convex environment variables. Route A does not remove FCM, it moves the key.
-- **Wake path**: A adds a hop and a third party (100 messages per request, 600 notifications/second per project, no SLA, receipts arrive about 15 minutes later and are cleared after 24 hours). B gets a synchronous per-token result.
-- **Server work**: A must track tickets and receipts to learn about dead tokens; B can clear a `devices` row inside the same action on a 404.
-- **APK size**: identical. Both routes need `expo-notifications` and the same Firebase Messaging dependency; neither puts a key in the APK.
+Route B is implemented. It needed no Expo account or EAS project id, keeps the
+service account in Convex environment variables instead of a third party, and
+gets a synchronous per-token result, so a dead token is cleared in the same
+run. Route A would only win if iOS arrived or if Expo's delivery telemetry
+replaced ours.
 
-**Recommendation: Route B.** The repo already owns its native modules and its Convex deployment, so the new pieces are a signed JWT and an HTTP POST. It keeps the sender key out of a third party, avoids an Expo project identifier in the APK, and turns FCM errors into immediate token cleanup. Route A would win if iOS arrived or if Expo's delivery telemetry replaced ours.
+## 2. What exists in Firebase
 
-## 2. Firebase console steps
+| Item | Value |
+|---|---|
+| Project | `messenger-e9f54` |
+| Project number / FCM sender id | `827664175441` |
+| Android apps | `com.yashraj.messenger`, `com.yashraj.messenger.dev` |
+| APIs | Firebase Cloud Messaging API (HTTP v1) enabled, legacy Cloud Messaging disabled |
+| `google-services.json` | repo root, 1,154 B, one `client` block per package |
 
-1. <https://console.firebase.google.com> → **Create a project** (or pick one). Skip Google Analytics; nothing in the APK uses it.
-2. **Project settings** (gear) → **General** → **Your apps** → **Add app** → Android. Package `com.yashraj.messenger`, nickname `Messenger`, leave **Debug signing certificate SHA-1** empty. SHA-1 is only needed for Google Sign-In, Phone Auth, App Check/Play Integrity and Dynamic Links, none of which this app uses (identity is `@convex-dev/auth`). **Register app**.
-3. Add a second Android app for `com.yashraj.messenger.dev`, the package `app.config.js` gives the dev variant. Without its own entry the dev APK fails Firebase Installations and gets no token.
-4. **Download google-services.json**. It holds one `client` entry per Android app in the project, so one download serves both packages; the Gradle google-services plugin selects the client by installed package name.
-5. Put it at the repo root as `google-services.json`; `app.json` points at it with `android.googleServicesFile` (section 3). Commit it: it holds public identifiers, and `.github/workflows/release.yml` regenerates `android/` and builds on CI, so an untracked file means a CI release without FCM.
-6. Fields that matter: `project_info.project_number` is the FCM sender id (a token is bound to its sender; the wrong one is `SENDER_ID_MISMATCH` or Expo's `MismatchSenderId`); `client[].client_info.android_client_info.package_name` must equal the installed package; `client[].api_key[].current_key` lets the app call Firebase Installations and FCM registration — not a secret because it ships in every APK, but it should be restricted (section 4). `mobilesdk_app_id`, `project_id`, `storage_bucket`, `client_type` and `certificate_hash` need no attention, and the file contains no private key.
-7. Google Cloud console → **APIs & Services**: enable **Firebase Cloud Messaging API** (usually on already) and **Firebase Installations API**. Leave the legacy **Cloud Messaging API (Legacy)** off; nothing here uses a server key.
-8. **Project settings** → **Service accounts** → **Generate new private key**. A dedicated account with `roles/firebase.messagingAdmin` (Firebase Cloud Messaging API Admin) is enough; the default `firebase-adminsdk` account carries broader roles. Keep the JSON out of the repo.
-9. One Firebase project for production and dev is enough for R1. A separate dev project would isolate dev tokens and quota, at the cost of a second file and a second env set.
+The file holds public identifiers only: project id, sender id, app ids and the
+client API key. It is committed, because the release workflow regenerates
+`android/` on CI and an untracked file would produce a release APK that never
+gets a token. Prebuild copies it to `android/app/google-services.json` and
+applies the `com.google.gms.google-services` plugin; the Gradle plugin picks
+the `client` block that matches the installed package.
 
-## 3. App configuration for CNG
+The client API key should be restricted in Google Cloud to the Firebase
+Installations and FCM Registration APIs, and to the two package names with the
+SHA-1 of the certificate that signs each APK. That restriction is not applied
+yet. A mismatch fails token retrieval with `403 PERMISSION_DENIED` and the app
+silently has no push.
 
-Install `expo-notifications` with `npx expo install expo-notifications`, plus `expo-task-manager` only if R1 runs JavaScript while the app is not running. Both variants inherit this from `app.json`; `app.config.js` changes only identity and feed for `APP_VARIANT=dev`, so the edit belongs in `app.json`.
+## 3. App configuration
+
+`app.json` carries two additions, both inherited by the dev variant:
 
 ```json
 "android": {
   "package": "com.yashraj.messenger",
+  "versionCode": 8,
   "googleServicesFile": "./google-services.json"
 },
-"plugins": [
-  ["expo-notifications", {
-    "icon": "./assets/notification-icon.png",
-    "color": "#E6F4FE",
-    "defaultChannel": "system_messages_v1"
-  }]
-]
+"plugins": [..., "expo-notifications"]
 ```
 
-- `icon` is the Android small icon: 96×96, all white with transparency. `defaultChannel` is used only if a notification message (title/body) ever arrives; point it at the channel the Kotlin module already creates (`NotificationRenderer.channels` → `system_messages_v1`) so Android does not gain a second "Messages" channel. A data-only wake names no channel.
-- `enableBackgroundRemoteNotifications` exists in SDK 57 but is **iOS only** (`UIBackgroundModes`); there is no Android equivalent, so do not add it. Do not add a legacy top-level `notification` object either; the SDK 57 plugin owns icon and colour.
-- `googleServicesFile` makes prebuild copy the file into the generated `android/app/` project and apply the google-services Gradle plugin. Regenerate with `npm run android:prebuild` or `npm run android:build`; never hand-edit `android/`.
-- Android 13+ `POST_NOTIFICATIONS` is already requested by `requestPermission()` in `src/services/systemNotifications.ts`; keep that one prompt path. Expo requires a channel to exist before the system prompt appears, so call the native `getStatus()` (which creates channels) before `getDevicePushTokenAsync()`. `expo-notifications` adds `RECEIVE_BOOT_COMPLETED` through its own manifest.
-- Expo Go is not a test target: remote push has been unavailable there on Android since SDK 53, so this needs a development/native build. The docs also allow an emulator with Google Play services, but test on a physical phone: the notification module is Android-only and OEM battery policy is part of what is being tested. `expo-device` is not needed for this — the old `Device.isDevice` guard predates the documented emulator support, and the real gate is a native build plus Play services. A de-Googled phone gets no token at all.
+- The plugin is listed without options. On Android it only writes a default
+  small icon, a colour and a default channel for notifications the OS renders
+  from a notification message. This app renders every notification through
+  `modules/system-notifications`, which owns the channels, so the plugin's
+  defaults stay unused. Never add a second channel here.
+- `enableBackgroundRemoteNotifications` is iOS only. A legacy top-level
+  `notification` object is not used either.
+- `scripts/android.mjs` re-runs prebuild only when its marker (variant,
+  package, version name, version code, feed) changes. Each dev build gets a
+  timestamp version code, so a dev build always re-runs prebuild; a production
+  build that only adds `googleServicesFile` needs the version code bumped or
+  `android/` deleted, because the marker does not hash `app.json`.
+
+Dependencies: `expo-notifications@~57.0.24`, `expo-task-manager@~57.0.21` and,
+on the server, `google-auth-library@^11.3.1`.
 
 ## 4. Keys and secrets
 
-| Artifact | Lives in | Secret? | If leaked |
-|---|---|---|---|
-| `google-services.json` | repo root, copied into `android/app/` at prebuild, bundled in the APK | No | Calls as this app; no install compromise |
-| Client API key (`api_key[].current_key`) | that file and the APK | No, but restrict | Quota abuse; rotate in Google Cloud console |
-| FCM server key (legacy) | nowhere | Never create it | — |
-| Service-account JSON (`project_id`, `client_email`, `private_key`) | Convex environment only | **Yes** | Can push to every install of the app |
+| Artifact | Lives in | Secret |
+|---|---|---|
+| `google-services.json` | repo root, copied into `android/app/`, bundled in the APK | no |
+| Client API key | that file and the APK | no, but restrict it |
+| Service-account JSON | Convex environment only | **yes** |
+| FCM server key (legacy) | nowhere | never created |
 
-Client API key restrictions: **API restrictions** → Firebase Installations API and FCM Registration API. **Application restrictions** → Android apps, with each package name and the SHA-1 of the certificate that actually signs the APK: the production release keystore (CI secret `ANDROID_KEYSTORE_BASE64`) and the dev key in `artifacts/messenger-dev-debug.keystore`. A mismatch yields `403 PERMISSION_DENIED: Requests from this Android client application are blocked` and the app never receives a token (documented by Expo).
-
-Server secrets live in Convex, per deployment, because dev and prod are separate:
+The development deployment `striped-finch-559` carries:
 
 ```sh
-npx convex env set FCM_PROJECT_ID    <project-id>
-npx convex env set FCM_CLIENT_EMAIL  <client_email from the JSON>
-npx convex env set FCM_PRIVATE_KEY   "<private_key with real newlines>"
-npx convex env list --names-only
+npx convex env set FCM_PROJECT_ID    messenger-e9f54
+npx convex env set FCM_CLIENT_EMAIL  firebase-adminsdk-fbsvc@messenger-e9f54.iam.gserviceaccount.com
+npx convex env set FCM_PRIVATE_KEY   # literal \n escapes; convex/push.ts unescapes
+npx convex env set PUSH_ALLOW_TEST_WAKE 1   # development only
 ```
 
-Names match `docs/RELAY.md` §5; each value may be up to 8 KiB. Never put them in the repo, in `app.json`, or in an `EXPO_PUBLIC_*` variable, because those are inlined into the JS bundle. If the private key leaks, delete that key in Google Cloud, generate a new one, and set it on both deployments; existing device tokens stay valid because they are registrations, not credentials.
+`convex/push.ts` reads them per call and calls `.replace(/\\n/g, "\n")` on the
+key. Values never go in the repo, `app.json` or an `EXPO_PUBLIC_*` variable,
+because those are inlined into the JS bundle. The default
+`firebase-adminsdk` account works; a dedicated account with
+`roles/firebase.messagingAdmin` is the tighter option. Rotating the key means
+generating a new one, setting it on each deployment, and deleting the old one;
+device tokens stay valid because they are registrations, not credentials.
+
+Verified without a device: with the service-account key, minting an access
+token for `https://www.googleapis.com/auth/firebase.messaging` succeeds, and a
+POST with a fabricated token answers `400 INVALID_ARGUMENT`, "The registration
+token is not a valid FCM registration token". That proves the key, the project
+and the enabled API; only a real token can prove delivery.
 
 ## 5. Token lifecycle
 
-- **Obtain**: `Notifications.getDevicePushTokenAsync()` after a channel exists and permission has been requested. On Android it resolves to `{ type: "android", data: "<FCM registration token>" }`.
-- **Register**: an authenticated mutation upserts the existing `devices` row through `by_user_device` (see `convex/devices.ts`), adding optional `fcmToken` and `fcmTokenUpdatedAt` alongside `platform`, `lastSeenAt` and `revokedAt`. That is `(userId, deviceId, platform, token, lastSeenAt, revokedAt)` mapped onto a table that already has one row per (user, device). A separate `pushTokens` table is only worth it if a token must outlive a revoked session, which R1 does not need.
-- **Refresh**: `Notifications.addPushTokenListener(register)`. A rolled token makes the old one invalid, and sends to it fail.
-- **Delete**: on sign-out clear `fcmToken` and set `revokedAt` (the existing revoke path already runs then); on `UNREGISTERED` (404) or `INVALID_ARGUMENT` ("not a valid FCM registration token") clear the column and never retry that token. Uninstalls cannot notify us; the first 404 is the signal.
-- **Multiple devices**: one row per (user, device) already exists; iterate `by_user` and send one wake per live token. Nothing is per-conversation.
+Client, in `src/services/pushTokens.ts`:
 
-## 6. Relay wake-up contract
+- `currentPushToken()` calls `Notifications.getDevicePushTokenAsync()` and
+  returns `data` when its `type` is `android`. It runs on every launch, because
+  rotation events are best effort. A missing Play service or a thrown native
+  error becomes `null`, never a crash.
+- `watchPushToken(listener)` wraps `addPushTokenListener` for rotation.
+- `releasePushToken()` calls `Notifications.unregisterForNotificationsAsync()`,
+  which is the only token delete API in SDK 57 (it calls
+  `FirebaseMessaging.deleteToken()`). It runs after the server row is cleared.
 
-FCM `data` values must be strings, so the wire payload is:
+Server, in `convex/devices.ts`, on the existing `devices` table:
+
+- `registerPushToken({ token, platform })` writes `pushToken`,
+  `pushPlatform`, `pushUpdatedAt` and clears `pushRevokedAt`. It also clears
+  the same token from any other device row, because one FCM token names one
+  install and must never stay attached to a previous account. It returns
+  `null` when the device row does not exist yet, which the client retries.
+- `clearPushToken({})` clears the token and stamps `pushRevokedAt`.
+- `tokensForUser(userId)` returns at most 20 tokens, skipping rows with a
+  revoked token or device and rows whose auth session expired.
+- `clearDeadToken(token)` runs when FCM says the token is gone.
+- `unregister`, the sign-out mutation, clears the token and stamps the revoke
+  time in the same write that revokes the device.
+
+Sign-out order in `src/features/profile/AccountSection.tsx` is
+`clearPushToken`, then `unregister`, then `signOut`, then
+`releasePushToken`. The server row must be cleared while the session is still
+valid, and the local token is deleted only after the session is gone; a token
+deleted first could never be cleared remotely.
+
+`src/state/usePushRegistration.ts` registers on mount after login, retries a
+`null` answer twice, and re-registers on rotation.
+
+## 6. Wake contract
+
+FCM `data` values must be strings:
 
 ```json
-{ "v": "1", "type": "wake", "queueId": "<opaque id>" }
+{ "v": "1", "type": "wake", "queueId": "<opaque id, at most 128 chars>" }
 ```
 
-- `conversationId` is optional and only acceptable as an already-opaque id; it tells Google which conversation is busy. `docs/RELAY.md` R1 defines `{type:"wake", queueId}`; `v` is added so the shape can change later. Nothing else goes in: no title, body, sender, preview, count or media URL. The app wakes, fetches, saves to SQLite, then acks.
-- **Data-only, not a notification message.** A notification message would be rendered by the OS with content we do not have, on a channel we do not control; MessagingStyle, mute state and local avatars live in the native module, so rendering must stay local.
-- **Channel and priority are different things.** Data messages carry no channel; `channelId` applies only to notification messages, and our posted notification uses `system_messages_v1` from the native module. Promptness comes from `message.android.priority: "high"`. Keep `ttl` short, e.g. `"60s"`: a stale wake adds nothing because every foreground drains the queue.
-- **Force-stopped** (`Settings → Apps → Messenger → Force stop`, or `adb shell am force-stop com.yashraj.messenger`): **nothing arrives** — no data message, task or notification — until the user opens the app. Android blocks the package. State this in release notes and never imply otherwise. Swiping from recents is not force-stop and still receives wakes. Doze can delay even high-priority data, so a wake is never delivery proof.
-- **Retry**: 429 `QUOTA_EXCEEDED` → exponential backoff with a minimum initial delay of one minute (FCM's guidance); 503 `UNAVAILABLE` → honour `Retry-After`, then backoff with jitter; 500 `INTERNAL` → retry with backoff; 400/401/403 → fix the request or credentials, do not retry. Coalesce with `collapse_key` and rate-limit per device, because too many high-priority messages get deprioritised.
-- **FCM accepting a request proves nothing.** A 200 returns only a message name. The only delivery evidence is the queue row being acked after the client saves it.
+Nothing else goes in: no title, body, sender, preview, count or media URL. In
+particular no key named `title`, `message` or `body`, because
+`expo-notifications` reads those from the data map and presents its own
+notification when they exist.
 
-## 7. Convex implementation sketch
+The message is data-only with `android.priority: "high"` and `ttl: "60s"`. A
+stale wake adds nothing, because every foreground drain reads the queue. No
+channel and no `collapse_key`: a data message names no channel, and a wake is
+cheap enough that coalescing is not needed at this volume.
 
-Sketch, not code to merge. Server dependency: `google-auth-library`, which mints and refreshes the OAuth token for `https://www.googleapis.com/auth/firebase.messaging`; the Firebase Admin SDK would work but is far larger than one endpoint needs. Signing the JWT with Web Crypto instead is possible but **unverified** on Convex's default runtime.
+Delivery, verified in the SDK 57 docs and the installed library source:
 
-```ts
-// convex/push.ts — SKETCH, not implemented
-"use node";
-import { internalAction } from "./_generated/server";
-import { v } from "convex/values";
-import { GoogleAuth } from "google-auth-library";
+| App state | What arrives |
+|---|---|
+| Foreground | the JS task runs; `addNotificationReceivedListener` also fires |
+| Background, process alive | the JS task runs; the notification listener does not |
+| Swiped from recents | the JS task runs in a headless JS process |
+| Force-stopped | nothing, until the user opens the app |
 
-const SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+`src/services/backgroundWake.ts` defines the task at module scope under
+`messenger-push-wake`, and `index.ts` calls `registerBackgroundWake()` before
+`registerComponent`. The task receives the serialized `RemoteMessage`, so the
+wake fields sit at `payload.data.data` (FCM also injects a `dataString` key
+there). `parseWake` accepts that shape and the plain data-map shape, rejects
+everything else, and never throws.
 
-async function accessToken() {
-  const auth = new GoogleAuth({
-    credentials: {
-      project_id: process.env.FCM_PROJECT_ID,
-      client_email: process.env.FCM_CLIENT_EMAIL,
-      private_key: process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    },
-    scopes: [SCOPE],
-  });
-  return (await auth.getClient()).getAccessToken();
-}
+Force-stop is an Android limit, not a bug: a broadcast intent cannot start a
+stopped package. Doze can also delay a high-priority message, so a wake is a
+hint, never proof of delivery. The proof is the queue row being acked after
+the phone commits it to SQLite.
 
-export const sendWake = internalAction({
-  args: { tokens: v.array(v.string()), queueId: v.string() },
-  handler: async (ctx, { tokens, queueId }) => {
-    const projectId = process.env.FCM_PROJECT_ID!;
-    const { token } = await accessToken();
-    const body = (device: string) =>
-      JSON.stringify({
-        message: {
-          token: device,
-          data: { v: "1", type: "wake", queueId },
-          android: { priority: "high", ttl: "60s", collapse_key: "wake" },
-        },
-      });
-    // HTTP v1 takes ONE message per request; 500 is only the Admin SDK cap.
-    for (let i = 0; i < tokens.length; i += 500) {
-      const batch = tokens.slice(i, i + 500);
-      for (let j = 0; j < batch.length; j += 10) {
-        await Promise.all(batch.slice(j, j + 10).map(async (device) => {
-          const res = await fetch(
-            `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
-            {
-              method: "POST",
-              headers: {
-                authorization: `Bearer ${token}`,
-                "content-type": "application/json",
-              },
-              body: body(device),
-            },
-          );
-          if (res.ok) return;
-          if ((await res.text()).includes("registration token")) {
-            await ctx.runMutation(internal.push.clearToken, { token: device });
-          }
-          // 429 / 5xx: retry policy in section 6.
-        }));
-      }
-    }
-  },
-});
-```
+## 7. Server implementation
 
-- The mutation that inserts a queue row schedules `internal.push.sendWake` with the recipient's live tokens, so a send failure cannot roll back the message. A wake is a hint; the next foreground drain recovers anything missed.
-- Mint the access token per batch and do not cache it in module scope, because Convex isolates are not durable. The 500 above is the Admin SDK's `sendEach` cap, quoted only as a batch size: the REST endpoint has no multi-token request.
+`convex/push.ts` (`"use node"`):
 
-## 8. Cost and APK impact
+- `sendWake({ tokens, queueId })` is an internal action. It mints one OAuth
+  token per invocation, sends one HTTP request per token with at most 10 in
+  flight, and rejects a `queueId` that is empty or longer than 128 characters,
+  which the client parser would silently drop.
+- `wakeUser({ userId, queueId })` is an internal action that resolves tokens
+  through `tokensForUser` and sends them. It is the seam R2 calls from the
+  queue insert; nothing calls it yet.
+- `sendTestWake({})` is a development aid: it wakes the caller's own devices
+  with `queueId: "test"` and refuses unless `PUSH_ALLOW_TEST_WAKE=1` is set on
+  the deployment. Delete it once `wakeUser` has a caller.
 
-- FCM has no charge, data messages included. Convex actions count against deployment usage: one action per recipient batch.
-- Client cost is `expo-notifications` plus the Firebase Messaging and Play Services libraries it pulls, their dex, and google-services resources. **Growth is unknown until measured**; no byte number is claimed here.
-- Budget: 16,777,216 B − 13,617,512 B = **3,159,704 B (3.01 MiB)**. Record the real delta in `docs/PERFORMANCE.md`, and in `CHANGELOG.md` for a release change. Measure with `npm run android:build` then `npm run release:check`; R8 and resource shrinking are on, so also confirm on a release install that a token is issued, because a stripped `FirebaseMessagingService` fails silently.
+Retry classification, per token:
 
-## 9. Test plan
+| Response | Action |
+|---|---|
+| 2xx | sent |
+| 404 `UNREGISTERED`, 400 "not a valid registration token" | clear the token, do not retry |
+| 403 `SENDER_ID_MISMATCH` | clear the token; it belongs to another project |
+| 429 | log and stop; FCM's documented minimum backoff is one minute, too long inside an action |
+| 5xx, network error | retry up to 3 attempts, 250 ms base with exponential backoff and jitter |
+| 400 without a token message, 401, 403 other | log the status and stop |
 
-Two physical Android phones, different accounts, A sends to B.
+A 2xx proves only that FCM accepted the request, not that the phone got it.
 
-1. **Registration**: fresh install → a token appears in the dev log and `devices` has `fcmToken` for that row; nothing is shown to the user.
-2. **Killed (swiped from recents)**: insert a queue row from A. Expect a wake in seconds; measure insert time → headless task start. The message appears, the ack lands, the queue row is gone.
-3. **Force-stopped**: `Settings → Apps → Messenger → Force stop` (or `adb shell am force-stop com.yashraj.messenger`), insert a queue row. Expect **no** wake, task or notification for at least five minutes; open the app by hand and confirm the launch drain fetches it. That is Android behaving as documented, not a bug.
-4. **No content**: capture the request body in Convex logs and the received data on device; confirm exactly `v`, `type`, `queueId` plus FCM internals — no text, sender or preview.
-5. **Permission**: Android 13+ install, deny `POST_NOTIFICATIONS`, send a wake: no visible notification and no crash; grant it and repeat for exactly one notification from `system_messages_v1`.
-6. **Sign-out**: the `devices` row loses `fcmToken` and gains `revokedAt`; a new queue row for that user sends nothing to that token.
-7. **Dead token**: uninstall on B, send, and expect a 404 `UNREGISTERED` in the action log with the token cleared.
-8. **Regression**: in-app notifications still work; `npm run check` and `npm test` pass.
+The queue write schedules the wake, so a failed send cannot roll back a
+message. A wake that never arrives is recovered by the next foreground drain.
 
-## 10. What we deliberately do not do
+## 8. APK impact
 
-- No content in the payload: no previews, sender names, counts or media URLs, and no message bodies through FCM, encrypted or otherwise.
-- No calls over push: no call wake, no push-delivered notification actions. Calls stay in-app.
-- No iOS; the app is Android-only, so APNs and background remote notifications stay out.
-- No topics, no device groups (deprecated by FCM), no console campaigns.
-- No server key or service-account JSON in the repo or the APK, and no push secret in any `EXPO_PUBLIC_*` variable.
+The dev APK `0.1.1-dev.20261029.094425` (version code 1793247265) is
+**14,047,427 bytes (13.40 MiB)**, up **429,915 bytes (+3.2%)** from the C4b
+build at 13,617,512 bytes. Headroom under the 16 MiB gate is **2,729,789
+bytes**, and under the 15 MiB shipping line **1,681,213 bytes**.
 
-## Unverified
+The growth came in two measured steps. Adding `expo-notifications` and the
+Firebase Messaging libraries took the same source to 13,942,403 bytes
+(+324,891). The only new native library is
+`libdatastore_shared_counter.so`, 7,112 bytes on disk and 2,630 stored; the
+rest is dex for Firebase and Play Services classes. Enabling
+`googleServicesFile` and adding the client push code took the build to
+14,047,427 bytes (+105,024): once an app id exists, R8 can no longer remove the
+Firebase initialisation path, so classes and resources it previously shrank
+away are kept.
 
-- APK growth from `expo-notifications` plus Firebase Messaging.
-- Signing the FCM JWT without `google-auth-library` on Convex's default runtime.
-- Wake latency per OEM: battery managers differ and are only measurable on the test devices.
-- The dev keystore SHA-1 (`artifacts/messenger-dev-debug.keystore`) if app restrictions are used; read it with `keytool -list -v` before restricting.
+The JavaScript bundle is 2,491,180 bytes (2.38 MiB) and stored uncompressed.
+The APK keeps one ABI, 19 native libraries and one dex (8.71 MiB), and passes
+all 11 slim-build checks.
+
+## 9. What is verified, and what is not
+
+Verified in this repo or against live docs:
+
+- The service account authenticates and the project accepts the message shape
+  (section 4).
+- `expo-notifications` and Firebase Messaging compile, minify and package in
+  this toolchain; the release APK still passes the slim-build gate.
+- Expo's own ProGuard rules keep `expo.modules.notifications.**`, and the
+  `MESSAGING_EVENT` service comes from the library manifest, so there is no
+  conflict with `modules/system-notifications` and nothing to add to
+  `extraProguardRules`.
+- Android 13 `POST_NOTIFICATIONS` gates display, not token issuance. A denied
+  permission still yields a token and still runs the wake task, but the app
+  cannot post anything.
+- The payload parser and its rejection cases, in
+  `src/services/pushPayload.test.mjs`.
+- The dev deployment runs `push:sendTestWake` and stops at `AUTH_REQUIRED`
+  without a session, so the action, the env gate and the token query are
+  deployed.
+
+Not verified, and impossible to verify without the phone:
+
+- A real wake in each app state, and the recorded `push/v1/lastWake` marker.
+  The marker is written but has no reader in the UI yet; R2 makes wakes visible
+  end to end, because a wake will then add a row to a thread.
+- Wake latency per OEM; battery managers differ.
+- That R8 kept the Firebase service classes on the installed build, which the
+  first real wake proves.
+- The dev keystore SHA-1, if client API key restrictions are added.
+
+## 10. Device check plan
+
+Two phones, different accounts, A sends to B.
+
+1. Install the dev APK, sign in, and confirm `devices` has a `pushToken` for
+   that row. Nothing is shown to the user.
+2. Call `api.push.sendTestWake` from a signed-in dev build and expect
+   `{ sent: 1, failed: 0 }`; `failed: 1` with a 404 in the Convex log means the
+   token was already dead. Foreground, background and swiped-from-recents
+   should each overwrite `push/v1/lastWake`; that key has no UI yet, so R2 is
+   the first place a wake becomes visible as a new message row.
+3. Force-stop the app and repeat: expect no wake for at least five minutes.
+   That is Android behaving as documented.
+4. Deny notification permission and repeat the wake: the marker still updates,
+   nothing appears, nothing crashes.
+5. Sign out: the row loses its token and gains `revokedAt`; a later wake for
+   that user reaches no token.
+6. Uninstall or rotate: FCM answers 404 and the action clears the token.
+7. In-app notifications still work, and `npm run check` plus `npm test` pass.
+
+## 11. Deliberately out of scope
+
+- No content in the payload, encrypted or otherwise.
+- No calls over push; calls stay in-app.
+- No iOS, no APNs, no background remote notifications.
+- No topics, device groups or console campaigns.
+- No server key or service-account JSON in the repo or the APK.
+- No visible notification posted by a wake; the local renderer owns every
+  notification.
