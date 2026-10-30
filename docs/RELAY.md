@@ -63,7 +63,7 @@ next to the account section.
 | R1b | Delivery acknowledgements: `pending_ack` in the same transaction, drain on launch, foreground and a visible-app timer | Shipped |
 | R2 | Relay queue for text and small media: `relayQueue`, send/react/remove, pull, caps, per-conversation sequence | Shipped `e84f1b5`, dev release `dev-1793251060`, APK 14,074,187 B |
 | R3 | Deletion: ack deletes the row and releases the blob, 30-day purge, reinstall warning | Shipped in R2 |
-| Cleanup | Component, legacy import, migrations, server paging, presence, typing and read receipts removed | Shipped, APK 14,046,155 B |
+| Cleanup | Component, legacy import, migrations, server paging, presence, typing and read receipts removed | Shipped `072c890`, dev release `dev-1793337177`, APK 14,043,551 B |
 | R4 | Groups beyond creation, multi-device, end-to-end encryption | Later |
 | C5 | Encrypted Drive backup | On hold (design ready in research §4) |
 

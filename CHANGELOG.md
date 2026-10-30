@@ -30,10 +30,11 @@ and this project adheres to
   the quoted id because retired envelopes leave no text to quote.
 - The relay is now the only message path. Conversations come from
   `conversations` and `conversationMembers`, threads are read from SQLite only,
-  and forwarding is a fresh relay send. The 2026-10-29 cleanup dev APK is
-  14,046,155 bytes (13.40 MiB), 28,032 bytes (-0.20%) smaller than the relay
-  build and 2.60 MiB under the 16 MiB gate; the JavaScript bundle fell from
-  2.40 MiB to 2.37 MiB with no dependency or native-library change.
+  and forwarding is a fresh relay send. The 2026-10-30 cleanup dev APK
+  (`dev-1793337177`) is 14,043,551 bytes (13.39 MiB), 30,636 bytes (-0.22%)
+  smaller than the relay build and 2.61 MiB under the 16 MiB gate; the
+  JavaScript bundle fell from 2.40 MiB to 2.37 MiB with no dependency or
+  native-library change.
 - Push wakes arrive through Firebase Cloud Messaging. Each device registers its
   FCM token against its own `devices` row, and the server sends a data-only
   message that carries no content, only an opaque queue id. A wake reaches the

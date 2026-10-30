@@ -5,8 +5,8 @@ This file records what was changed for size and runtime, why, and how to re-meas
 ## APK size
 
 The current development build (relay queue with the pre-decision architecture
-removed) is **14,046,155 bytes (13.40 MiB)**, 2.60 MiB below the 16 MiB gate and
-1.60 MiB below the 15 MiB shipping line. It is a development APK, so the gate
+removed) is **14,043,551 bytes (13.39 MiB)**, 2.61 MiB below the 16 MiB gate and
+1.61 MiB below the 15 MiB shipping line. It is a development APK, so the gate
 runs with `--variant dev`, which expects the dev package and version; all 11
 checks pass.
 The per-change numbers are under "Measured APK size"; the historical narrative
@@ -61,14 +61,15 @@ the gate measured is 2.40 MiB and still stored uncompressed, and all 11 dev
 checks pass. This is a local build measurement, not a claim that device
 acceptance has passed.
 
-The 2026-10-29 cleanup **development** APK `0.1.1-dev.20261029.120201` is
-**14,046,155 bytes (13.40 MiB)**, down **28,032 bytes (-0.20%)** from the relay
-build, with **2,731,061 bytes** left under the 16 MiB gate. Removing the
-`convex-chat` component, migrations, presence, typing and read receipts, server
-paging and the local web tester removed JavaScript but no dependency and no
-native library. The bundle fell from 2.40 MiB to 2.37 MiB; the APK still has one
-dex (8.71 MiB), one ABI, 19 native libraries and a stored, uncompressed bundle,
-and all 11 dev checks pass.
+The 2026-10-30 cleanup **development** APK `0.1.1-dev.20261030.104257`
+(`dev-1793337177`) is **14,043,551 bytes (13.39 MiB)**, down **30,636 bytes
+(-0.22%)** from the relay build, with **2,733,665 bytes** left under the 16 MiB
+gate. Removing the `convex-chat` component, migrations, presence, typing and
+read receipts, server paging, the server-era thread helpers and the local web
+tester removed JavaScript but no dependency and no native library. The bundle
+fell from 2.40 MiB to 2.37 MiB; the APK still has one dex (8.71 MiB), one ABI,
+19 native libraries and a stored, uncompressed bundle, and all 11 dev checks
+pass.
 
 ### Build configuration in `app.json`
 
@@ -247,7 +248,7 @@ Each figure is the same working tree, the same Expo config and the same
 | C4b durability build (chat and message tombstones, guarded outbox, load-older fixes; dev variant) | 13,617,512 bytes (12.99 MiB) | **+7,304 bytes, +0.05%** against the storage build, -68.7% overall |
 | Push wake build (FCM sends, device token registry, data-only wake; dev variant) | 14,047,423 bytes (13.40 MiB) | **+429,911 bytes, +3.2%** against the C4b build, -67.7% overall |
 | Relay build (queue, acknowledgements, 30-day purge, Settings warning; dev variant) | 14,074,187 bytes (13.42 MiB) | **+26,764 bytes, +0.19%** against the push build, -67.7% overall |
-| Cleanup build (component, migrations, presence, typing, read receipts, server paging and the web tester removed; dev variant) | 14,046,155 bytes (13.40 MiB) | **-28,032 bytes, -0.20%** against the relay build, -67.7% overall |
+| Cleanup build (component, migrations, presence, typing, read receipts, server paging, dead thread helpers and the web tester removed; dev variant) | 14,043,551 bytes (13.39 MiB) | **-30,636 bytes, -0.22%** against the relay build, -67.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
