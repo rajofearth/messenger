@@ -2,7 +2,6 @@ import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
 import { messagePreview } from "../domain/messageActions";
 import { isSendConfirmed } from "../domain/outbox";
-import { newestReadSequence } from "../domain/threadMerge";
 import {
   mapMessage,
   remoteUid,
@@ -20,11 +19,6 @@ type SendText = (args: {
   clientMessageId: string;
   text: string;
 }) => Promise<RemoteMessage>;
-
-type MarkReadThrough = (args: {
-  conversationId: string;
-  sequence: number;
-}) => Promise<unknown>;
 
 type UpdateChats = (next: (current: Chat[]) => Chat[]) => void;
 
@@ -104,15 +98,14 @@ export function createRemoteReplySender({
   };
 }
 
-/** Clears the badge locally and persists the newest sequence to the server. */
+/**
+ * Opening or focusing a conversation clears its badge. Unread lives only on
+ * this phone, so no server acknowledgement is part of reading.
+ */
 export function createRemoteReadMarker({
-  messagesRef,
   updateChats,
-  markReadThrough,
 }: {
-  messagesRef: MutableRefObject<Record<string, Message[]>>;
   updateChats: UpdateChats;
-  markReadThrough: MarkReadThrough;
 }) {
   return function markRead(chatId: string) {
     updateChats((current) =>
@@ -120,10 +113,5 @@ export function createRemoteReadMarker({
         item.id === chatId ? { ...item, unread: 0 } : item,
       ),
     );
-    // A local-only send can sit after the newest server row; skip it rather
-    // than leaving the actual unread messages unacknowledged.
-    const sequence = newestReadSequence(messagesRef.current[chatId] || []);
-    if (!sequence) return;
-    void markReadThrough({ conversationId: chatId, sequence }).catch(() => {});
   };
 }

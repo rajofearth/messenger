@@ -241,13 +241,13 @@ export default function SettingsDialogs({
                 </View>
                 <Text style={[styles.modalBody, { color: colors.text }]}>
                   {sheet === "privacy"
-                    ? "Your account, profile, contacts, conversations, messages and stories live on this app's Convex deployment. The app also keeps a local cache on this device so chats open offline."
-                    : "A Convex-backed messenger built with Expo and React Native. Accounts, chats, presence and stories sync through a Convex deployment, with a local cache for offline use."}
+                    ? "Your account, profile, contacts, conversations and stories live on this app's Convex deployment. Messages wait there only until the recipient's phone confirms delivery, then the server copy is deleted; each phone keeps its own history."
+                    : "A Convex-backed messenger built with Expo and React Native. Accounts, conversations and stories sync through a Convex deployment, while messages are relayed and history stays on the phone."}
                 </Text>
                 <Text style={[styles.modalBody, { color: colors.muted }]}>
                   {sheet === "privacy"
-                    ? "The local cache is not encrypted by the app. Profile photos and shared media are uploaded to Convex storage; received media stays in app storage unless the conversation's Save media to gallery switch is on, which also copies photos and videos into a Messenger album. There is no end-to-end encryption, so treat the deployment and this device as trusted. Signing out removes the local account cache, not the messages already stored on the deployment."
-                    : "Voice and video calls connect on a timer and use a placeholder for the remote video because there is no call transport. Notifications are posted by the running app, not by a push service."}
+                    ? "The local database is not encrypted by the app. Profile photos and shared media are uploaded to Convex storage; received media stays in app storage unless the conversation's Save media to gallery switch is on, which also copies photos and videos into a Messenger album. There is no end-to-end encryption, so treat the deployment and this device as trusted. Signing out deletes this device's local history, not the other members' copies."
+                    : "Voice and video calls connect on a timer and use a placeholder for the remote video because there is no call transport. FCM wakes the app, but notifications are posted by the running app rather than delivered by the push payload."}
                 </Text>
                 {sheet === "privacy" && (
                   <Pressable

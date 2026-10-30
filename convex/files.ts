@@ -230,7 +230,6 @@ export const finalizeUpload = mutation({
       width: args.width,
       height: args.height,
       durationMs: args.durationMs,
-      messageRefs: [],
       // Avatar and photo-story rows also benefit from the same flag, but only
       // an image can ever carry variant rows.
       variantsState: resolved.length
@@ -261,10 +260,10 @@ export const finalizeUpload = mutation({
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Reclaims storage the chat model cannot reclaim on its own: files rows whose
- * blob is gone, message uploads that never finalised, and `_storage` objects no
- * row protects. The grace period keeps an upload that is still in flight safe;
- * the cron repeats, so a bounded page of objects per run is enough.
+ * Reclaims storage nothing else owns: files rows whose blob is gone, message
+ * uploads that never became a message, and `_storage` objects no row protects.
+ * The grace period keeps an upload that is still in flight safe; the cron
+ * repeats, so a bounded page of objects per run is enough.
  */
 export const sweepOrphans = internalMutation({
   args: {},
@@ -275,9 +274,8 @@ export const sweepOrphans = internalMutation({
     let variants = 0;
     const kept: Array<{ storageId: Id<"_storage"> }> = [];
 
-    // A relay upload carries no message refs until it is delivered, so the
-    // unused check below would reap it a day after it was queued and leave the
-    // recipient with a row whose blob can never be fetched.
+    // An attachment exists on the server only while some recipient's queue row
+    // points at it, so the queue is the whole reference set for a message blob.
     const queuedStorageIds = new Set<string>();
     for (const queued of await ctx.db.query("relayQueue").collect()) {
       if (queued.storageId) queuedStorageIds.add(queued.storageId);
@@ -291,18 +289,17 @@ export const sweepOrphans = internalMutation({
         rows += 1;
         continue;
       }
-      // Avatars and stories have no message refs by design, so the unused
-      // check below must never expire them; their own flows own those blobs.
+      // Avatars and stories have no queue entry by design, so the unused check
+      // below must never expire them; their own flows own those blobs.
       const isMessageUpload =
         row.kind === "image" ||
         row.kind === "video" ||
         row.kind === "audio" ||
         row.kind === "file";
       const unused =
-        row.messageRefs !== undefined &&
-        row.messageRefs.length === 0 &&
-        now - row.createdAt > ORPHAN_GRACE_MS;
-      if (isMessageUpload && unused && !queuedStorageIds.has(row.storageId)) {
+        now - row.createdAt > ORPHAN_GRACE_MS &&
+        !queuedStorageIds.has(row.storageId);
+      if (isMessageUpload && unused) {
         await deleteMediaVariants(ctx, row.storageId);
         await ctx.db.delete(row._id);
         await ctx.storage.delete(row.storageId);

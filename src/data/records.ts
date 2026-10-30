@@ -11,11 +11,6 @@ export type AppearanceRecord = {
   theme: ThemePreference;
 };
 
-/** Shape written before the theme control gained its "system" option. */
-export type LegacyAppearanceRecord = {
-  dark: boolean;
-};
-
 export type ChatRecord = Chat;
 export type MessageRecord = Message;
 export type StoryRecord = Story;

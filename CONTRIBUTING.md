@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking at Messenger. It is an Android messenger with a Convex backend for accounts and chat, a local-first cache, and Android system notifications while the app is running. Bug reports, feature requests and pull requests are welcome.
+Thanks for looking at Messenger. It is an Android messenger with a Convex backend for accounts, conversation metadata and message relay, local SQLite history on the phone, and Android system notifications while the app is running. Bug reports, feature requests and pull requests are welcome.
 
 By participating you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 Report security issues privately as described in [SECURITY.md](SECURITY.md), not
@@ -112,14 +112,22 @@ In practice, features depend on `src/domain` and the shared modules under
 `src/ui`, and `src/domain` depends on nothing but itself. Keep React Native and
 Expo package versions aligned when you upgrade.
 
-Convex functions live in `convex/` and use the `convex-chat` component for
-conversation membership, messages, unread counts, reactions and presence. The
-client talks to them only through `src/state/useRemoteMessenger.ts` and its
-focused helpers (`useRemoteCache`, `useRemoteServerSync`, `useRemotePresence`,
-`useRemoteThreadMedia`, `remoteMessenger*`). Screens must not call Convex
-directly; add a mutation or query to the state layer and keep the screen props
-the same. Run `npx convex dev --once` after changing backend functions so the
-generated types stay in sync.
+Convex functions live in `convex/`. `conversations.ts` owns conversation rows and
+membership; `relay.ts` and `lib/relayStore.ts` own the queue, the membership and
+block checks, sequencing, and release of acknowledged attachments. The client
+talks to them only through `src/state/useRemoteMessenger.ts` and its focused
+helpers (`useRemoteCache`, `conversationSync`, `useRelayDrain`, `remoteMessenger*`).
+Screens must not call Convex directly; add a mutation or query to the state layer
+and keep the screen props the same. Run `npx convex dev --once` after changing
+backend functions so the generated types stay in sync.
+
+Messages are different from every other row: they are never a Convex table. A
+message exists on the server only as a `relayQueue` envelope waiting for one
+recipient, and it is deleted when that recipient acknowledges its local commit.
+Do not add a server-side message read or a "history" query; the contract and the
+invariants are in [docs/RELAY.md](docs/RELAY.md). The local schema has one
+version and resets on a mismatch, so a schema change means bumping
+`SCHEMA_VERSION` rather than writing a migration.
 
 ## Adding a test
 

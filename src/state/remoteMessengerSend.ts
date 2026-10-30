@@ -65,8 +65,7 @@ function relayAttachmentSender(relay: RelayConfirm): SendAttachment {
 
 /**
  * The relay receipt carries no sender flag, so stamp this device's send as
- * `mine` before the receipt replaces the optimistic bubble. Both send shapes
- * come from the same relay mutation so the rollback flag has one owner.
+ * `mine` before the receipt replaces the optimistic bubble.
  */
 export function relaySendPath(relay: RelaySend): {
   sendText: SendText;
@@ -212,8 +211,7 @@ export function createRemoteSend({
             progress,
           }),
         // Persist the finalized blob before the mutation, so a retry after a
-        // failed send reuses the same parts instead of hitting
-        // IDEMPOTENCY_CONFLICT with a new storage id.
+        // failed send reuses the same parts instead of uploading a second blob.
         onUploaded: async (storageId) => {
           const uploaded =
             updateLocalMessage({
@@ -305,5 +303,41 @@ export function createRemoteSend({
     return true;
   }
 
-  return { send, retryMessage };
+  /**
+   * Forwards into another conversation by sending a fresh message: the relay
+   * keeps no server copy, so the only source is this phone's own file, and the
+   * normal send path handles the copy, upload and retry.
+   */
+  function forward(message: Message, targetChatId: string): boolean {
+    const chat = chatsRef.current.find((item) => item.id === targetChatId);
+    if (!chat || chat.blocked) return false;
+    const forwarded: Message = {
+      id: remoteUid(),
+      text: message.text,
+      mine: true,
+      time: timeLabel(),
+      createdAt: new Date().toISOString(),
+      status: "sending",
+      forwarded: true,
+      ...(message.kind
+        ? {
+            kind: message.kind,
+            uri: message.uri,
+            mimeType: message.mimeType,
+            filename: message.filename,
+            width: message.width,
+            height: message.height,
+            duration: message.duration,
+            uploadProgress: 0,
+          }
+        : {}),
+    };
+    if (!forwarded.text?.trim() && !forwarded.uri) return false;
+    appendLocal(chat, forwarded, messagePreview(forwarded));
+    if (forwarded.kind) void deliverAttachment(chat.id, forwarded);
+    else void deliverText(chat.id, forwarded);
+    return true;
+  }
+
+  return { send, retryMessage, forward };
 }

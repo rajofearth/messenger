@@ -68,12 +68,10 @@ export function Avatar({
   uri,
   name,
   size = 54,
-  online = false,
 }: {
   uri?: string;
   name?: string;
   size?: number;
-  online?: boolean;
 }) {
   const [failed, setFailed] = React.useState(false);
   const imageUri = useAvatarUri(uri);
@@ -116,7 +114,6 @@ export function Avatar({
           }}
         />
       )}
-      {online && <View style={styles.online} />}
     </View>
   );
 }
@@ -137,16 +134,5 @@ const styles = StyleSheet.create({
     color: "#5B4A3F",
     fontFamily: "DMSans_700Bold",
     letterSpacing: 0.3,
-  },
-  online: {
-    position: "absolute",
-    bottom: 0,
-    right: 1,
-    backgroundColor: "#82A78C",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2.5,
-    borderColor: "#FBFAF7",
   },
 });

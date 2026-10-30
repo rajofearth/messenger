@@ -369,7 +369,6 @@ function MessengerApp() {
               chat={chat}
               messages={messenger.messages[chat.id] || []}
               dark={messenger.dark}
-              typing={messenger.typingIds.includes(chat.id)}
               onBack={messenger.closeChat}
               onCall={(video) => startCall(chat, video)}
               onSend={messenger.send}
@@ -380,7 +379,6 @@ function MessengerApp() {
               onDelete={messenger.deleteMessage}
               onForward={setForward}
               onSaveMedia={messenger.saveMedia}
-              onTypingChange={messenger.setTyping}
               hasOlder={messenger.hasOlder}
               loadingOlder={messenger.loadingOlder}
               loadOlderFailed={messenger.loadOlderFailed}
@@ -421,7 +419,6 @@ function MessengerApp() {
               stories={messenger.stories}
               avatar={messenger.profile.avatar}
               dark={messenger.dark}
-              typingId={messenger.typingIds[0] || null}
               onOpenChat={openChat}
               onProfile={(contact) =>
                 setDetail({ id: contact.id, kind: "profile" })

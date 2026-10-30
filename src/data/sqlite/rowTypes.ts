@@ -11,8 +11,6 @@ export type ConversationRow = {
   avatar: string;
   preview: string;
   time: string;
-  online: number;
-  typing: number;
   is_group: number;
   color: string;
   username: string | null;
@@ -25,13 +23,11 @@ export type ConversationRow = {
   pinned: number;
   media_visibility: string | null;
   last_message_at: number | null;
-  last_message_status: string | null;
   unread: number;
   unread_ordinal: number;
   last_read_unread_ordinal: number;
   cleared_through: number | null;
   hidden_at: number | null;
-  history_exhausted_at: number | null;
   position: number;
 };
 
@@ -39,9 +35,7 @@ export type MessageRow = {
   id: string;
   conversation_id: string;
   sequence: number | null;
-  revision: number | null;
   client_message_id: string | null;
-  author_subject_id: string | null;
   mine: number;
   time: string;
   text: string | null;
@@ -63,7 +57,6 @@ export type MessageRow = {
   deleted: number;
   created_at: string | null;
   created_at_ms: number | null;
-  edited_at: string | null;
   local_status: string | null;
   upload_progress: number | null;
   storage_id: string | null;

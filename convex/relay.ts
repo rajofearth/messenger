@@ -72,13 +72,13 @@ export const send = mutation({
       };
     }
     // The contract carries only the quoted id, and the relay keeps no copy of a
-    // delivered message, so the text is the same generic fallback the chat
-    // component uses. The phone has the real snapshot on its own row.
+    // delivered message, so the text is a generic fallback. The phone has the
+    // real snapshot on its own row.
     const replyTo: RelayReply | undefined = args.replyToMessageId
       ? { id: args.replyToMessageId, text: "Message", mine: false }
       : undefined;
     const createdAt = Date.now();
-    const sequence = await allocateSequence(ctx, meta, actor);
+    const sequence = await allocateSequence(ctx, meta.conversation);
     const message: RelayMessage = {
       id: args.clientMessageId,
       text: text || undefined,
@@ -90,7 +90,7 @@ export const send = mutation({
       duration: attachment?.duration,
       replyTo,
     };
-    await fanOut(ctx, recipientsOf(meta, actor), {
+    await fanOut(ctx, recipientsOf(meta.memberIds, actor), {
       conversationId: args.conversationId,
       senderUserId: actor.userId,
       senderSubjectId: actor.subjectId,
@@ -124,7 +124,7 @@ export const react = mutation({
     const actor = await requireUser(ctx);
     const meta = await memberConversation(ctx, actor, args.conversationId);
     const createdAt = Date.now();
-    const queueIds = await fanOut(ctx, recipientsOf(meta, actor), {
+    const queueIds = await fanOut(ctx, recipientsOf(meta.memberIds, actor), {
       conversationId: args.conversationId,
       senderUserId: actor.userId,
       senderSubjectId: actor.subjectId,
@@ -152,7 +152,7 @@ export const remove = mutation({
     const actor = await requireUser(ctx);
     const meta = await memberConversation(ctx, actor, args.conversationId);
     const createdAt = Date.now();
-    const queueIds = await fanOut(ctx, recipientsOf(meta, actor), {
+    const queueIds = await fanOut(ctx, recipientsOf(meta.memberIds, actor), {
       conversationId: args.conversationId,
       senderUserId: actor.userId,
       senderSubjectId: actor.subjectId,

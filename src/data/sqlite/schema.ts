@@ -1,27 +1,28 @@
 /**
  * Local SQLite schema.
  *
- * The schema is additive only: it is applied once and versioned through
- * `PRAGMA user_version`, so a later release appends a statement list for its
- * new version instead of rewriting a table. Tables are ordinary rowid tables
- * (never STRICT), and every optional field is nullable so an older writer can
- * keep saving rows after an upgrade.
+ * One version, no migrations. This is a development app with no users to carry
+ * over, so a database written by another build is not upgraded: `applySchema`
+ * drops every known table and creates the current shape. A build that changes
+ * the schema therefore starts from an empty database on purpose; there is no
+ * ranking of old data worth the code that reading it would cost.
+ *
+ * Tables are ordinary rowid tables (never STRICT), and every optional field is
+ * nullable so a writer can leave it out.
  */
 
 import type { SqlDatabase } from "./types";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 1;
 
-/** Statements for version 1, in dependency order. */
-const VERSION_1: readonly string[] = [
+/** The whole schema, in dependency order. */
+const SCHEMA_STATEMENTS: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL DEFAULT '',
     avatar TEXT NOT NULL DEFAULT '',
     preview TEXT NOT NULL DEFAULT '',
     time TEXT NOT NULL DEFAULT '',
-    online INTEGER NOT NULL DEFAULT 0,
-    typing INTEGER NOT NULL DEFAULT 0,
     is_group INTEGER NOT NULL DEFAULT 0,
     color TEXT NOT NULL DEFAULT '',
     username TEXT,
@@ -34,22 +35,18 @@ const VERSION_1: readonly string[] = [
     pinned INTEGER NOT NULL DEFAULT 0,
     media_visibility TEXT,
     last_message_at INTEGER,
-    last_message_status TEXT,
     unread INTEGER NOT NULL DEFAULT 0,
     unread_ordinal INTEGER NOT NULL DEFAULT 0,
     last_read_unread_ordinal INTEGER NOT NULL DEFAULT 0,
     cleared_through INTEGER,
     hidden_at INTEGER,
-    history_exhausted_at INTEGER,
     position INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS messages (
     id TEXT PRIMARY KEY NOT NULL,
     conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     sequence INTEGER,
-    revision INTEGER,
     client_message_id TEXT,
-    author_subject_id TEXT,
     mine INTEGER NOT NULL DEFAULT 0,
     time TEXT NOT NULL DEFAULT '',
     text TEXT,
@@ -71,7 +68,6 @@ const VERSION_1: readonly string[] = [
     deleted INTEGER NOT NULL DEFAULT 0,
     created_at TEXT,
     created_at_ms INTEGER,
-    edited_at TEXT,
     local_status TEXT,
     upload_progress REAL,
     storage_id TEXT,
@@ -161,24 +157,11 @@ const VERSION_1: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS gallery_saved (
     id TEXT PRIMARY KEY NOT NULL
   )`,
-  `CREATE TABLE IF NOT EXISTS migration_state (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS sync_state (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  )`,
-];
-
-/**
- * Statements for version 2: delete-for-me tombstones.
- *
- * A hidden id outlives its message row on purpose, so it carries no foreign
- * key: no writer may ever put that message back, and the record is what says
- * so. `conversation_id` is kept for the cheap per-thread lookups.
- */
-const VERSION_2: readonly string[] = [
+  /*
+   * A hidden id outlives its message row on purpose, so it carries no foreign
+   * key: no writer may ever put that message back, and the record is what says
+   * so. `conversation_id` is kept for the cheap per-thread lookups.
+   */
   `CREATE TABLE IF NOT EXISTS hidden_messages (
     message_id TEXT PRIMARY KEY NOT NULL,
     conversation_id TEXT NOT NULL,
@@ -186,17 +169,12 @@ const VERSION_2: readonly string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS hidden_messages_conversation
     ON hidden_messages(conversation_id)`,
-];
-
-/**
- * Statements for version 3: relay delivery acknowledgements.
- *
- * A pending row deliberately has no foreign key. The message it names can be
- * deleted locally before the next drain, and the ack must still survive so the
- * server is allowed to drop the envelope. `conversation_id` is kept for the
- * cheap per-thread lookup.
- */
-const VERSION_3: readonly string[] = [
+  /*
+   * A pending ack deliberately has no foreign key. The message it names can be
+   * deleted locally before the next drain, and the ack must still survive so the
+   * server is allowed to drop the envelope. `conversation_id` is kept for the
+   * cheap per-thread lookup.
+   */
   `CREATE TABLE IF NOT EXISTS pending_ack (
     queue_id TEXT PRIMARY KEY NOT NULL,
     conversation_id TEXT NOT NULL,
@@ -206,17 +184,7 @@ const VERSION_3: readonly string[] = [
     ON pending_ack(conversation_id)`,
 ];
 
-/** Every version and its statements, applied in order. */
-export const SCHEMA_MIGRATIONS: readonly {
-  version: number;
-  statements: readonly string[];
-}[] = [
-  { version: 1, statements: VERSION_1 },
-  { version: 2, statements: VERSION_2 },
-  { version: 3, statements: VERSION_3 },
-];
-
-/** Tables wiped on sign-out, children before their parents. */
+/** Tables held today, children before their parents, for sign-out. */
 export const SCHEMA_TABLES: readonly string[] = [
   "pending_ack",
   "hidden_messages",
@@ -229,29 +197,35 @@ export const SCHEMA_TABLES: readonly string[] = [
   "call_history",
   "settings",
   "gallery_saved",
-  "migration_state",
-  "sync_state",
 ];
 
 /**
- * Applies every migration the database has not seen yet. A database written by
- * a newer build is left alone rather than downgraded, and an upgrade only runs
- * the statements of the versions above the one already stored, so existing
- * rows are never rewritten.
+ * Creates the schema unless the file already carries it. Anything else, older
+ * or newer, is a database this build cannot read: its tables are dropped and
+ * rebuilt empty, because the phone is the durable copy and this app has no
+ * history worth interpreting.
  */
 export async function applySchema(database: SqlDatabase): Promise<void> {
   const row = await database.getFirstAsync<{ user_version: number }>(
     "PRAGMA user_version",
   );
-  const current = row?.user_version ?? 0;
-  if (current >= SCHEMA_VERSION) return;
-  await database.withTransactionAsync(async () => {
-    for (const migration of SCHEMA_MIGRATIONS) {
-      if (migration.version <= current) continue;
-      for (const statement of migration.statements) {
+  if ((row?.user_version ?? 0) === SCHEMA_VERSION) return;
+
+  // Foreign keys are a connection setting, so they are switched around the
+  // rebuild rather than inside it; a drop would otherwise cascade through the
+  // children or refuse while they still reference the parent.
+  await database.execAsync("PRAGMA foreign_keys = OFF");
+  try {
+    await database.withTransactionAsync(async () => {
+      for (const table of SCHEMA_TABLES) {
+        await database.execAsync(`DROP TABLE IF EXISTS ${table}`);
+      }
+      for (const statement of SCHEMA_STATEMENTS) {
         await database.execAsync(statement);
       }
-    }
-    await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-  });
+      await database.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    });
+  } finally {
+    await database.execAsync("PRAGMA foreign_keys = ON");
+  }
 }

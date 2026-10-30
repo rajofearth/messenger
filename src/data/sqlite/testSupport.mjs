@@ -7,18 +7,6 @@ import ts from "typescript";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const modules = new Map();
 
-// The data layer imports the real AsyncStorage module only to build its driver.
-const mocks = {
-  "@react-native-async-storage/async-storage": {
-    default: {
-      getItem: async () => null,
-      setItem: async () => {},
-      removeItem: async () => {},
-      getAllKeys: async () => [],
-    },
-  },
-};
-
 /** Loads a TypeScript module by compiling it for CommonJS. */
 function load(relative) {
   const file = path.resolve(here, relative);
@@ -33,7 +21,6 @@ function load(relative) {
     },
   }).outputText;
   const require = (specifier) => {
-    if (Object.hasOwn(mocks, specifier)) return mocks[specifier];
     if (!specifier.startsWith(".")) {
       throw new Error(`Missing module mock: ${specifier} (from ${file})`);
     }
@@ -49,11 +36,10 @@ function load(relative) {
 }
 
 export const schema = load("schema.ts");
-export const migrate = load("migrate.ts");
 export const repository = load("repository.ts");
 export const { createStore } = load("../store.ts");
 
-export const NAMESPACE = "messenger/v2";
+const NAMESPACE = "messenger/v2";
 
 function createDatabase() {
   const raw = new DatabaseSync(":memory:");
@@ -94,10 +80,7 @@ function memoryDriver() {
   };
 }
 
-export function seed(driver, key, value) {
-  driver.data.set(`${NAMESPACE}/${key}`, JSON.stringify(value));
-}
-
+/** A fresh in-memory database with the current schema and its repository. */
 export async function setup() {
   const database = createDatabase();
   await schema.applySchema(database);

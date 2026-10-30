@@ -21,7 +21,6 @@ export type ConversationListProps = {
   messages: Message[];
   dark: boolean;
   visible: boolean;
-  typing: boolean;
   hasOlder: boolean;
   loadingOlder: boolean;
   /** The last "load older" failed; the control offers a retry. */
@@ -45,7 +44,6 @@ export default function ConversationList({
   messages,
   dark,
   visible,
-  typing,
   hasOlder,
   loadingOlder,
   loadOlderFailed = false,
@@ -57,7 +55,7 @@ export default function ConversationList({
   onOpenAlbum,
   onRetry,
 }: ConversationListProps) {
-  const { muted, card, coralInk } = palette(dark);
+  const { muted, coralInk } = palette(dark);
   const rows = useMemo(() => groupMediaMessages(messages), [messages]);
   // One label per row: the first row of a local day gets a chip, later rows on
   // the same day get none. A row without a timestamp never starts a day.
@@ -215,13 +213,6 @@ export default function ConversationList({
         <Text style={[s.emptyThread, { color: muted }]}>
           No messages yet. Say hello to start the conversation.
         </Text>
-      }
-      ListFooterComponent={
-        typing ? (
-          <View style={[s.typing, { backgroundColor: card }]}>
-            <Text style={{ color: coralInk, letterSpacing: 5 }}>● ● ●</Text>
-          </View>
-        ) : null
       }
     />
   );

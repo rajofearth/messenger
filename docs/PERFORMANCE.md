@@ -4,9 +4,9 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-The current development build (C4b durability plus push wakes plus the relay
-queue) is **14,074,187 bytes (13.42 MiB)**, 2.58 MiB below the 16 MiB gate and
-1.58 MiB below the 15 MiB shipping line. It is a development APK, so the gate
+The current development build (relay queue with the pre-decision architecture
+removed) is **14,046,155 bytes (13.40 MiB)**, 2.60 MiB below the 16 MiB gate and
+1.60 MiB below the 15 MiB shipping line. It is a development APK, so the gate
 runs with `--variant dev`, which expects the dev package and version; all 11
 checks pass.
 The per-change numbers are under "Measured APK size"; the historical narrative
@@ -60,6 +60,15 @@ records the byte size and SHA-256 in `artifacts/messenger-dev.json`; the bundle
 the gate measured is 2.40 MiB and still stored uncompressed, and all 11 dev
 checks pass. This is a local build measurement, not a claim that device
 acceptance has passed.
+
+The 2026-10-29 cleanup **development** APK `0.1.1-dev.20261029.120201` is
+**14,046,155 bytes (13.40 MiB)**, down **28,032 bytes (-0.20%)** from the relay
+build, with **2,731,061 bytes** left under the 16 MiB gate. Removing the
+`convex-chat` component, migrations, presence, typing and read receipts, server
+paging and the local web tester removed JavaScript but no dependency and no
+native library. The bundle fell from 2.40 MiB to 2.37 MiB; the APK still has one
+dex (8.71 MiB), one ABI, 19 native libraries and a stored, uncompressed bundle,
+and all 11 dev checks pass.
 
 ### Build configuration in `app.json`
 
@@ -238,6 +247,7 @@ Each figure is the same working tree, the same Expo config and the same
 | C4b durability build (chat and message tombstones, guarded outbox, load-older fixes; dev variant) | 13,617,512 bytes (12.99 MiB) | **+7,304 bytes, +0.05%** against the storage build, -68.7% overall |
 | Push wake build (FCM sends, device token registry, data-only wake; dev variant) | 14,047,423 bytes (13.40 MiB) | **+429,911 bytes, +3.2%** against the C4b build, -67.7% overall |
 | Relay build (queue, acknowledgements, 30-day purge, Settings warning; dev variant) | 14,074,187 bytes (13.42 MiB) | **+26,764 bytes, +0.19%** against the push build, -67.7% overall |
+| Cleanup build (component, migrations, presence, typing, read receipts, server paging and the web tester removed; dev variant) | 14,046,155 bytes (13.40 MiB) | **-28,032 bytes, -0.20%** against the relay build, -67.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
@@ -430,7 +440,7 @@ before calling those runtime behaviours verified.
 
 ### Remote media is downloaded once
 
-Convex storage returns a signed URL only after the conversation membership check. `src/services/mediaCache.ts` downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Image messages and photo stories also store up to three client-rendered WebP widths (`w256`, `w512`, `w1080`) in `mediaVariants`; a variant file is named `<id>-<variant>.<mime extension>` so it cannot collide with the original, and the server caps each width at 128 KiB, 384 KiB and 1 MiB. Message and story projections return the variant rows with their stored URLs. `chooseImageSource` in `src/domain/imageVariants.ts` picks the smallest stored width that covers the display slot at up to 2x density (220dp for a chat bubble, 180dp for an album tile, 130dp for a shared-media thumbnail, the screen width for a viewer and 430dp for a story); `useRemoteThreadMedia` and `prefetchStories` cache exactly one of those widths in `previewUri` for photos and leave the original in `uri`/`image`; videos keep one local original. A local preview narrower than the chosen width is ignored, and gallery saves still fetch the original, so exporting never downgrades a photo. The original file still keeps the sender's aspect ratio, no server-side resize is performed, and `expo-image` decodes whatever source the renderer asks for at the displayed size.
+Convex storage returns a signed URL only after the conversation membership check. The relay drain downloads each received file once into `Paths.document/messenger-media`, named after the message or story id, so reopening a thread, prefetching a story or saving an album copy does not download it again. The signed URL stays as the fallback when a download fails. Image messages and photo stories also store up to three client-rendered WebP widths (`w256`, `w512`, `w1080`) in `mediaVariants`; a variant file is named `<id>-<variant>.<mime extension>` so it cannot collide with the original, and the server caps each width at 128 KiB, 384 KiB and 1 MiB. Message envelopes and story projections return the variant rows with their stored URLs. `chooseImageSource` in `src/domain/imageVariants.ts` picks the smallest stored width that covers the display slot at up to 2x density (220dp for a chat bubble, 180dp for an album tile, 130dp for a shared-media thumbnail, the screen width for a viewer and 430dp for a story); the relay drain and `prefetchStories` cache exactly one of those widths in `previewUri` for photos and leave the original in `uri`/`image`; videos keep one local original. A local preview narrower than the chosen width is ignored, and gallery saves still fetch the original, so exporting never downgrades a photo. The original file still keeps the sender's aspect ratio, no server-side resize is performed, and `expo-image` decodes whatever source the renderer asks for at the displayed size.
 
 ### Avatars in the notification pipeline
 
@@ -440,7 +450,7 @@ Downloads and files are keyed by the storage object (`storage-<id>`), not by the
 
 ### Lazy per-conversation history
 
-Only the selected conversation's thread is queried (`api.chat.listMessages`, newest 100 rows). `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while `useRemoteThreadMedia` stores an opened thread and its downloaded files. SQLite holds one row per message, so a send upserts that row and the conversation's inbox projection instead of rewriting a whole thread; opening a thread reads 100 rows plus pending sends, and older pages come from the table or the server on demand.
+Only the selected conversation's thread is read, newest 100 rows from SQLite. `useRemoteCache` hydrates the inbox, stories, settings and call history at launch, while the relay drain appends newly delivered rows and their downloaded files. SQLite holds one row per message, so a send upserts that row and the conversation's inbox projection instead of rewriting a whole thread; opening a thread reads 100 rows plus pending sends, and older pages come from the table on demand. There is no server history query to wait for.
 
 ### Disk caches
 

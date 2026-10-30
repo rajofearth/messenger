@@ -4,7 +4,6 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { Message, Story } from "../domain/data";
 import { convexClient } from "../services/convexClient";
 import {
-  RELAY_ENABLED,
   RELAY_MEDIA_LIMIT_BYTES,
 } from "../services/relayConfig";
 import { uploadLocalFile } from "../services/remoteFiles";
@@ -58,7 +57,6 @@ function positive(value: number | undefined) {
  * its bytes are already in Convex and the send is the only step left.
  */
 function refuseRelayOversize(uri: string) {
-  if (!RELAY_ENABLED) return;
   const size = new File(uri).size ?? 0;
   if (size > RELAY_MEDIA_LIMIT_BYTES) {
     throw new Error("QUEUE_MEDIA_TOO_LARGE");
@@ -76,10 +74,10 @@ export function attachmentErrorMessage(error: unknown) {
 }
 
 /**
- * Uploads an attachment and asks the server to send it under the same client
+ * Uploads an attachment and asks the relay to send it under the same client
  * message id. A message that already holds a finalized storage id skips the
  * upload: retrying with the same id and parts is idempotent, while a second
- * upload would change the parts and be rejected with IDEMPOTENCY_CONFLICT.
+ * upload would leave a second blob for the relay to release later.
  * Throws on failure so the caller can mark the bubble failed and keep it for a
  * retry. Returns the server's confirmed view of the message.
  */

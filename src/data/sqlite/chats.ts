@@ -1,14 +1,14 @@
 /**
  * Conversations: the inbox cache and the row every message hangs off.
  *
- * `saveChats` only ever upserts. The server owns the inbox snapshot, but the
- * phone owns history, so a conversation missing from one snapshot is never
- * removed by a write; only clearing, deleting or signing out removes rows.
- * Deleting is a tombstone, not a delete: the row keeps `hidden_at` and
- * `cleared_through`, so a page or receipt that lands afterwards cannot recreate
- * the chat with default columns. Only a snapshot whose newest message is
- * younger than the tombstone brings it back, which is the point of deleting a
- * chat: new messages start it again from empty.
+ * `saveChats` only ever upserts. A conversation missing from one inbox
+ * snapshot is history the phone still owns, so a write never removes a row;
+ * only clearing, deleting or signing out removes rows. Deleting is a
+ * tombstone, not a delete: the row keeps `hidden_at` and `cleared_through`, so
+ * a page or receipt that lands afterwards cannot recreate the chat with default
+ * columns. Only a snapshot whose newest message is younger than the tombstone
+ * brings it back, which is the point of deleting a chat: new messages start it
+ * again from empty.
  */
 
 import type { ChatRecord } from "../records";
@@ -24,8 +24,6 @@ ON CONFLICT(id) DO UPDATE SET
   avatar = excluded.avatar,
   preview = excluded.preview,
   time = excluded.time,
-  online = excluded.online,
-  typing = excluded.typing,
   is_group = excluded.is_group,
   color = excluded.color,
   username = excluded.username,
@@ -38,7 +36,6 @@ ON CONFLICT(id) DO UPDATE SET
   pinned = excluded.pinned,
   media_visibility = excluded.media_visibility,
   last_message_at = excluded.last_message_at,
-  last_message_status = excluded.last_message_status,
   unread = excluded.unread,
   unread_ordinal = CASE
     WHEN excluded.unread > 0 THEN excluded.unread_ordinal
@@ -70,27 +67,6 @@ export async function ensureConversation(
   await database.runAsync(
     "INSERT INTO conversations (id) VALUES (?) ON CONFLICT(id) DO NOTHING",
     chatId,
-  );
-}
-
-/**
- * A named conversation for a thread that arrived without its inbox entry, such
- * as a legacy thread whose chat the old store never listed. A nameless
- * placeholder (a message write that beat the inbox) is upgraded, because
- * `listChats` leaves those out and the thread would be unreachable.
- */
-export async function ensureNamedConversation(
-  database: SqlDatabase,
-  chatId: string,
-  name: string,
-): Promise<void> {
-  await database.runAsync(
-    `INSERT INTO conversations (id, name, position)
-     VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM conversations))
-     ON CONFLICT(id) DO UPDATE SET name = excluded.name
-     WHERE conversations.name = ''`,
-    chatId,
-    name,
   );
 }
 
@@ -148,8 +124,7 @@ export async function deleteConversation(
     `UPDATE conversations SET
        hidden_at = ?,
        cleared_through = ?,
-       unread = 0,
-       last_message_status = NULL
+       unread = 0
      WHERE id = ?`,
     now,
     now,

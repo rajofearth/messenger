@@ -4,17 +4,17 @@
 [![Release](https://img.shields.io/github/v/release/rajofearth/messenger?include_prereleases&sort=semver)](https://github.com/rajofearth/messenger/releases)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-A messenger for Android, built with Expo SDK 57 and React Native 0.86. Accounts, profiles, contacts, groups, messages, presence, typing, stories and per-conversation preferences live in a Convex deployment; the app keeps a local copy so chats open instantly and survive an offline start. Calls and messages still arrive as real Android system notifications with working action buttons while the app process is alive. There is no push service and no call signalling server.
+A messenger for Android, built with Expo SDK 57 and React Native 0.86. Accounts, profiles, contacts, conversations, preferences and 24-hour stories live in a Convex deployment. Messages do not: Convex relays them, and each phone keeps its own history in SQLite. Undelivered messages wait in a relay queue for at most 30 days, and a delivered message is deleted from the server once the phone acknowledges it. FCM wakes the app when something arrives, but carries no content. Calls and messages appear as real Android system notifications with working action buttons while the app process is alive. There is no call signalling server.
 
-The client architecture reads through one typed cache seam (`src/data/messengerRepository.ts`); `useRemoteCache` and `useRemoteServerSync` keep that cache current, and `useRemoteMessenger` hydrates screens from it first, then reconciles with Convex. A backend outage therefore degrades to the last known state instead of an empty app. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The client reads through one repository seam (`src/data/messengerRepository.ts`), which is now the source of truth for chats and messages rather than a cache. `useRemoteCache` paints the stored inbox and threads first, `conversationSync` merges conversation metadata, and the relay drain appends delivered rows. The app therefore opens offline with its full history. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/RELAY.md](docs/RELAY.md).
 
 ## What it is, and what it is not
 
-Working: username/password accounts with signed-in device management, editable profile photos, contact creation by username, direct and group chats, text and media messages, replies, reactions, forwarding, delete for me/everyone, online and typing presence, mute and block, per-chat gallery visibility, call history, 24-hour stories, and Android system notifications for calls and messages.
+Working: username/password accounts with signed-in device management, editable profile photos, contact creation by username, direct and group chats, text and media messages, replies, reactions, forwarding, delete for me/everyone, mute and block, per-chat gallery visibility, call history, 24-hour stories, FCM wakes, and Android system notifications for calls and messages.
 
-Local-first: the inbox, threads, stories, settings and downloaded media are cached on the device. The cache paints immediately while Convex queries reconcile or refresh it; a cache hit does not stop the query. A per-conversation switch can copy received photos and videos into a `Messenger` album in the device gallery; otherwise media stays inside app storage.
+Local-first: chats, threads, stories, settings and downloaded media live on the device. The server keeps conversation metadata and a bounded delivery queue, so the inbox and every opened thread paint from SQLite before the network answers. A per-conversation switch can copy received photos and videos into a `Messenger` album in the device gallery; otherwise media stays inside app storage. Reinstalling or clearing app data deletes history, because the server no longer keeps a copy; Settings says so.
 
-Simulated or limited: calls connect on a timer and the remote video is a placeholder, because there is no call transport. Notifications are posted by the running app, not by push. There is no end-to-end encryption and local caches are not encrypted by the app; treat the deployment's database and the device as trusted for this prototype.
+Simulated or limited: calls connect on a timer and the remote video is a placeholder, because there is no call transport. Presence, typing indicators and read receipts are not part of this build. There is no end-to-end encryption, and local history is not encrypted by the app; treat the deployment's database and the device as trusted for this prototype.
 
 ## Requirements
 
@@ -88,18 +88,12 @@ development signing key; subsequent development builds are intended to arrive
 through the updater. If the agent lacks `gh` authentication or the development
 Convex configuration, the release is blocked and that setup must be provided.
 
-### Web tester for a second user
+### Testing with a second user
 
-`tools/web-tester/` is a local-only browser client for testing a second account against the phone. It uses the same Convex deployment and the same password auth as the app, so no backend test bypass is involved. It supports direct chats, groups, text and media attachments, replies, reactions, and read state.
-
-```sh
-npm run web:dev      # http://localhost:5174 and the LAN URL Vite prints
-npm run web:agent -- chats
-npm run web:agent -- send --to <username> --text "hello"
-npm run web:control  # optional local HTTP control API on 127.0.0.1:8787
-```
-
-The reusable test account is `webtester_2026`; its password lives in the ignored `tools/web-tester/.env.local`. The CLI uses that account and can target another account with `--username`/`--password`; the control API uses the account from the environment. See [tools/web-tester/README.md](tools/web-tester/README.md) for the full command list, control API routes and test flow. The web tester is not imported by the mobile app and is not part of the APK.
+Relay delivery needs two accounts, and the second one must run the app: the
+relay deletes a delivered message, so there is no server-side history a browser
+client could read. Install the dev build on a second phone and sign in with a
+different account. `docs/RELAY.md` §8 lists the round-trip check.
 
 `npm run android:build` is a Windows helper. On macOS or Linux, generate the project and build it yourself:
 
@@ -126,15 +120,11 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 | `npm run dev:publish` | Publishes the existing dev APK without rebuilding |
 | `npm run android` | Alias for `android:build` |
 | `npm run release:check` | Typecheck, tests and the slim-build gate over `artifacts/messenger-local.apk` |
-| `npm run web:dev` | Local second-user web tester at `http://localhost:5174` |
-| `npm run web:agent` | CLI for the web tester account: chats, send, read, upload, react |
-| `npm run web:control` | Local HTTP control API for the web tester account |
-| `npm run web:check` | Typecheck the web tester independently of the app |
 
 ## Features
 
 - **Accounts.** Create an account with a name, username and password. Usernames are how people find you; changing one renames the password account at the same time. There is deliberately no signed-out password reset, and the app warns that forgetting the password loses the account. Password changes and device removal live in Settings, where a device must be signed in for 24 hours before it can remove other devices.
-- **Chats.** Compact heading with private/group tabs, search that hides the stories strip while a query is active, unread badges, and live online and typing indicators. Opening a chat clears its unread count and syncs the read position.
+- **Chats.** Compact heading with private/group tabs, search that hides the stories strip while a query is active, unread badges, and a full local thread that opens instantly. Opening a chat clears its unread count and marks it read on this device.
 - **Messages.** Text, photos, videos, files and voice notes, with a metered recording waveform. Long-press a bubble for anchored reactions, reply (including replies to replies), forward, save photo/video to the gallery, and delete for me or everyone. Double-tap to react. Forwarding opens a searchable multi-recipient screen. Media opens in a viewer; documents use the system share sheet.
 - **Media albums.** Consecutive media from one sender within two minutes forms a grid with up to four previews and a `+n` overflow tile. Albums break on text, a different sender, different reply targets, forwarded or deleted messages. Individual items stay addressable for deletion, replies and shared-media history.
 - **Stories.** One ring per person, plus a self ring for your own uploads, with per-item captions and no forced cropping. Stories expire after 24 hours locally and in the database, and the next few are prefetched into app storage.
@@ -159,7 +149,7 @@ Builds are signed with the debug keystore Expo generates, which is fine for a pr
 - **Message notification.** Contact or group avatar and name, the last few messages in `MessagingStyle`, and three actions: reply inline through `RemoteInput`, mark as read, and mute the conversation. Marking read clears the notification and the unread badge; muting suppresses later notifications for that conversation.
 - **Tap and act while closed.** Button presses are written to native storage before anything else, then delivered to JavaScript when the app runs. Answer and taps launch the app; other actions queue. Every action carries a UUID and is acknowledged only after it has been handled, so a crash between the two replays the action instead of losing it, and the app deduplicates by that ID.
 
-Limits worth knowing: this is presentation and action delivery only. It does not register a Telecom call, run a foreground service, wake the process, receive push, or keep audio alive, so notification buttons are requests that the app applies when JavaScript is running rather than a headless call engine. Dismissing a notification does not hang up the local call state. See the module's [README](modules/system-notifications/README.md) for the full contract, and note that everything notification-related still needs a pass on physical hardware.
+Limits worth knowing: this is presentation and action delivery only. It does not register a Telecom call, run a foreground service, wake the process, drain the relay, or keep audio alive, so notification buttons are requests that the app applies when JavaScript is running rather than a headless call engine. FCM wakes can start the process, but a wake carries no content and cannot authenticate a drain. Dismissing a notification does not hang up the local call state. See the module's [README](modules/system-notifications/README.md) for the full contract, and note that everything notification-related still needs a pass on physical hardware.
 
 ## Project layout
 
@@ -167,11 +157,11 @@ Limits worth knowing: this is presentation and action delivery only. It does not
 App.tsx                     Screen composition and navigation only
 app.config.js               Production app.json, or the dev variant selected by APP_VARIANT
 assets/dev/                 Dev-only launcher icons
-convex/                     Convex schema, auth, chat, files, devices, stories, release feed
+convex/                     Convex schema, auth, conversations, relay, push, files, stories, release feed
 src/domain/                 Types and pure helpers (no React, no storage)
-src/data/                   Typed local persistence, cache and the repository seam
-src/services/               Convex client, uploads, media cache, secure identity, native bridges
-src/state/                  Local-first state: remote messenger, cache, sync, presence, writers
+src/data/                   SQLite history, media index and the repository seam
+src/services/               Convex client, relay drain, uploads, push, media cache, native bridges
+src/state/                  Local-first state: repository reads, conversation sync, relay drain, writers
 src/notifications/          Notification payloads, settings, bridge and ledger
 src/features/               Screens grouped by area: auth, chats, conversations, contacts,
                             calls, profile, stories
@@ -180,7 +170,6 @@ modules/system-notifications/  Kotlin: Android call and message notifications
 modules/keyboard-media/        Kotlin: rich content from third-party keyboards
 plugins/                    Config plugins; keep unused barcode scanner code and non-English resources out of the APK
 scripts/                    Android build helpers, dev release publisher and Node test files
-tools/web-tester/           Local-only second-user website, CLI and control API
 ```
 
 Features depend on `src/domain`, `src/data` and `src/ui`, never on `App.tsx`. `npm test` enforces this: a 500-line limit per source file, no imports back into `App.tsx`, and domain modules free of React, storage and native imports.
@@ -212,9 +201,10 @@ The two feeds are separate. Production's `releases` rows live on the production 
 
 ## Known limitations
 
-- No push notifications. Message and call notifications are posted by the running app, so they do not arrive after the process is killed.
+- Push wakes arrive through FCM, but they do not deliver messages. A killed app records the wake and drains when it next opens, because the headless task has no Convex auth session; Android force-stop suppresses the wake entirely.
 - Calls are local simulations: there is no audio or remote video transport, no signalling server and no Telecom integration. Group calls are intentionally unavailable.
-- The app stores its local cache unencrypted and the Convex deployment is the source of truth for accounts and messages. There is no end-to-end encryption, and signing out deletes this device's local copy so the next account cannot read it.
+- History lives on one phone. A delivered message is deleted from the server, so a second device starts empty, and reinstalling or clearing app data loses history. Presence, typing indicators and read receipts are not implemented.
+- The app stores its local history unencrypted. There is no end-to-end encryption, and signing out deletes this device's local copy so the next account cannot read it.
 - The in-app updater only runs when the build was published with a feed URL, and it cannot install silently: Android always shows its installer, and the "install unknown apps" switch must be on.
 - Switching from the generated debug key to a real release keystore needs one manual uninstall and reinstall, because Android refuses to update across a signature change.
 - The dev channel is published from the local checkout through `npm run dev:ship`. A CI dev channel would need a development Convex deploy key and a stable dev signing key; no such workflow is configured yet.

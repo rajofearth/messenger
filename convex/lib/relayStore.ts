@@ -7,12 +7,12 @@
  */
 
 import { ConvexError } from "convex/values";
-import { components, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { isMember } from "./conversations";
 import { requireUser } from "./identity";
 import { deleteMediaVariants, readMediaVariants } from "./mediaVariants";
-import { shouldDeleteBlob } from "./retention";
 import {
   MAX_ATTACHMENT_BYTES,
   envelopeJson,
@@ -56,7 +56,7 @@ type EnqueueInput = {
   reactionKey?: string;
 };
 
-/** Mirrors `convex/chat.ts`, which derives the bubble kind from the MIME type. */
+/** Derives the bubble kind from the MIME type, as the client does. */
 function attachmentKind(mediaType: string): RelayAttachmentKind {
   if (mediaType.startsWith("image/")) return "image";
   if (mediaType.startsWith("video/")) return "video";
@@ -76,32 +76,55 @@ export function envelopeVariant(
   };
 }
 
-async function conversationMeta(
+async function conversationDoc(
   ctx: MutationCtx,
   conversationId: string,
-): Promise<Doc<"conversationMeta"> | null> {
-  return await ctx.db
-    .query("conversationMeta")
-    .withIndex("by_conversationId", (q) => q.eq("conversationId", conversationId))
-    .unique();
+): Promise<Doc<"conversations"> | null> {
+  // Ids arrive as strings. `normalizeId` rejects anything that is not a
+  // `conversations` id without a database read, so a forged handle is
+  // indistinguishable from an unknown conversation.
+  const id = ctx.db.normalizeId("conversations", conversationId);
+  return id ? await ctx.db.get(id) : null;
 }
 
+async function memberSubjectIds(
+  ctx: MutationCtx,
+  conversationId: Id<"conversations">,
+): Promise<string[]> {
+  const rows = await ctx.db
+    .query("conversationMembers")
+    .withIndex("by_conversation", (q) => q.eq("conversationId", conversationId))
+    .collect();
+  return rows.map((row) => row.subjectId);
+}
+
+/** A conversation plus its members, which is all the relay needs to route. */
+export type RelayConversation = {
+  conversation: Doc<"conversations">;
+  memberIds: string[];
+};
+
 /**
- * Membership is mirrored in `conversationMeta`, so the relay never needs the
- * chat component to decide who a message goes to. Unknown conversation and
+ * Membership lives in `conversationMembers`, so the relay never needs another
+ * component to decide who a message goes to. Unknown conversation and
  * non-membership look the same from outside, which keeps ids unguessable.
  */
 export async function memberConversation(
   ctx: MutationCtx,
   actor: Actor,
   conversationId: string,
-): Promise<Doc<"conversationMeta">> {
-  const meta = await conversationMeta(ctx, conversationId);
-  if (!meta || !meta.memberSubjectIds.includes(actor.subjectId)) {
+): Promise<RelayConversation> {
+  const conversation = await conversationDoc(ctx, conversationId);
+  if (!conversation) {
+    throw new ConvexError({ code: "CONVERSATION_NOT_FOUND" });
+  }
+  const memberIds = await memberSubjectIds(ctx, conversation._id);
+  if (!isMember(memberIds, actor.subjectId)) {
     throw new ConvexError({ code: "CONVERSATION_NOT_FOUND" });
   }
   // The relay is a second write path, so it enforces the same block rule as
-  // `chat.canWrite`: otherwise a blocked peer could still send, react or delete.
+  // the preference mutations: otherwise a blocked peer could still send, react
+  // or delete.
   const preference = await ctx.db
     .query("conversationPreferences")
     .withIndex("by_user_conversation", (q) =>
@@ -109,8 +132,8 @@ export async function memberConversation(
     )
     .unique();
   if (preference?.blocked) throw new ConvexError({ code: "CONVERSATION_BLOCKED" });
-  if (meta.kind === "direct") {
-    for (const peerId of meta.memberSubjectIds) {
+  if (conversation.kind === "direct") {
+    for (const peerId of memberIds) {
       if (peerId === actor.subjectId) continue;
       const peerPreference = await ctx.db
         .query("conversationPreferences")
@@ -125,45 +148,32 @@ export async function memberConversation(
       }
     }
   }
-  return meta;
+  return { conversation, memberIds };
 }
 
 export function recipientsOf(
-  meta: Doc<"conversationMeta">,
+  memberIds: readonly string[],
   actor: Actor,
 ): Id<"users">[] {
   // The sender is skipped entirely: one row per other member, and no row for
   // the sender's own other devices, which is the v1 single-history-device rule.
-  return meta.memberSubjectIds
+  return memberIds
     .filter((subjectId) => subjectId !== actor.subjectId)
     .map((subjectId) => subjectId as Id<"users">);
 }
 
 /**
  * The counter stores the last number handed out, so a fresh conversation starts
- * at 1. Its first value is seeded from the chat component once, which keeps
- * relay messages in order with the history written before the relay existed.
- * Patching the same meta row is what separates two concurrent sends: Convex
- * re-runs the losing mutation against the patched document.
+ * at 1. Patching the same conversation document is what separates two
+ * concurrent sends: Convex re-runs the losing mutation against the patched
+ * document.
  */
 export async function allocateSequence(
   ctx: MutationCtx,
-  meta: Doc<"conversationMeta">,
-  actor: Actor,
+  conversation: Doc<"conversations">,
 ): Promise<number> {
-  // The component can still advance while the relay is in use, because a
-  // forward writes there. Reading the newest component sequence on every send
-  // and taking the larger of the two keeps one number space per conversation,
-  // which is what `mergeThread` and the paging cursors assume.
-  const newest = await ctx.runQuery(components.chat.messages.list, {
-    scopeId: actor.scopeId,
-    subjectId: actor.subjectId,
-    conversationId: meta.conversationId,
-    limit: 1,
-  });
-  const last = Math.max(meta.nextSequence ?? 0, newest[0]?.sequence ?? 0);
-  const sequence = last + 1;
-  await ctx.db.patch(meta._id, { nextSequence: sequence });
+  const sequence = (conversation.nextSequence ?? 0) + 1;
+  await ctx.db.patch(conversation._id, { nextSequence: sequence });
   return sequence;
 }
 
@@ -288,9 +298,9 @@ export async function fanOut(
 }
 
 /**
- * Reclaims one attachment once its last queue row is gone. `lib/retention`
- * decides whether the files row may go: an empty ref list means the blob was
- * only ever queued, while a legacy or shared row keeps both the row and bytes.
+ * Reclaims one attachment once its last queue row is gone. Delivery leaves no
+ * server-side message behind, so the files row exists only to describe the
+ * queue entry and goes with it.
  */
 export async function releaseAttachment(
   ctx: MutationCtx,
@@ -305,7 +315,6 @@ export async function releaseAttachment(
     .query("files")
     .withIndex("by_storageId", (q) => q.eq("storageId", storageId))
     .unique();
-  if (file && !shouldDeleteBlob(file.messageRefs)) return false;
   if (file) await ctx.db.delete(file._id);
   await deleteMediaVariants(ctx, storageId);
   const metadata = await ctx.db.system.get("_storage", storageId);

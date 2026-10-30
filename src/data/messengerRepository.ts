@@ -23,5 +23,5 @@ const store = createStore(asyncStorageDriver, STORE_NAMESPACE);
 /** Shared instance: every reader hits the same database and memory cache. */
 export const messengerRepository = createMessengerRepository(
   store,
-  openMessengerDatabase(store),
+  openMessengerDatabase(),
 );

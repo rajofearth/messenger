@@ -147,14 +147,13 @@ export async function writeRelayBatch(
   );
   // Same projection a normal save leaves behind: the newest confirmed row
   // supplies the preview, the time and `last_message_at`, and no delivery
-  // state survives on a server row. `created_at` is only seeded for a
+  // state is stored on a confirmed row. `created_at` is only seeded for a
   // conversation the inbox has not described yet.
   await database.runAsync(
     `UPDATE conversations SET
        preview = ?,
        time = ?,
        last_message_at = ?,
-       last_message_status = NULL,
        created_at = COALESCE(created_at, ?)
      WHERE id = ?
        AND hidden_at IS NULL

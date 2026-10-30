@@ -1,12 +1,12 @@
 # Architecture
 
-A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger. Accounts, profiles, contacts, conversations, messages, reactions, unread counts, presence, typing, conversation preferences and 24-hour stories live in a Convex deployment. The client keeps a device cache in front of every read, so the inbox and previously opened threads paint before the network answers and an offline start still shows the last known state. The production and development release feeds are separate HTTP endpoints on separate deployments.
+A contributor guide to this Expo SDK 57 / React Native 0.86.3 Android messenger. Accounts, profiles, contacts, conversations, preferences, 24-hour stories and the update feed live in a Convex deployment. Messages do not: Convex relays them, and the phone keeps the durable history in SQLite. The inbox and previously opened threads paint from the device before the network answers, and an offline start still shows the last known state. The production and development release feeds are separate HTTP endpoints on separate deployments.
 
-## Direction: relay-only
+## Relay-only
 
-Decided 2026-10-28. The target is the WhatsApp shape: Convex authenticates and relays, each phone owns history in SQLite, undelivered items wait in a queue for at most 30 days, and delivered content is deleted from the server. Large-file transfer and the encrypted Google Drive backup are on hold; FCM push wakes are in scope.
+Decided 2026-10-28 and shipped. This is the WhatsApp shape: Convex authenticates and relays, each phone owns history in SQLite, undelivered items wait in a queue for at most 30 days, and delivered content is deleted from the server. Large-file transfer and the encrypted Google Drive backup remain on hold; FCM push wakes are in scope and shipped.
 
-None of that is built yet. The code still stores every message in the `convex-chat` component, and `docs/RELAY.md` is the living state, phase order and decision log. The storage review and the relay constraints are in `P:\Projects\messenger-research\11-storage-reality.md` §2–§3.
+There is no second message path left. The `convex-chat` component, its wrapper functions, the AsyncStorage history import, schema migrations, server paging, presence, typing indicators and read receipts are gone, and their data was wiped from the development deployment. `docs/RELAY.md` is the phase record, known gaps and verification checklist. The storage review is in `P:\Projects\messenger-research\11-storage-reality.md` §2–§3.
 
 ## Layers and allowed dependency direction
 
@@ -17,11 +17,11 @@ Intended direction: `features` and `state` depend on `domain`, `data`, `services
 | Composition | `App.tsx` | Screen selection, hook wiring, Android back handling, the notification preference switch. No feature markup. |
 | Screens | `src/features/<area>/` | One folder per area: `auth`, `chats`, `conversations`, `contacts`, `calls`, `profile`, `stories`. Screen components, their stylesheets, and feature-local hooks such as `useCalls` and `useMessageMedia`. |
 | Shared UI | `src/ui/` | Presentational primitives (`primitives.tsx`, `ResponsiveImage.tsx`, `Navigation.tsx`, `QuickActions.tsx`, `theme.ts`), `KeyboardMediaInput`, `UpdatePrompt.tsx`, `openAttachment`. |
-| App state | `src/state/` | `useRemoteMessenger.ts` (the screen-facing API), `useRemoteCache.ts`, `useRemoteServerSync.ts`, `useRemotePresence.ts`, `useRemoteThreadMedia.ts`, `remoteMessengerSend.ts` (optimistic send and retry), `useOutboxResume.ts` (resumes persisted sends), the `remoteMessenger*` mutation helpers, `useAppUpdater.ts`, `useNotificationActions.ts`, `useThemePreference.ts` and `useDeviceScheme.ts`. |
-| Native and network bridges | `src/services/` | `convexClient.ts`, `deviceIdentity.ts`, `remoteFiles.ts`, `mediaCache.ts`, `outbox.ts` (durable copy and queue for unsent sends), `systemNotifications.ts`, `keyboardMedia.ts`, `appUpdater.ts` and `deviceScheme.ts`. Thin typed wrappers, no screen logic. |
-| Persistence | `src/data/` | `messengerRepository.ts` (the local cache seam), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`, `updateFeed.ts` (the release-feed client). |
-| Backend | `convex/` | `schema.ts`, Convex Auth (`auth.ts`, `auth.config.ts`), `profiles`, `chat`, `preferences`, `devices`, `files`, `stories`, the `convex-chat` component mount, the expiry cron and the release feed. |
-| Domain | `src/domain/` | `data.ts` (types), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`, `time.ts` (local date labels), `threadMerge.ts` (optimistic message and inbox matching), `outbox.ts` (hydrating persisted sends and their inbox previews), `updates.ts`. Pure functions and types only. |
+| App state | `src/state/` | `useRemoteMessenger.ts` (the screen-facing API), `useRemoteCache.ts`, `useRemoteServerSync.ts` and `conversationSync.ts` (conversation metadata only), `useThreadPaging.ts` (local history), `remoteMessengerSend.ts` (relay send, optimistic bubble and retry), `useOutboxResume.ts` (resumes persisted sends), `useRelayDrain.ts` (pull, commit and acknowledge), `galleryExport.ts`, the `remoteMessenger*` mutation helpers, `useAppUpdater.ts`, `useNotificationActions.ts`, `useThemePreference.ts` and `useDeviceScheme.ts`. |
+| Native and network bridges | `src/services/` | `convexClient.ts`, `deviceIdentity.ts`, `remoteFiles.ts`, `mediaCache.ts`, `outbox.ts` (durable copy and queue for unsent sends), `relayDrain.ts`, `relayConfig.ts`, `pushTokens.ts`, `backgroundWake.ts`, `systemNotifications.ts`, `keyboardMedia.ts`, `appUpdater.ts` and `deviceScheme.ts`. Thin typed wrappers, no screen logic. |
+| Persistence | `src/data/` | `messengerRepository.ts` (the local source of truth), `sqlite/` (schema, rows, repository), `store.ts`, `records.ts`, `cache.ts`, `avatars.ts`, `updateFeed.ts` (the release-feed client). |
+| Backend | `convex/` | `schema.ts`, Convex Auth (`auth.ts`, `auth.config.ts`), `profiles`, `conversations`, `relay`, `preferences`, `devices`, `push`, `files`, `stories`, the expiry crons and the release feed. |
+| Domain | `src/domain/` | `data.ts` (types), `model.ts`, `messageActions.ts`, `mediaAlbums.ts`, `stories.ts`, `chatDetails.ts`, `time.ts` (local date labels), `threadMerge.ts` (confirmed-row test and older-page merge), `outbox.ts` (hydrating persisted sends and their inbox previews), `updates.ts`. Pure functions and types only. |
 
 `app.json` remains the production identity. `app.config.js` reads it and returns it unchanged unless `APP_VARIANT=dev`; the dev branch changes the name, scheme, package, generated version, launcher icons and feed metadata. `scripts/android.mjs` owns the native side of the switch: it stores the variant identity in `android/.messenger-build.json`, regenerates the generated project when that identity changes, and preserves the debug keystore so builds can update one another.
 
@@ -41,25 +41,26 @@ Some dependency directions sit outside the ideal picture. `src/state/useRemoteCa
 
 ### Convex layout
 
-`convex/schema.ts` extends Convex Auth's tables with `username`, then adds `profiles`, `devices`, `conversationMeta`, `conversationPreferences`, `files`, `mediaVariants`, `stories` and `storyViews`. Conversations, memberships, messages and presence are owned by the `convex-chat` component, mounted in `convex/convex.config.ts`; `convex/chat.ts` wraps it with the app's identity, block rules, message projection and inbox shape.
+`convex/schema.ts` extends Convex Auth's tables with `username`, then adds `profiles`, `devices`, `conversations`, `conversationMembers`, `relayQueue`, `conversationPreferences`, `files`, `mediaVariants`, `stories` and `storyViews`. There is no message table: a message exists on the server only as a `relayQueue` row waiting for one recipient.
 
 - **Auth.** `convex/auth.ts` configures the Password provider. The username is normalized (`@` removed, lowercased) and used as the provider account id and email, so there is no email delivery and no signed-out reset. `convex/auth.config.ts` trusts Convex's own site URL as the JWT issuer. `JWT_PRIVATE_KEY` and `JWKS` are deployment configuration, not repository secrets; `SITE_URL` is only relevant to OAuth or email flows. See `convex/README.md`.
 - **Profiles.** `profiles.ensure` creates a row on first sign-in from the password provider id, which is the canonical username. `profiles.update` checks both `profiles` and `authAccounts` for uniqueness, validates the name and username, renames the account and profile together, and deletes the previous avatar storage object after a replacement is saved.
-- **Identity.** All server functions call `requireUser` in `convex/lib/identity.ts`, which validates that the auth session belongs to the user, has not expired, and returns a stable `subjectId` and the `messenger` chat scope. Conversation access always goes through the component's `getMemberAccess`; a missing membership is reported as `CHAT_NOT_FOUND`.
-- **Blocks.** `chat.canWrite` refuses a blocked conversation and, for direct conversations, also refuses when the peer blocked the writer. The block preference is per user but enforced for both sides.
-- **Clearing and hiding.** `conversationPreferences` stores `clearedThrough` and `hiddenAt` per user. The inbox and thread query apply the clear timestamp; the inbox hides a conversation until a newer message arrives. Opening a direct conversation restores a hidden row; deleting a chat writes `hiddenAt`.
+- **Identity and conversations.** All server functions call `requireUser` in `convex/lib/identity.ts`, which validates that the auth session belongs to the user, has not expired, and returns a stable `subjectId`. `convex/conversations.ts` owns `list`, `createDirect` and `createGroup`. A conversation is one `conversations` row (kind, title, direct-chat key and `nextSequence`) plus one `conversationMembers` row per member; `memberConversation` in `convex/lib/relayStore.ts` is the single membership check every relay write and read goes through.
+- **Blocks.** `relay.send` and `relay.react` refuse a conversation the user blocked, and a direct conversation the peer blocked. The block preference is per user but enforced for both sides.
+- **Clearing and hiding.** `conversationPreferences` stores `clearedThrough`, `hiddenAt`, mute, block and gallery visibility per user. `conversations.list` answers membership only; the client merges preferences over its local rows and applies clearing and hiding there. Delete-for-me is local-only.
+- **Relay.** `convex/relay.ts` exposes `send`, `react`, `remove`, `pull`, `ack` and the internal `purgeExpired`. `send` allocates the next sequence on the conversation, writes one `relayQueue` row per other member, schedules a push wake per recipient and returns the sender's own view. `pull` returns this recipient's envelopes and `ack` deletes the rows after the phone commits them locally. The envelope carries text, reply target, attachment metadata and signed media URLs; bytes live in `_storage`, capped at 2 MiB per attachment. Caps are 200 rows and 10 MiB of queued attachments per recipient, and 8000 characters per message; a full queue answers `QUEUE_FULL` with the recipient's last-seen time. Rows expire 30 days after creation.
 - **Devices.** `devices.register` ties the installation's stable SecureStore id to the current auth session. `devices.list` reports only live sessions, flags the current device and marks whether it is older than 24 hours. `devices.revokeDevice` and `devices.revokeOthers` refuse to act until the current device is a day old, and expire the target auth session so its next request fails.
-- **Files and stories.** Uploads take a Convex storage URL, then `files.finalizeUpload` reads the real object metadata and records its owner; the storage `contentType` is checked against the upload kind instead of trusting the client's MIME string. Finalization rejects an empty object, anything over 25 MiB, and a mismatched MIME type. A rejected object is deleted in a committing mutation and returned as `{ error }`, because throwing would roll the delete back. Message queries return a signed storage URL only after the membership check; there is no standalone file-URL endpoint. A new `files` row starts with an empty `messageRefs` list; sending, forwarding and deleting a message keep that list in step with the live messages that show the blob. Story rows carry an explicit `expiresAt`; `stories.cleanupExpired` runs hourly from `convex/crons.ts` and removes the row, its storage object, its variants and its views. `stories.list` and `markSeen` only expose the owner and people who share a `conversationMeta` conversation with them, and `stories.views` returns a story's viewers only to its owner. The client filters expired stories on load and after each sync, and the list query filters the audience before applying its newest-row limit.
-- **Image variants.** An image upload may carry up to three client-rendered widths (`w256`, `w512`, `w1080`). `convex/lib/mediaVariantRules.ts` validates each one against its name (within 2px), a maximum height, WebP/PNG MIME, unique storage ids and a per-width byte ceiling (128 KiB, 384 KiB, 1 MiB). The size always comes from Convex storage metadata, never the client's `bytes` field. A bad batch deletes every blob in the request and returns `{ error: "INVALID_VARIANTS" }`; the client retries the original once without variants. Accepted rows live in `mediaVariants` with the source storage id and a URL resolved at write time, so `chat.messageView` adds one indexed read per image instead of a `getUrl` call per width. `stories.list` returns the same variants plus the source `width` and `height`.
+- **Files and stories.** Uploads take a Convex storage URL, then `files.finalizeUpload` reads the real object metadata and records its owner; the storage `contentType` is checked against the upload kind instead of trusting the client's MIME string. Finalization rejects an empty object, anything over 25 MiB, and a mismatched MIME type. A message blob is released when the last queue row that references it is acknowledged or expires. Story rows carry an explicit `expiresAt`; `stories.cleanupExpired` runs hourly from `convex/crons.ts` and removes the row, its storage object, its variants and its views. `stories.list` and `markSeen` only expose the owner and people who share a conversation with them, and `stories.views` returns a story's viewers only to its owner.
+- **Image variants.** An image upload may carry up to three client-rendered widths (`w256`, `w512`, `w1080`). `convex/lib/mediaVariantRules.ts` validates each one against its name (within 2px), a maximum height, WebP/PNG MIME, unique storage ids and a per-width byte ceiling (128 KiB, 384 KiB, 1 MiB). The size always comes from Convex storage metadata, never the client's `bytes` field. A bad batch deletes every blob in the request and returns `{ error: "INVALID_VARIANTS" }`; the client retries the original once without variants. Accepted rows live in `mediaVariants` with the source storage id and a URL resolved at write time, so a relay pull adds one indexed read per image instead of a `getUrl` call per width. `stories.list` returns the same variants plus the source `width` and `height`.
 - **Release feed.** `convex/http.ts` keeps the public `/updates/manifest` route, and `convex/lib/manifest.ts` mirrors the client's validation. The feed remains independent of user data.
 
 ### Client data flow
 
-`src/state/useRemoteMessenger.ts` is the screen-facing hook. `useRemoteCache` loads the local slices first and exposes `loaded = localReady`, so screens paint cached chats instead of waiting for the network. `useRemoteServerSync` writes every fresh inbox, story list and opened thread back to `messengerRepository`; `useRemoteThreadMedia` downloads attachments into app storage, reuses cached file URIs, merges threads through `src/domain/threadMerge.ts`, keeps optimistic bubbles until the server echoes them, and optionally copies received media to the gallery; `useRemotePresence` keeps the online heartbeat and the open conversation's typing room alive.
+`src/state/useRemoteMessenger.ts` is the screen-facing hook. `useRemoteCache` loads the local rows first and exposes `loaded = localReady`, so screens paint stored chats and threads instead of waiting for the network. `useRemoteServerSync` refreshes conversation metadata and stories; `conversationSync.ts` merges each server conversation over its cached row, keeping the local preview, time, unread count and preferences, and hiding a row until a newer message arrives. Threads are read from SQLite, never from a server snapshot. `src/services/relayDrain.ts` pulls this account's queue, downloads any attachment into app documents, commits the rows and their `pending_ack` entries in one transaction, and only then acknowledges; `galleryExport.ts` copies newly arrived photos and videos into the gallery for conversations that asked for it. Those received files are what make a delivered message survive the server deleting its copy.
 
-Writes are optimistic. `remoteMessengerWriters.ts` updates the messages record and chat list through small shared helpers; `remoteMessengerPreferences.ts` applies mute, block, gallery visibility, clear and delete locally before calling the server; `remoteMessengerProfile.ts` uploads a newly picked avatar once and then updates the profile; `remoteMessengerSend.ts` owns text and attachment sends plus retries, while `remoteMessengerUploads.ts` holds the lower-level upload-and-send path. A text or attachment send that fails keeps its bubble with `status: "failed"`, its text (or local URI), its client message id and, once uploaded, its finalized storage id, and the row shows "Not sent. Tap to retry." A retry reuses the same client id, payload and storage id, so the server's `clientMessageId` deduplication still holds and the same blob is sent again. `src/domain/threadMerge.ts` matches a confirmed server row against the local bubble, keeps unmatched and failed bubbles across refreshes, and preserves a pending inbox row until a newer server message replaces it.
+Writes are optimistic. `remoteMessengerWriters.ts` updates the messages record and chat list through small shared helpers; `remoteMessengerPreferences.ts` applies mute, block, gallery visibility, clear and delete locally before calling the server; `remoteMessengerProfile.ts` uploads a newly picked avatar once and then updates the profile; `remoteMessengerSend.ts` owns text and attachment sends plus retries, while `remoteMessengerUploads.ts` holds the lower-level upload-and-send path. A text or attachment send that fails keeps its bubble with `status: "failed"`, its text (or local URI), its client message id and, once uploaded, its finalized storage id, and the row shows "Not sent. Tap to retry." A retry reuses the same client id, payload and storage id, so the relay's `clientMessageId` deduplication still holds and the same blob is sent again. `isConfirmed` in `src/domain/threadMerge.ts` separates confirmed history (a relay `sequence`) from this device's pending sends.
 
-Confirmed history is the `messages` rows that carry a server `sequence`; every optimistic send is written as a sequence-less row plus an `outbox` entry first, and an attachment is copied into `message-media/outbox-<clientId>.<ext>` before its row is written, so a missing picker source fails without queueing a retry that can never work. A killed process revives the row as a failed bubble and `useOutboxResume` retries it at launch, when the app returns to the foreground, when the Convex socket reconnects, and every 30 seconds (three automatic attempts per message per session, reset by a reconnect; the bubble's retry is unlimited). Because a pending row never has a `sequence`, it is never mistaken for confirmed history, and a server echo replaces it in place. `markLocalMessageStatus` writes the inbox row once the server accepts the send, so the preview survives a restart even if the echoed message has not arrived yet. Other failures surface as an alert and leave the local copy in place.
+Confirmed history is the `messages` rows that carry a relay `sequence`; every optimistic send is written as a sequence-less row plus an `outbox` entry first, and an attachment is copied into `message-media/outbox-<clientId>.<ext>` before its row is written, so a missing picker source fails without queueing a retry that can never work. A killed process revives the row as a failed bubble and `useOutboxResume` retries it at launch, when the app returns to the foreground, when the Convex socket reconnects, and every 30 seconds (three automatic attempts per message per session, reset by a reconnect; the bubble's retry is unlimited). Because a pending row never has a `sequence`, it is never mistaken for confirmed history, and the reply from `relay.send` replaces it in place. `markLocalMessageStatus` writes the inbox row once the relay accepts the send, so the preview survives a restart even if the recipient has not drained yet. Other failures surface as an alert and leave the local copy in place.
 
 The app starts behind `StartupGate`, which loads the bundled DM Sans faces, and then `AuthGate`. While Convex Auth is restoring the stored session it shows a spinner; once the session is authenticated it renders the app even if `profiles.me` is still in flight, so cached content survives an offline start. Signing out invalidates the in-memory outbox and waits for its queued writes, then calls `devices.unregister`, `messengerRepository.clearAccountData()` and `clearLocalAccountFiles()` so the next account on the same installation cannot read the previous local database, inherit its downloaded media, avatar files, picker and voice-recording caches, image and video library caches, or cached update APK, or have a late upload callback re-queue a previous account's message. The theme, dismissed-release and pending-call keys live in the same namespace and are cleared too; the next start falls back to the default theme.
 
@@ -75,74 +76,94 @@ The device scheme does not come from `useColorScheme`. React Native reads it fro
 
 ### SQLite, not key-value
 
-`messenger.db` (expo-sqlite) is the durable device copy: conversations,
+`messenger.db` (expo-sqlite) is the durable history: conversations,
 messages, message variants, media metadata, stories, the outbox, call history,
-settings and gallery markers are tables that mirror the Convex shapes. Media
-bytes stay in `documents/messenger-media`; the database only points at them.
-`src/data/sqlite` owns the schema, row mapping, migration and repository, and
-only `src/data/sqlite/database.ts` imports `expo-sqlite`.
+settings, hidden-message tombstones and pending acknowledgements are tables that
+mirror the client shapes. Media bytes stay in `documents/messenger-media`; the
+database only points at them. `src/data/sqlite` owns the schema, row mapping and
+repository, and only `src/data/sqlite/database.ts` imports `expo-sqlite`.
 
 The connection opens once with `useNewConnection: true` (the SDK has a teardown
 bug that can double-close a cached handle after a JavaScript restart) and sets
 WAL, `synchronous=NORMAL`, `foreign_keys=ON` and `busy_timeout=5000`. Every
 operation runs on one promise chain, so writes never interleave and
-`withTransactionAsync` never nests. Schema changes are additive through
-`PRAGMA user_version`.
+`withTransactionAsync` never nests.
+
+There is exactly one schema version and no migrations. `applySchema` compares
+`PRAGMA user_version` with `SCHEMA_VERSION` (1); anything else drops the known
+tables and rebuilds them empty. The phone is the durable copy, so a build with
+a different schema deliberately starts with no history rather than carrying
+upgrade code for users this development app does not have.
 
 `saveChats` and `saveMessages` upsert: a row missing from a page is history the
 phone owns, not a deletion. Clearing a chat is an explicit `clearMessages`,
 which also stamps `cleared_through`; deleting a conversation cascades its
-messages, media index and queued sends.
+messages, media index and queued sends. Delete-for-me writes `hidden_messages`,
+which has no foreign key, so no later relay row can revive the message.
 
 A newly opened thread reads the newest 100 confirmed rows plus this device's
 pending sends. Scrolling to the top asks for a page older than the oldest
-confirmed sequence: SQLite answers first, and only a short local page makes the
-client ask the server. The server's `hasMore`/`nextBeforeSequence` are computed
-from the raw page before per-user deletes and clears, so a hidden page cannot
-look like the start of the thread. The confirmed rows are written before they
-are painted, and the thread is marked exhausted only when the server proves the
-history ended. An older page is merged as a union, not as a replacement: a row
-the relay purged after delivery is still history the phone owns, so it stays.
+confirmed sequence, and only SQLite answers: `useThreadPaging` uses
+`loadOlderMessages` and `hasOlderMessages`. The relay never serves history, so a
+row this installation never received cannot be fetched later. An older page is
+merged as a union, not a replacement, and a message deleted for everyone is a
+tombstone rather than a missing row.
 
 ### AsyncStorage still owns a few slices
 
 The theme is read before the database opens (`appearance`), the dismissed
 release is one update record, and a pending incoming call must survive a kill
 before the UI mounts; the notification action ledger belongs to
-`system-notifications`. Everything else moved out of the old `messenger/v2/*`
-keys, which the one-time migration in `src/data/sqlite/migrate.ts` imports per
-chat, records in `migration_state`, and removes only after every chat has a
-marker. `src/data/store.ts` is now just the driver for those slices.
+`system-notifications`. The old `messenger/v2/*` history keys are not read by
+this build: there is no import and no compatibility path. `src/data/store.ts` is
+just the driver for those remaining slices.
 
 ### Outgoing queue
 
 A send is written to the `outbox` table before the network call; an attachment
 is copied byte-for-byte into `documents/message-media/outbox-<messageId>.<ext>`
-before its row is written. Confirmed history is every message row with a server
+before its row is written. Confirmed history is every message row with a relay
 `sequence`; a pending send has no sequence and is rebuilt from the outbox entry,
-which is what survives a kill between picking a file and the server echo.
+which is what survives a kill between picking a file and the relay receipt.
 `src/services/outbox.ts` owns the in-memory queue and serializes writes through
 the repository. A cold-start read accepts only an array of records with a string
 `chatId` and message id, and merges rows queued while the read was in flight by
 message id, keeping the queued version. Signing out clears the in-memory queue
 and awaits its pending writes before the database and store are cleared.
 
-The finalized Convex `_storage` id is written back to the row before `sendAttachment`, so a retry reuses the uploaded blob. A second upload would change the message parts, and `convex-chat` rejects a reused `clientMessageId` with `IDEMPOTENCY_CONFLICT`. If the finalized blob has disappeared server-side and the mutation answers `FILE_FORBIDDEN`, the durable copy is uploaded once more and the send retried. On cold start `src/domain/outbox.ts` appends the rows as `failed` bubbles and updates the inbox preview; `useOutboxResume` retries them immediately, on foreground, on reconnect and every 30 seconds while active, capped at three automatic attempts per message (a reconnect resets the cap).
+The finalized Convex `_storage` id is written back to the row before the relay
+send, so a retry reuses the uploaded blob instead of leaving a second one for
+the 30-day sweep. A retry also reuses the client message id, and `relay.send`
+returns the existing queue row instead of spending a second sequence. On cold
+start `src/domain/outbox.ts` appends the rows as `failed` bubbles and updates
+the inbox preview; `useOutboxResume` retries them immediately, on foreground, on
+reconnect and every 30 seconds while active, capped at three automatic attempts
+per message (a reconnect resets the cap).
 
-A send becomes `sent` only when the mutation returns the server view with a `sequence` (`isSendConfirmed`); that view replaces the optimistic bubble and is merged into the stored thread by message id, in sequence order, before it is written to the messages table, and only then does the row leave the queue. A kill between the server accepting and the client receiving that view therefore leaves the row queued and the bubble pending, never a cached message without a sequence. A row also leaves when its bubble is deleted or the chat is cleared, and a late upload callback never re-inserts a row that is gone. Copies the queue no longer references are swept on the next launch or foreground once they are an hour old, so a sent attachment does not keep a second copy forever.
+A send becomes `sent` only when the mutation returns the relay view with a
+`sequence` (`isSendConfirmed`); that view replaces the optimistic bubble and is
+merged into the stored thread by message id, in sequence order, before it is
+written to the messages table, and only then does the row leave the queue. A
+kill between the relay accepting and the client receiving that view therefore
+leaves the row queued and the bubble pending, never a cached message without a
+sequence. A row also leaves when its bubble is deleted or the chat is cleared,
+and a late upload callback never re-inserts a row that is gone. Copies the queue
+no longer references are swept on the next launch or foreground once they are an
+hour old, so a sent attachment does not keep a second copy forever.
 
 ### Server retention
 
-A `files` row created by this version carries `messageRefs`, the ids of the live
-messages that show its blob. Sending and forwarding add an id; delete for
-everyone removes it and deletes the `_storage` object only when the list becomes
-empty. A row created before this list existed has `messageRefs: undefined` and
-is treated as unknown, so its blob is never deleted. Per-user delete and clear
-only write `conversationPreferences`; another member's copy keeps the blob.
+A message attachment exists on the server only while some recipient's
+`relayQueue` row points at it. `ack` deletes the recipient's row, and the last
+ack releases the `_storage` object, its `mediaVariants` rows and blobs and the
+`files` row. `relay.purgeExpired` does the same for rows past their 30-day
+`expiresAt`, in batches of 200 with a follow-up sweep while a batch is full. The
+sender keeps its own durable copy, so its bubble never depends on the server
+blob. Per-user delete and clear only touch local rows and `conversationPreferences`.
 
 `files.sweepOrphans` runs daily from `convex/crons.ts`. It removes a `files` row
-whose blob is gone, a message upload that never became a message once it is 24
-hours old, and any `_storage` object that no files row, profile avatar, story or
+whose blob is gone, an upload that never became a queued message once it is 24
+hours old, and any `_storage` object that no queue row, profile avatar, story or
 variant row protects. Deleting a source also deletes its `mediaVariants` rows
 and blobs, and a variant row whose source or variant blob is missing is removed
 so it cannot pin the generic sweep. The grace period keeps an upload that is
@@ -175,7 +196,7 @@ See `docs/PERFORMANCE.md` for why avatars are resolved to local files before the
 
 ## The notification pipeline
 
-Scope first: there is no push service, no FCM or APNs, and no headless JavaScript. Notifications are posted by the app while it runs, and their actions are queued natively until the app next runs. The native module is Android-only and is not present in Expo Go, so `isSystemNotificationsAvailable` in `src/services/systemNotifications.ts` is false there and every notification hook returns early. When the module is missing, calling a bridge function throws a described error instead of pretending to succeed.
+Scope first: FCM delivers only an opaque wake (`{v, type, queueId}`) with no sender, text or preview, and every notification is built by the app from its local rows. There is no headless JavaScript drain yet: a killed process records the wake and waits for the app to open. The native notification module is Android-only and is not present in Expo Go, so `isSystemNotificationsAvailable` in `src/services/systemNotifications.ts` is false there and every notification hook returns early. When the module is missing, calling a bridge function throws a described error instead of pretending to succeed.
 
 ### Payload mapping
 
@@ -263,33 +284,38 @@ Two checks stand between the feed and a replaced app: the digest must match the 
 ## Adding a feature
 
 - **A pure rule or type** goes in `src/domain/`. Domain code must not import React, React Native, Expo or anything under `features/`, `state/` or `ui/`.
-- **Server data** starts in `convex/schema.ts`: add the table and the indexes the queries will use, then write the functions in a `convex/` module. Every public function resolves the user through `requireUser`, conversation access through the `convex-chat` component's membership check, and storage access through an owner or membership check. Run `npx convex dev --once` to deploy and regenerate `convex/_generated`.
-- **A client field** needs the shape in `src/domain/data.ts` (or `src/data/records.ts` for cache-only data), a projection in `useRemoteServerSync.ts` or the matching `remoteMessenger*` helper, and an optimistic write if the UI must not wait. Add a column and a new `PRAGMA user_version` step in `src/data/sqlite/schema.ts` for persisted message data; the remaining AsyncStorage slices keep `messenger/v2` keys and bump `STORE_VERSION` when one of those shapes changes.
+- **Server data** starts in `convex/schema.ts`: add the table and the indexes the queries will use, then write the functions in a `convex/` module. Every public function resolves the user through `requireUser`, conversation access through `memberConversation` in `convex/lib/relayStore.ts`, and storage access through an owner or membership check. Run `npx convex dev --once` to deploy and regenerate `convex/_generated`.
+- **A client field** needs the shape in `src/domain/data.ts` (or `src/data/records.ts` for cache-only data), a projection in `conversationSync.ts`, `relayDrain.ts` or the matching `remoteMessenger*` helper, and an optimistic write if the UI must not wait. Persisted fields go in `src/data/sqlite/schema.ts` and a bump of `SCHEMA_VERSION`, which deliberately resets the local database; the remaining AsyncStorage slices keep `messenger/v2` keys and bump `STORE_VERSION` when one of those shapes changes.
 - **A native call** needs a typed function in `src/services/`, gated by the availability check the module already exports. App behaviour stays in the caller.
 - **A screen** goes in `src/features/<area>/`, a shared control in `src/ui/`, and only composition in `App.tsx`.
 - **Size.** A file over 500 lines fails `npm test`; extract a focused module instead of growing the hook or screen.
 
-## Cache versus server
+## Local history versus the server
 
-`src/data/messengerRepository.ts` is the device cache seam, not the source of truth. `useRemoteCache` loads it once, and `useRemoteServerSync` writes fresh inbox and story snapshots back to it. `useRemoteThreadMedia` writes the opened thread and its downloaded files. Screens read the merged values from `useRemoteMessenger`; they never call Convex directly.
+`src/data/messengerRepository.ts` is the source of truth for chats and messages. `useRemoteCache` loads it once, `conversationSync.ts` merges conversation identity and preferences over it, and `relayDrain.ts` appends newly delivered rows. Screens read from `useRemoteMessenger`; they never call Convex directly.
 
-Writes are optimistic. Small helpers (`remoteMessengerWriters.ts`, `remoteMessengerPreferences.ts`, `remoteMessengerMessageActions.ts`, `remoteMessengerUploads.ts`, `remoteMessengerSend.ts`) update the cache before the mutation resolves, and a failure keeps the local copy in place instead of rolling it back. There is no operation log: `src/domain/threadMerge.ts` reconciles pending rows with the next server snapshot, two devices editing the same conversation resolve last-write-wins, and SQLite stores confirmed rows plus this device's pending sends; the `outbox` table is what marks and resumes the pending ones. The server's thread query pages backwards with `beforeSequence`; opening a thread requests the newest 100 rows, and `src/state/useThreadPaging.ts` loads older pages from SQLite first and from the server only when the local page ends.
+Writes are optimistic. Small helpers (`remoteMessengerWriters.ts`, `remoteMessengerPreferences.ts`, `remoteMessengerMessageActions.ts`, `remoteMessengerUploads.ts`, `remoteMessengerSend.ts`) write locally before the mutation resolves, and a failure keeps the local copy in place instead of rolling it back. SQLite stores confirmed rows plus this device's pending sends, and `src/domain/threadMerge.ts` keeps the distinction between them while merging an older local page; the `outbox` table marks and resumes the pending ones. There is no server history to page: `useThreadPaging.ts` reads older rows from SQLite only.
 
-Story uploads are the exception that stays outside the cache. `useRemoteStories` owns a local upload queue, reports byte progress into each row, and appends those rows after the server stories with `mergeStoryUploads`; a row disappears only when `stories.list` returns the same id. This keeps multi-video shares fully visible while their uploads run. The viewer's owner-only audience comes from `useStoryViewers`, which maps `stories.views` to the same `StoryView` shape as the rest of the domain.
+Story uploads are the exception that stays outside the local history. `useRemoteStories` owns a local upload queue, reports byte progress into each row, and appends those rows after the server stories with `mergeStoryUploads`; a row disappears only when `stories.list` returns the same id. This keeps multi-video shares fully visible while their uploads run. The viewer's owner-only audience comes from `useStoryViewers`, which maps `stories.views` to the same `StoryView` shape as the rest of the domain.
 
-Notification replies use `notice-<actionId>` as the client message id. The `convex-chat` component deduplicates on `clientMessageId`, so a redelivered Android action cannot create a second message.
+Notification replies use `notice-<actionId>` as the client message id. `relay.send` deduplicates on `clientMessageId`, so a redelivered Android action cannot create a second message.
 
 ## Deliberate non-goals and known limitations
 
-- **No push yet.** Notifications are posted by the running app. There is no FCM or APNs integration today, so a stopped process hears nothing until Android starts it again, and actions other than answer/open wait for the next launch. Message notifications also only cover threads whose messages are already in memory or on disk, because the inbox query carries a preview rather than the full thread. Planned: opaque FCM wakes, setup in `docs/PUSH.md`.
+- **Push wakes are not a delivery path.** FCM carries an opaque wake, and the running app answers it by draining the relay. A killed app records the wake but cannot drain, because the headless task has no Convex auth session; delivery waits for the app to open. Android force-stop suppresses even the wake. Setup and the wire contract are in `docs/PUSH.md`.
+- **No presence, typing or read receipts.** Online status, typing indicators and read receipts are not part of this build; Settings says so. Unread counts are local.
+- **History lives on one phone.** A delivered message is deleted from the server, so a second device starts empty and a reinstall or Clear data loses history until the parked Drive backup ships. Settings warns about this.
 - **Calls are simulated.** They connect on a timer and show the local camera preview; there is no call signalling server, call audio or remote video. Group calls are disabled in the header, the profile and the `startCall` guard.
 - **No OTA JavaScript updates yet.** A release is offered as a whole APK, so every update downloads the full package.
-- **No end-to-end encryption.** Convex stores profiles, message text and media, and the deployment operator can read them. The local cache is not encrypted either: auth tokens and the device id live in SecureStore, but message rows and downloaded attachments do not. Treat the deployment's database and the device as trusted.
+- **No end-to-end encryption.** Convex stores profiles, story media and queued message envelopes, and the deployment operator can read them while they wait. The local database is not encrypted either: auth tokens and the device id live in SecureStore, but message rows and downloaded attachments do not. Treat the deployment's database and the device as trusted.
 - **No signed-out password reset.** Forgetting the password loses the account and its conversations; the sign-up screen says so. A signed-in user can change the password from Settings.
 - **Android-only native features.** `system-notifications` and `keyboard-media` do nothing on iOS and web, and neither exists in Expo Go; `device-scheme` falls back to React Native's `useColorScheme` where it is absent.
 - **Notification actions other than answer/open do not run while JavaScript is dead**; they are queued natively.
 - **Notification threads are capped at the newest 25 messages**, and the payload still uses the group name as the sender because it does not project per-message sender names.
-- **Failed sends survive a restart, with a capped resume.** Unsent text and attachment rows live in the `outbox` table with a durable copy of the bytes, and resume automatically at launch, on foreground, on reconnect and every 30 seconds, capped at three automatic attempts per message per session (reset by a reconnect). A message the server already accepted but whose echo never arrived is retried with the same client id and storage id, so the server deduplicates it and the retry returns the same sequence. A row is only dropped after that confirmed view has replaced the local bubble, so a kill in the echo window leaves a retryable row rather than a cached message without a sequence. Copies no longer referenced by a row are swept at launch or foreground once they are an hour old.
-- **Thread history paints 100 rows per page.** The device keeps every delivered row, and scrolling to the top loads older ones from SQLite or, on a device that never received them, from `listMessages(beforeSequence)`. A fully hidden page is followed by its raw cursor, capped at four pages before the range is treated as history the user hid on purpose.
-- **Server retention is still unbounded.** Delivered content is not purged yet; the relay step adds acknowledgements and a 30-day purge.
+- **Failed sends survive a restart, with a capped resume.** Unsent text and attachment rows live in the `outbox` table with a durable copy of the bytes, and resume automatically at launch, on foreground, on reconnect and every 30 seconds, capped at three automatic attempts per message per session (reset by a reconnect). A message the relay already accepted but whose receipt never arrived is retried with the same client id and storage id, so `relay.send` returns the existing row and sequence. A row is only dropped after that confirmed view has replaced the local bubble. Copies no longer referenced by a row are swept at launch or foreground once they are an hour old.
+- **Thread history paints 100 rows per page.** The device keeps every delivered row and scrolling to the top reads older ones from SQLite. A row this installation never received cannot be fetched later.
+- **Groups are create-only.** `conversations.createGroup` adds members at creation; there is no add, remove, leave or rename flow.
+- **An op can arrive before its target.** A reaction or delete-for-everyone that reaches a phone before the message it names is applied once and not retried; there is no operation log.
+- **Delete-for-me is local.** It writes a tombstone on this phone only; delete-for-everyone goes through the relay.
+- **Forwarding is a fresh send.** The relay keeps no server copy, so a forwarded attachment is re-uploaded from the local file and the 2 MiB queued-media cap applies again.
 - **The architecture test's rules are narrow:** size, no App imports, domain purity, test registration, no `any`/`console.log`, bundled DM Sans faces declared in `StartupGate`, and images through `expo-image`. Layer boundaries between `features`, `state` and `services` are convention, as the exceptions above show.

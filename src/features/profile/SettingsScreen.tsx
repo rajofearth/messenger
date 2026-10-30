@@ -381,6 +381,10 @@ export default function SettingsScreen({
               Chats live on this phone. Uninstalling Messenger or clearing its
               data deletes them permanently.
             </Text>
+            <Text style={[styles.note, { color: colors.muted }]}>
+              Typing indicators, online status and read receipts are not part of
+              this build.
+            </Text>
             {section("INFORMATION")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {row(

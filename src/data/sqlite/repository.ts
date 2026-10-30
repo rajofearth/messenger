@@ -3,18 +3,22 @@
  *
  * Reads go straight to the connection; writes join one promise chain, so two
  * saves from different screens cannot interleave their statements or open a
- * nested transaction. The store is still used for the three slices that must
- * live outside SQLite: the startup theme, the dismissed release and the
- * pending incoming call.
+ * nested transaction. The store still owns the slices that must be readable
+ * before the database opens: the startup theme, the dismissed release and the
+ * pending incoming call. The notification ledger keeps its own store over the
+ * same driver.
+ *
+ * The whole-list slices at the top (stories, call history, settings and gallery
+ * markers) live here because this facade is their only caller; their writes
+ * replace the stored set instead of upserting like the paged writers.
  */
 
+import type { ImageVariant } from "../../domain/data";
 import type { ThemePreference } from "../../ui/theme";
 import { normalizeAppearance } from "../appearance";
 import type {
-  AppearanceRecord,
   CallHistoryRecord,
   ChatRecord,
-  LegacyAppearanceRecord,
   MessageRecord,
   OutboxRecord,
   PendingCallRecord,
@@ -24,8 +28,10 @@ import type {
 } from "../records";
 import type { Store } from "../store";
 import { deleteConversation, listChats, writeChats } from "./chats";
+import { STORY_COLUMNS } from "./columns";
+import type { MediaFileRow } from "./media";
+import { mediaVariantFromRow, replaceStoryMedia, storyMedia } from "./media";
 import {
-  exhaustThread,
   hasOlderThread,
   readOlderThread,
   readThread,
@@ -41,18 +47,135 @@ import {
   writeRelayDelete,
   writeRelayReaction,
 } from "./relay";
-import { SCHEMA_TABLES } from "./schema";
 import {
-  listGallerySaved,
-  listHistory,
-  listStories,
-  readSettings,
-  writeGallerySaved,
-  writeHistory,
-  writeSettings,
-  writeStories,
-} from "./snapshots";
+  callHistoryFromRow,
+  callHistoryParams,
+  settingsFromRow,
+  settingsParams,
+  storyFromRow,
+  storyParams,
+} from "./rows";
+import type { CallHistoryRow, SettingsRow, StoryRow } from "./rowTypes";
+import { SCHEMA_TABLES } from "./schema";
 import type { SqlDatabase } from "./types";
+
+async function listStories(
+  database: SqlDatabase,
+): Promise<StoryRecord[] | undefined> {
+  const rows = await database.getAllAsync<StoryRow>(
+    "SELECT * FROM stories ORDER BY position ASC, id ASC",
+  );
+  if (!rows.length) return undefined;
+  const media = await database.getAllAsync<MediaFileRow>(
+    `SELECT * FROM media_files
+     WHERE story_id IS NOT NULL AND variant IS NOT NULL
+     ORDER BY story_id ASC, width ASC, variant ASC`,
+  );
+  const variants = new Map<string, ImageVariant[]>();
+  for (const row of media) {
+    if (!row.story_id) continue;
+    const variant = mediaVariantFromRow(row);
+    if (!variant) continue;
+    const current = variants.get(row.story_id);
+    if (current) current.push(variant);
+    else variants.set(row.story_id, [variant]);
+  }
+  return rows.map((row) => storyFromRow(row, variants.get(row.id) ?? []));
+}
+
+async function writeStories(
+  database: SqlDatabase,
+  stories: readonly StoryRecord[],
+): Promise<void> {
+  await database.runAsync("DELETE FROM stories");
+  for (const [position, story] of stories.entries()) {
+    await database.runAsync(
+      `INSERT INTO stories (${STORY_COLUMNS.join(", ")})
+       VALUES (${STORY_COLUMNS.map(() => "?").join(", ")})`,
+      ...storyParams(story, position),
+    );
+    await replaceStoryMedia(database, story.id, storyMedia(story));
+  }
+}
+
+async function listHistory(
+  database: SqlDatabase,
+): Promise<CallHistoryRecord[] | undefined> {
+  const rows = await database.getAllAsync<CallHistoryRow>(
+    "SELECT * FROM call_history ORDER BY position ASC, id ASC",
+  );
+  const history = rows.flatMap((row) => {
+    const record = callHistoryFromRow(row);
+    return record ? [record] : [];
+  });
+  return history.length ? history : undefined;
+}
+
+async function writeHistory(
+  database: SqlDatabase,
+  history: readonly CallHistoryRecord[],
+): Promise<void> {
+  await database.runAsync("DELETE FROM call_history");
+  for (const [position, record] of history.entries()) {
+    await database.runAsync(
+      `INSERT INTO call_history (id, chat, video, seconds, time, missed, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ...callHistoryParams(record, position),
+    );
+  }
+}
+
+async function readSettings(
+  database: SqlDatabase,
+): Promise<SettingsRecord | undefined> {
+  const row = await database.getFirstAsync<SettingsRow>(
+    "SELECT * FROM settings WHERE id = 1",
+  );
+  return row ? settingsFromRow(row) : undefined;
+}
+
+async function writeSettings(
+  database: SqlDatabase,
+  settings: SettingsRecord,
+): Promise<void> {
+  await database.runAsync(
+    `INSERT INTO settings
+       (id, name, bio, username, haptics, avatar, sound, previews, system_notifications)
+     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       name = excluded.name,
+       bio = excluded.bio,
+       username = excluded.username,
+       haptics = excluded.haptics,
+       avatar = excluded.avatar,
+       sound = excluded.sound,
+       previews = excluded.previews,
+       system_notifications = excluded.system_notifications`,
+    ...settingsParams(settings),
+  );
+}
+
+async function listGallerySaved(
+  database: SqlDatabase,
+): Promise<string[] | undefined> {
+  const rows = await database.getAllAsync<{ id: string }>(
+    "SELECT id FROM gallery_saved ORDER BY rowid ASC",
+  );
+  return rows.length ? rows.map((row) => row.id) : undefined;
+}
+
+async function writeGallerySaved(
+  database: SqlDatabase,
+  ids: readonly string[],
+): Promise<void> {
+  await database.runAsync("DELETE FROM gallery_saved");
+  for (const id of ids) {
+    await database.runAsync(
+      "INSERT OR REPLACE INTO gallery_saved (id) VALUES (?)",
+      id,
+    );
+  }
+}
 
 export type MessengerRepository = ReturnType<typeof createMessengerRepository>;
 
@@ -90,9 +213,7 @@ export function createMessengerRepository(
   return {
     store,
     loadAppearance: async () =>
-      normalizeAppearance(
-        await store.load<AppearanceRecord | LegacyAppearanceRecord>("appearance"),
-      ),
+      normalizeAppearance(await store.load<unknown>("appearance")),
     saveAppearance: (theme: ThemePreference) =>
       enqueue(() => store.save("appearance", { theme })),
 
@@ -122,12 +243,16 @@ export function createMessengerRepository(
       read((connection) => readThread(connection, chatId)),
     saveMessages: (chatId: string, messages: MessageRecord[]) =>
       write((connection) => writeThread(connection, chatId, messages)),
-    loadOlderMessages: (chatId: string, beforeSequence: number) =>
-      read((connection) => readOlderThread(connection, chatId, beforeSequence)),
-    threadHasOlder: (chatId: string) =>
-      read((connection) => hasOlderThread(connection, chatId)),
-    markThreadExhausted: (chatId: string) =>
-      write((connection) => exhaustThread(connection, chatId)),
+    /**
+     * One scroll-to-the-top page, newest-first inside the cursor, and whether
+     * anything older than that page exists.
+     */
+    loadOlderMessages: (chatId: string, beforeSequence: number, limit?: number) =>
+      read((connection) =>
+        readOlderThread(connection, chatId, beforeSequence, limit),
+      ),
+    hasOlderMessages: (chatId: string, beforeSequence: number) =>
+      read((connection) => hasOlderThread(connection, chatId, beforeSequence)),
     clearMessages: (chatId: string) =>
       write((connection) => resetThread(connection, chatId)),
     /** Delete-for-me: the row goes and a durable tombstone keeps it gone. */

@@ -29,7 +29,6 @@ export type ConversationScreenProps = {
   chat: Chat;
   messages: Message[];
   dark: boolean;
-  typing: boolean;
   visible?: boolean;
   onBack: () => void;
   onCall: (video: boolean) => void;
@@ -40,9 +39,8 @@ export type ConversationScreenProps = {
   onDelete: (id: string, everyone: boolean) => void;
   onForward: (message: Message) => void;
   onSaveMedia?: (message: Message) => Promise<boolean>;
-  onTypingChange?: (typing: boolean) => void;
   onRetry: (messageId: string) => void;
-  /** True while the server may still hold rows older than the local page. */
+  /** True while SQLite holds confirmed rows older than the loaded page. */
   hasOlder?: boolean;
   loadingOlder?: boolean;
   /** The last older-page read failed; the control offers a retry. */
@@ -54,7 +52,6 @@ export default function ConversationScreen({
   chat,
   messages,
   dark,
-  typing,
   visible = true,
   onBack,
   onCall,
@@ -65,7 +62,6 @@ export default function ConversationScreen({
   onDelete,
   onForward,
   onSaveMedia,
-  onTypingChange,
   onRetry,
   hasOlder = false,
   loadingOlder = false,
@@ -105,25 +101,6 @@ export default function ConversationScreen({
     setAlbum(null);
     setReply(null);
   }, [chat.id]);
-  // Only signal a transition: React runs effect cleanups before every key, so
-  // the old version sent a false/true pair for every character typed.
-  const typingCallback = useRef(onTypingChange);
-  typingCallback.current = onTypingChange;
-  const typingActive = useRef(false);
-  useEffect(() => {
-    const next = draft.trim().length > 0;
-    if (typingActive.current === next) return;
-    typingActive.current = next;
-    typingCallback.current?.(next);
-  }, [draft]);
-  useEffect(
-    () => () => {
-      if (!typingActive.current) return;
-      typingActive.current = false;
-      typingCallback.current?.(false);
-    },
-    [],
-  );
   useEffect(() => {
     if (!visible) {
       setTarget(null);
@@ -224,30 +201,11 @@ export default function ConversationScreen({
             {chat.name}
             {chat.muted ? " · Muted" : ""}
           </Text>
-          <Text
-            style={[
-              s.tiny,
-              {
-                color:
-                  chat.online || typing
-                    ? dark
-                      ? "#9FD0B2"
-                      : "#2F6A4B"
-                    : muted,
-                marginTop: 3,
-              },
-            ]}
-          >
-            {chat.blocked
-              ? "Blocked"
-              : typing
-                ? "typing…"
-                : chat.group
-                  ? "Your little circle"
-                  : chat.online
-                    ? "● Online"
-                    : "Last seen recently"}
-          </Text>
+          {(chat.blocked || chat.group) && (
+            <Text style={[s.tiny, { color: muted, marginTop: 3 }]}>
+              {chat.blocked ? "Blocked" : "Your little circle"}
+            </Text>
+          )}
         </Pressable>
         {!chat.group && (
           <>
@@ -272,7 +230,6 @@ export default function ConversationScreen({
           messages={messages}
           dark={dark}
           visible={visible}
-          typing={typing}
           hasOlder={hasOlder}
           loadingOlder={loadingOlder}
           loadOlderFailed={loadOlderFailed}

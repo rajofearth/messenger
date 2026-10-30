@@ -1,9 +1,9 @@
 /**
  * Row shapes and the pure mapping between them and the domain types.
  *
- * Reads are defensive: rows may have been written by an older release, so an
- * unknown enum value becomes `undefined` instead of reaching a screen. Writes
- * only ever store values the domain types allow.
+ * Reads still re-check enum values instead of casting, so a value the domain
+ * does not know becomes `undefined` instead of reaching a screen. Writes only
+ * ever store values the domain types allow.
  */
 
 import type {
@@ -92,8 +92,6 @@ export function chatFromRow(row: ConversationRow): ChatRecord {
     preview: row.preview,
     time: row.time,
     unread: row.unread,
-    online: boolean(row.online),
-    typing: boolean(row.typing),
     group: boolean(row.is_group),
     color: row.color,
     username: row.username ?? undefined,
@@ -106,7 +104,6 @@ export function chatFromRow(row: ConversationRow): ChatRecord {
     pinned: boolean(row.pinned),
     mediaVisibility: mediaVisibility(row.media_visibility),
     lastMessageAt: row.last_message_at ?? undefined,
-    lastMessageStatus: messageStatus(row.last_message_status),
   };
 }
 
@@ -121,8 +118,6 @@ export function chatParams(
     chat.avatar ?? "",
     chat.preview ?? "",
     chat.time ?? "",
-    chat.online ? 1 : 0,
-    chat.typing ? 1 : 0,
     chat.group ? 1 : 0,
     chat.color ?? "",
     chat.username ?? null,
@@ -135,7 +130,6 @@ export function chatParams(
     chat.pinned ? 1 : 0,
     mediaVisibilityValue(chat.mediaVisibility),
     finite(chat.lastMessageAt) ?? null,
-    messageStatusValue(chat.lastMessageStatus),
     finite(chat.unread) ?? 0,
     unreadOrdinal,
     position,
@@ -187,7 +181,6 @@ export function messageFromRow(
     duration: finite(row.duration),
     reaction: row.reaction ?? undefined,
     sequence: row.sequence ?? undefined,
-    revision: finite(row.revision),
     // A confirmed server row never carries a delivery state.
     status:
       row.sequence === null
@@ -198,7 +191,7 @@ export function messageFromRow(
   };
 }
 
-/** The order must match `MESSAGE_COLUMNS` in `messages.ts`. */
+/** The order must match `MESSAGE_COLUMNS` in `columns.ts`. */
 export function messageParams(
   conversationId: string,
   message: MessageRecord,
@@ -213,9 +206,7 @@ export function messageParams(
     message.id,
     conversationId,
     finite(message.sequence) ?? null,
-    finite(message.revision) ?? null,
     pending ? message.id : null,
-    null,
     message.mine ? 1 : 0,
     message.time ?? "",
     message.text ?? null,
@@ -237,7 +228,6 @@ export function messageParams(
     message.deleted ? 1 : 0,
     message.createdAt ?? null,
     Number.isFinite(createdAtMs) ? createdAtMs : null,
-    null,
     localStatus,
     finite(message.uploadProgress) ?? null,
     message.storageId ?? null,
@@ -354,8 +344,8 @@ export function callHistoryFromRow(
 }
 
 /**
- * A contact snapshot stored as JSON. Old rows may predate a field, so every
- * optional value is re-checked instead of cast.
+ * A contact snapshot stored as JSON. The blob is untrusted input on the way
+ * back, so every optional value is re-checked instead of cast.
  */
 export function chatFromSnapshot(value: unknown): ChatRecord | undefined {
   if (!isRecord(value) || typeof value.id !== "string") return undefined;
@@ -367,8 +357,6 @@ export function chatFromSnapshot(value: unknown): ChatRecord | undefined {
     time: typeof value.time === "string" ? value.time : "",
     unread: typeof value.unread === "number" ? value.unread : 0,
     color: typeof value.color === "string" ? value.color : "",
-    online: value.online === true,
-    typing: value.typing === true,
     group: value.group === true,
     username: typeof value.username === "string" ? value.username : undefined,
     bio: typeof value.bio === "string" ? value.bio : undefined,
@@ -389,11 +377,6 @@ export function chatFromSnapshot(value: unknown): ChatRecord | undefined {
     ),
     lastMessageAt:
       typeof value.lastMessageAt === "number" ? value.lastMessageAt : undefined,
-    lastMessageStatus: messageStatus(
-      typeof value.lastMessageStatus === "string"
-        ? value.lastMessageStatus
-        : null,
-    ),
   };
 }
 

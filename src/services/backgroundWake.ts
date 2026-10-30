@@ -22,8 +22,8 @@ const WAKE_KEY = "lastWake";
 export type LastWake = { queueId: string; receivedAt: number };
 
 // Deliberately not the messenger namespace: a wake is a device event, and this
-// task must not import the repository, whose module scope opens SQLite and runs
-// the legacy import. A headless launch does none of that.
+// task must not import the repository, which opens SQLite at module scope. A
+// headless launch has no Convex session, so it cannot drain the queue anyway.
 const store = createStore(asyncStorageDriver, "push/v1");
 
 async function recordWake(queueId: string): Promise<void> {
@@ -42,9 +42,9 @@ if (Platform.OS === "android") {
     // `data` is untrusted network input: parse it, never index into it.
     const wake = parseWake(data);
     if (!wake) return;
-    // R2 seam: fetch the relay queue entry named by `wake.queueId`, save it to
-    // SQLite, and acknowledge the queue only after that commit. Until the
-    // queue exists, a wake is only recorded so the path is observable.
+    // A wake is only a hint: it names the queued envelope, and the foreground
+    // drain is what commits and acknowledges it. Recording the id keeps the
+    // wake observable in diagnostics.
     await recordWake(wake.queueId);
   });
 }

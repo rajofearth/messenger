@@ -10,18 +10,26 @@ import {
 
 /**
  * A story is visible to its owner and to anyone who shares a conversation with
- * the owner. Conversations are mirrored in `conversationMeta`, which is small
- * enough to scan and keeps the rule in one place.
+ * the owner. Membership is one row per subject in `conversationMembers`, so the
+ * caller's rows name the conversations whose members are allowed.
  */
 async function storyAudience(
   ctx: QueryCtx | MutationCtx,
   actor: { subjectId: string },
 ) {
-  const conversations = await ctx.db.query("conversationMeta").collect();
+  const mine = await ctx.db
+    .query("conversationMembers")
+    .withIndex("by_subject", (q) => q.eq("subjectId", actor.subjectId))
+    .collect();
   const allowed = new Set<string>([actor.subjectId]);
-  for (const conversation of conversations) {
-    if (!conversation.memberSubjectIds.includes(actor.subjectId)) continue;
-    for (const memberId of conversation.memberSubjectIds) allowed.add(memberId);
+  for (const row of mine) {
+    const members = await ctx.db
+      .query("conversationMembers")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", row.conversationId),
+      )
+      .collect();
+    for (const member of members) allowed.add(member.subjectId);
   }
   return allowed;
 }

@@ -20,16 +20,20 @@ and this project adheres to
   queued attachments per recipient, 2 MiB per attachment, and 8000 characters
   per message; a full queue answers with the recipient's last-seen time.
   Reactions and delete-for-everyone use the same queue. Message order continues
-  after the legacy component sequence, so old threads keep paging. The dev APK
-  grows 26,764 bytes (+0.19%) to 14,074,187 bytes (13.42 MiB), 2.58 MiB under
-  the 16 MiB gate; the relay adds no dependency and no native library.
+  from `conversations.nextSequence`. The dev APK grows 26,764 bytes (+0.19%) to
+  14,074,187 bytes (13.42 MiB), 2.58 MiB under the 16 MiB gate; the relay adds no
+  dependency and no native library.
 - Settings now says that chats live on this phone and that uninstalling
   Messenger or clearing its data deletes them permanently.
 - The server keeps no delivered message. A message that is not acknowledged
   within 30 days expires with its attachment, and a recorded reply carries only
   the quoted id because retired envelopes leave no text to quote.
-- Forwarding, read receipts and presence still use the chat component, so a
-  forwarded message still has a server copy for now.
+- The relay is now the only message path. Conversations come from
+  `conversations` and `conversationMembers`, threads are read from SQLite only,
+  and forwarding is a fresh relay send. The 2026-10-29 cleanup dev APK is
+  14,046,155 bytes (13.40 MiB), 28,032 bytes (-0.20%) smaller than the relay
+  build and 2.60 MiB under the 16 MiB gate; the JavaScript bundle fell from
+  2.40 MiB to 2.37 MiB with no dependency or native-library change.
 - Push wakes arrive through Firebase Cloud Messaging. Each device registers its
   FCM token against its own `devices` row, and the server sends a data-only
   message that carries no content, only an opaque queue id. A wake reaches the
@@ -44,12 +48,11 @@ and this project adheres to
   at 2,630 stored bytes, plus Firebase dex); `googleServicesFile` and the client
   push code are 105,020, because an app id keeps the Firebase initialisation
   path that R8 previously removed.
-- Chats keep their full history on the phone in SQLite (`messenger.db`) instead
-  of the newest 100 messages in AsyncStorage. Scrolling to the top of a thread
-  loads the previous page from the device and only asks the server for rows this
-  installation never received; a thread shorter than the screen shows a "Load
-  older messages" control. An existing installation imports its `messenger/v2`
-  cache once, per chat, and resumes the import if the process is killed.
+- Chats keep their full history on the phone in SQLite (`messenger.db`). Scrolling
+  to the top of a thread loads the previous page from the device; there is no
+  server history to ask. A thread shorter than the screen shows a "Load older
+  messages" control. This build does not import the old `messenger/v2` cache:
+  a different local schema resets the database instead of migrating it.
 - Unsent text and attachments now survive a process kill. Every send is
   recorded in a durable outbox first, an attachment is copied into app
   documents before upload, and a finalized upload id is reused on retry so the
@@ -80,13 +83,39 @@ and this project adheres to
   at 2x density, caches one preview file per image and keeps the original URI
   in `uri`/`image`, so a gallery save still exports full resolution.
 
+### Removed
+
+- The `convex-chat` component, `convex/chat.ts`, `convex/convex.config.ts`,
+  `convex/lib/paging.ts`, `convex/lib/retention.ts` and the component
+  dependency. `messageRefs` and `messageDeletes` are gone; conversations are
+  `conversations` plus `conversationMembers`.
+- The one-time AsyncStorage history import (`migrate.ts`), snapshots, the
+  migration tests and the additive `user_version` steps. `messenger.db` has one
+  schema version and drops a database from any other build.
+- Server paging and thread media downloads: `threadPaging.ts`,
+  `loadOlderThread.ts`, `useRemoteThreadMedia.ts` and their tests.
+- The server-era thread helpers with no caller left: `mergeThread`,
+  `mergeChats`, `sameOptimistic`, `newestReadSequence`, `isPendingStatus` and
+  `SERVER_MATCH_WINDOW_MS`. `threadMerge.ts` keeps only `isConfirmed` and
+  `mergeOlderPage`; direct and group chats come from `conversations`.
+- Presence, typing indicators and read receipts, including
+  `useRemotePresence.ts` and their UI. Settings states that they are not part of
+  this build.
+- The local `tools/web-tester` browser client and its `web:*` scripts. It read
+  server-stored messages, which the relay no longer keeps; a second phone is now
+  required for a relay round trip.
+- The development deployment's data: every relay row, conversation, file, story
+  and telemetry event was deleted, including 31 storage blobs. Accounts,
+  profiles, devices and the release history were kept.
+
 ### Changed
 
 - The device cache is now `messenger.db` (expo-sqlite) with WAL, foreign keys
-  and additive `user_version` migrations; media bytes stay in app documents.
+  and a single schema version; a mismatched `user_version` resets the database
+  instead of migrating it. Media bytes stay in app documents.
   Opening or refreshing a chat upserts rows instead of re-serialising a whole
-  thread, and confirming a short server page can no longer drop older history
-  the phone already owns. The dev APK grows 678,113 bytes (+5.2%) to
+  thread, and a short local page can no longer drop older history the phone
+  already owns. The dev APK grows 678,113 bytes (+5.2%) to
   13,610,208 bytes: the SQLite library adds 684,983 stored bytes (1,431,992
   raw, with FTS disabled) and the JavaScript bundle adds 169,140, while the dex
   is about 18 KB larger. The Ionicons subset in the same build removes 194,959
@@ -140,24 +169,18 @@ and this project adheres to
   and the cached update APK, so the next account on the same installation
   cannot inherit the previous account's files.
 - Deleting or clearing a chat is now durable. The conversation row stays as a
-  tombstone (`hidden_at`, `cleared_through`), so a page or receipt that was
-  already queued can no longer recreate the chat with default columns and put
-  the deleted messages back; only a genuinely newer incoming message reopens
-  it. Delete-for-me writes a per-message tombstone (`user_version` 2,
-  `hidden_messages`) that `readThread`, `readOlderThread` and `hasOlderThread`
-  honour, so the message cannot return after a relaunch or a stale server page.
-- The legacy import now runs in two phases, inbox first and threads second, so
-  a thread whose chat the old store never listed still becomes a reachable
-  conversation before the old keys are deleted; a kill between the phases
-  resumes instead of skipping the threads.
+  tombstone (`hidden_at`, `cleared_through`), so a late relay receipt can no
+  longer recreate the chat with default columns and put the deleted messages
+  back; only a genuinely newer incoming message reopens it. Delete-for-me writes
+  a per-message tombstone (`hidden_messages`) that the thread reads honour, so
+  the message cannot return after a relaunch or a stale page.
 - A failed cold-start read of the outbox can no longer be persisted as an empty
   queue. Writes stay closed until a read succeeds, and rows queued in the
   meantime are persisted by that successful read instead of being wiped.
 - Load-older no longer offers a dead control on a short thread, jumps to the
-  bottom when a page is prepended, drops the rows already on disk when the
-  network read fails, leaks its spinner into the next chat, or treats the
-  hidden-page budget as the end of history. A failure now shows "Couldn't load
-  older messages. Tap to retry." with a polite accessibility announcement.
+  bottom when a page is prepended, drops the rows already on disk when a read
+  fails, or leaks its spinner into the next chat. A failure now shows "Couldn't
+  load older messages. Tap to retry." with a polite accessibility announcement.
 
 The stacked A2/A3/C3 local gate build is 12,702,235 bytes (12.11 MiB),
 458,828 bytes (-3.5%) below the 13,161,063-byte R8 build and 3.89 MiB below

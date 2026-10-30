@@ -8,8 +8,6 @@
  */
 
 import { openDatabaseAsync } from "expo-sqlite";
-import type { Store } from "../store";
-import { migrateLegacy } from "./migrate";
 import { applySchema } from "./schema";
 import type { SqlDatabase } from "./types";
 
@@ -22,20 +20,19 @@ PRAGMA busy_timeout = 5000;`;
 
 let opening: Promise<SqlDatabase> | undefined;
 
-async function open(store: Store): Promise<SqlDatabase> {
+async function open(): Promise<SqlDatabase> {
   const connection = await openDatabaseAsync(DATABASE_NAME, {
     useNewConnection: true,
   });
   await connection.execAsync(PRAGMAS);
   await applySchema(connection);
-  await migrateLegacy(connection, store);
   return connection;
 }
 
-/** The shared connection, opened and migrated on first call. */
-export function openMessengerDatabase(store: Store): Promise<SqlDatabase> {
+/** The shared connection, opened and checked against the schema on first call. */
+export function openMessengerDatabase(): Promise<SqlDatabase> {
   if (!opening) {
-    opening = open(store).catch((error: unknown) => {
+    opening = open().catch((error: unknown) => {
       opening = undefined;
       throw error;
     });

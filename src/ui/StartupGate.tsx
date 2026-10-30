@@ -1,7 +1,7 @@
 /**
  * Owns the bundled font load so every screen paints with the intended face.
  *
- * The splash is the same mark the messenger uses while its local cache loads.
+ * The splash is the same mark the messenger uses while its local history loads.
  * A font failure still starts the app: falling back to the platform face is
  * better than a splash that never leaves.
  */

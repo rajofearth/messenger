@@ -32,7 +32,6 @@ type Props = {
   stories: Story[];
   avatar: string;
   dark: boolean;
-  typingId: string | null;
   onOpenChat: (chat: Chat) => void;
   onProfile: (chat: Chat) => void;
   onToggleMute: (chat: Chat) => void;
@@ -50,7 +49,6 @@ export default function ChatsScreen({
   stories,
   avatar,
   dark,
-  typingId,
   onOpenChat,
   onProfile,
   onToggleMute,
@@ -98,12 +96,11 @@ export default function ChatsScreen({
       <ChatRow
         chat={item}
         dark={dark}
-        typing={item.typing || typingId === item.id}
         onOpen={onOpenChat}
         onActions={onRowActions}
       />
     ),
-    [dark, typingId, onOpenChat, onRowActions],
+    [dark, onOpenChat, onRowActions],
   );
 
   return (

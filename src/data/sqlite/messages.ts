@@ -1,7 +1,7 @@
 /**
- * Message rows, newest-first reads, upsert-only writes and thread flags.
+ * Message rows: newest-first reads, upsert-only writes and local paging.
  *
- * A thread is two queries: the newest confirmed page (server rows own their
+ * A thread is two queries: the newest confirmed page (rows that carry their own
  * sequence) and the pending sends that only live on this device. Reads never
  * return a deleted row, one the user cleared past, or one they deleted for
  * themselves.
@@ -21,6 +21,10 @@ import { messageMedia, replaceMessageMedia } from "./media";
 import type { SqlDatabase, SqlValue } from "./types";
 
 export const THREAD_PAGE_SIZE = 100;
+
+/** Rows returned by one scroll-to-the-top page. */
+export const OLDER_PAGE_SIZE = 30;
+
 
 const UPSERT = `INSERT INTO messages (${MESSAGE_COLUMNS.join(", ")})
 VALUES (${MESSAGE_COLUMNS.map(() => "?").join(", ")})
@@ -180,8 +184,8 @@ async function clearedThrough(
 
 /**
  * The newest confirmed page, ascending, followed by the pending sends. The
- * cleared timestamp is applied here as well as on the server, so a page that
- * was in flight while the user cleared a chat cannot bring the old rows back.
+ * cleared timestamp is applied here too, so a page that was in flight while
+ * the user cleared a chat cannot bring the old rows back.
  */
 export async function readThread(
   database: SqlDatabase,
@@ -212,13 +216,23 @@ export async function readThread(
   return toMessages(rows, variants);
 }
 
-/** The page just before `beforeSequence`, ascending. */
+/** One page of older history and whether anything before it exists. */
+export type OlderPage = {
+  messages: MessageRecord[];
+  hasMore: boolean;
+};
+
+/**
+ * The page just before `beforeSequence`, ascending. One extra row is read to
+ * decide `hasMore`, so the caller can tell the last page from a full one
+ * without a second query.
+ */
 export async function readOlderThread(
   database: SqlDatabase,
   chatId: string,
   beforeSequence: number,
-  limit = THREAD_PAGE_SIZE,
-): Promise<MessageRecord[]> {
+  limit = OLDER_PAGE_SIZE,
+): Promise<OlderPage> {
   const cleared = await clearedThrough(database, chatId);
   const rows = await database.getAllAsync<MessageRow>(
     `SELECT * FROM messages WHERE ${CONFIRMED_FILTER} AND sequence < ?
@@ -227,14 +241,34 @@ export async function readOlderThread(
     cleared,
     cleared,
     beforeSequence,
-    limit,
+    limit + 1,
   );
+  const hasMore = rows.length > limit;
+  if (hasMore) rows.pop();
   const ascending = rows.reverse();
   const variants = await readVariants(
     database,
     ascending.map((row) => row.id),
   );
-  return toMessages(ascending, variants);
+  return { messages: toMessages(ascending, variants), hasMore };
+}
+
+/** Whether any confirmed row sits before a sequence, for the "older" control. */
+export async function hasOlderThread(
+  database: SqlDatabase,
+  chatId: string,
+  beforeSequence: number,
+): Promise<boolean> {
+  const cleared = await clearedThrough(database, chatId);
+  const row = await database.getFirstAsync<{ id: string }>(
+    `SELECT id FROM messages WHERE ${CONFIRMED_FILTER} AND sequence < ?
+     LIMIT 1`,
+    chatId,
+    cleared,
+    cleared,
+    beforeSequence,
+  );
+  return !!row;
 }
 
 /** Empties a thread locally and remembers how far the user cleared it. */
@@ -258,8 +292,7 @@ export async function resetThread(
        preview = 'No messages yet',
        time = '',
        unread = 0,
-       last_message_at = NULL,
-       last_message_status = NULL
+       last_message_at = NULL
      WHERE id = ?`,
     Date.now(),
     chatId,
@@ -293,50 +326,4 @@ export async function removeMessage(
     messageId,
   );
   await database.runAsync("DELETE FROM outbox WHERE message_id = ?", messageId);
-}
-
-/**
- * Whether the server is likely to have rows older than the local page: false
- * once the thread is known to start at sequence 1 or was marked exhausted.
- *
- * A deleted chat has nothing to page through, and a cleared thread with no
- * confirmed row left must not offer history either: the server cleared the
- * same range, so asking again would empty the thread and, worse, let it
- * advertise history forever.
- */
-export async function hasOlderThread(
-  database: SqlDatabase,
-  chatId: string,
-): Promise<boolean> {
-  const row = await database.getFirstAsync<{
-    exhausted: number | null;
-    hidden: number | null;
-    cleared: number | null;
-    oldest: number | null;
-  }>(
-    `SELECT
-       history_exhausted_at AS exhausted,
-       hidden_at AS hidden,
-       cleared_through AS cleared,
-       (SELECT MIN(sequence) FROM messages
-         WHERE conversation_id = conversations.id
-           AND sequence IS NOT NULL
-           AND ${HIDDEN}) AS oldest
-     FROM conversations WHERE id = ?`,
-    chatId,
-  );
-  if (!row || row.exhausted != null || row.hidden != null) return false;
-  if (row.cleared != null && row.oldest === null) return false;
-  return row.oldest === null || row.oldest > 1;
-}
-
-export async function exhaustThread(
-  database: SqlDatabase,
-  chatId: string,
-): Promise<void> {
-  await database.runAsync(
-    "UPDATE conversations SET history_exhausted_at = ? WHERE id = ?",
-    Date.now(),
-    chatId,
-  );
 }

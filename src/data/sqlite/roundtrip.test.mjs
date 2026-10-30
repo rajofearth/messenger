@@ -25,7 +25,11 @@ function assertSameRecord(actual, expected) {
   assert.deepEqual(defined(actual), defined(expected));
 }
 
-/** Every ChatRecord field set, so one dropped column shows up here. */
+/**
+ * Every persisted ChatRecord field is set, so one dropped column shows up here.
+ * `lastMessageStatus` is deliberately absent: it describes a live inbox row and
+ * no column stores it.
+ */
 const contact = {
   id: "c-full",
   name: "Asha Rao",
@@ -33,8 +37,6 @@ const contact = {
   preview: "see you at six",
   time: "09:41",
   unread: 3,
-  online: true,
-  typing: true,
   group: true,
   color: "#3d7bfd",
   username: "asha",
@@ -47,10 +49,9 @@ const contact = {
   pinned: true,
   mediaVisibility: "gallery",
   lastMessageAt: 1_760_000_000_000,
-  lastMessageStatus: "sent",
 };
 
-test("a confirmed outgoing message keeps variants, reply, reaction and revision", async () => {
+test("a confirmed outgoing message keeps variants, reply and reaction", async () => {
   const { repository: repo } = await setup();
   const outgoing = {
     id: "m-out",
@@ -92,7 +93,6 @@ test("a confirmed outgoing message keeps variants, reply, reaction and revision"
     filename: "plan.webp",
     reaction: "🔥",
     sequence: 42,
-    revision: 7,
   };
 
   await repo.saveMessages("a", [outgoing]);
@@ -316,10 +316,14 @@ test("the thread read is the newest confirmed page, ascending, then pending", as
 
   const older = await repo.loadOlderMessages("a", 51);
   assert.deepEqual(
-    older.map((item) => item.id),
-    Array.from({ length: 50 }, (_, index) => `m${index + 1}`),
+    older.messages.map((item) => item.id),
+    Array.from({ length: 30 }, (_, index) => `m${index + 21}`),
   );
-  assert.deepEqual(await repo.loadOlderMessages("a", 1), []);
+  assert.equal(older.hasMore, true);
+  assert.deepEqual(await repo.loadOlderMessages("a", 1), {
+    messages: [],
+    hasMore: false,
+  });
 });
 
 test("the cached inbox follows the newest snapshot order", async () => {

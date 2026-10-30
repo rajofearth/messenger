@@ -79,7 +79,6 @@ test("delete for me removes only that message and restores latest preview/time",
     preview: "No messages yet",
     time: "",
     unread: 0,
-    typing: false,
   });
 });
 

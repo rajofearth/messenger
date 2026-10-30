@@ -10,13 +10,12 @@ import { s } from "./ChatsScreen.styles";
 type Props = {
   chat: Chat;
   dark: boolean;
-  typing: boolean;
   onOpen: (chat: Chat) => void;
   onActions: (chat: Chat, x?: number, y?: number) => void;
 };
 
-/** Memoized row so typing or an open action menu does not re-render the whole list. */
-function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
+/** Memoized row so an open action menu does not re-render the whole list. */
+function ChatRow({ chat, dark, onOpen, onActions }: Props) {
   const colors = palette(dark);
   const longPressed = useRef(false);
   const pending =
@@ -27,11 +26,8 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
       ? "Sending…"
       : chat.lastMessageStatus === "failed"
         ? "Not sent"
-        : typing
-          ? "typing •••"
-          : chat.preview;
+        : chat.preview;
   const confirmed =
-    !typing &&
     !pending &&
     (chat.lastMessageStatus === "sent" ||
       (!chat.lastMessageStatus && chat.preview.startsWith("You:")));
@@ -68,7 +64,7 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
         pressed && { backgroundColor: colors.card },
       ]}
     >
-      <Avatar uri={chat.avatar} name={chat.name} online={chat.online} />
+      <Avatar uri={chat.avatar} name={chat.name} />
       <View style={s.chatBody}>
         <View style={s.rowTop}>
           <Text numberOfLines={1} style={[s.name, { color: colors.fg }]}>
@@ -90,13 +86,11 @@ function ChatRow({ chat, dark, typing, onOpen, onActions }: Props) {
                   ? dark
                     ? "#FFB4AB"
                     : "#B3261E"
-                  : typing
-                    ? colors.coralInk
-                    : chat.unread > 0
-                      ? dark
-                        ? "#D7DAD3"
-                        : "#667268"
-                      : colors.muted,
+                  : chat.unread > 0
+                    ? dark
+                      ? "#D7DAD3"
+                      : "#667268"
+                    : colors.muted,
               },
             ]}
           >

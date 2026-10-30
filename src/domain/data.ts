@@ -38,8 +38,7 @@ export type Message = {
   duration?: number;
   reaction?: string;
   sequence?: number;
-  revision?: number;
-  /** Local-only delivery state; confirmed server rows leave it undefined. */
+  /** Local-only delivery state; a confirmed relay row leaves it undefined. */
   status?: MessageStatus;
   /** Local-only upload fraction (0..1) while an attachment is on its way. */
   uploadProgress?: number;
@@ -58,8 +57,6 @@ export type Chat = {
   preview: string;
   time: string;
   unread: number;
-  online?: boolean;
-  typing?: boolean;
   group?: boolean;
   color: string;
   username?: string;

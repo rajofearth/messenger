@@ -18,17 +18,27 @@ test("the thread read is the newest confirmed page plus pending sends", async ()
     Array.from({ length: 100 }, (_, index) => index + 51),
   );
 
-  const older = await repo.loadOlderMessages("a", 51);
-  assert.equal(older.length, 50);
-  assert.equal(older[0].id, "m1");
-  assert.equal(older[49].id, "m50");
+  // A page holds 30 rows and reports whether anything older survives.
+  const first = await repo.loadOlderMessages("a", 51);
+  assert.deepEqual(
+    first.messages.map((item) => item.id),
+    Array.from({ length: 30 }, (_, index) => `m${index + 21}`),
+  );
+  assert.equal(first.hasMore, true);
 
-  assert.equal(await repo.threadHasOlder("a"), false);
+  const last = await repo.loadOlderMessages("a", 21);
+  assert.deepEqual(
+    last.messages.map((item) => item.id),
+    Array.from({ length: 20 }, (_, index) => `m${index + 1}`),
+  );
+  assert.equal(last.hasMore, false);
+
+  const wider = await repo.loadOlderMessages("a", 51, 50);
+  assert.equal(wider.messages.length, 50);
+  assert.equal(wider.messages[0].id, "m1");
+  assert.equal(wider.hasMore, false);
+
   await repo.saveMessages("b", thread.slice(100));
-  assert.equal(await repo.threadHasOlder("b"), true);
-  await repo.markThreadExhausted("b");
-  assert.equal(await repo.threadHasOlder("b"), false);
-
   await repo.saveOutbox([{ chatId: "b", message: pending("p1") }]);
   const withPending = await repo.loadMessages("b");
   assert.equal(withPending.length, 51);
@@ -105,7 +115,6 @@ test("a confirmed message keeps reply, reaction, variants, paths and previews", 
     forwarded: true,
     albumId: "album-1",
     reaction: "fire",
-    revision: 3,
     storageId: "storage-9",
     uploadProgress: 1,
   });
@@ -129,7 +138,6 @@ test("a confirmed message keeps reply, reaction, variants, paths and previews", 
   assert.equal(stored.forwarded, true);
   assert.equal(stored.albumId, "album-1");
   assert.equal(stored.reaction, "fire");
-  assert.equal(stored.revision, 3);
   assert.equal(stored.storageId, "storage-9");
   assert.equal(stored.uploadProgress, 1);
   assert.deepEqual(stored.replyTo, {
@@ -156,7 +164,6 @@ test("clearing a thread hides old rows and resets the inbox projection", async (
       preview: "old",
       time: "09:00",
       lastMessageAt: 123,
-      lastMessageStatus: "sent",
     }),
   ]);
   await repo.saveMessages("a", old);
@@ -170,7 +177,6 @@ test("clearing a thread hides old rows and resets the inbox projection", async (
   assert.equal(cleared.time, "");
   assert.equal(cleared.unread, 0);
   assert.equal(cleared.lastMessageAt, undefined);
-  assert.equal(cleared.lastMessageStatus, undefined);
 
   await repo.saveMessages("a", old);
   assert.deepEqual(await repo.loadMessages("a"), []);
@@ -278,7 +284,6 @@ test("a deleted conversation stays deleted when a late write lands", async () =>
     ["b"],
   );
   assert.deepEqual(await repo.loadMessages("a"), []);
-  assert.equal(await repo.threadHasOlder("a"), false);
   // The row is kept as a tombstone so the clear mark survives.
   const tombstone = await database.getFirstAsync(
     "SELECT hidden_at, cleared_through FROM conversations WHERE id = ?",
@@ -342,7 +347,7 @@ test("delete-for-me survives a stale page, an older read and a relaunch", async 
     ["m1", "m3"],
   );
   assert.deepEqual(
-    (await repo.loadOlderMessages("a", 3)).map((item) => item.id),
+    (await repo.loadOlderMessages("a", 3)).messages.map((item) => item.id),
     ["m1"],
   );
   // The message went with its variants, so nothing is left to re-download.
@@ -364,7 +369,7 @@ test("delete-for-me survives a stale page, an older read and a relaunch", async 
     ["m1", "m3"],
   );
   assert.deepEqual(
-    (await repo.loadOlderMessages("a", 3)).map((item) => item.id),
+    (await repo.loadOlderMessages("a", 3)).messages.map((item) => item.id),
     ["m1"],
   );
   const rows = await database.getAllAsync("SELECT id FROM messages ORDER BY id");
@@ -385,18 +390,6 @@ test("a deleted pending send is not revived by a stale queue snapshot", async ()
   await repo.saveOutbox([{ chatId: "a", message: pending("p1") }]);
   assert.deepEqual(await repo.loadOutbox(), []);
   assert.deepEqual(await repo.loadMessages("a"), []);
-});
-
-test("a cleared thread stops advertising older history", async () => {
-  const { repository: repo } = await setup();
-  await repo.saveChats([chat("a")]);
-  await repo.saveMessages("a", [message("m1", 5), message("m2", 6)]);
-  assert.equal(await repo.threadHasOlder("a"), true);
-
-  // The server cleared the same range, so there is nothing older to page in;
-  // offering the control would empty the thread on every scroll.
-  await repo.clearMessages("a");
-  assert.equal(await repo.threadHasOlder("a"), false);
 });
 
 test("story snapshots replace the previous set and keep variants", async () => {

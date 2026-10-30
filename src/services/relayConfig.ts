@@ -1,9 +1,3 @@
-/**
- * The one-line rollback to the component send path: set this to false and the
- * app sends text, attachments, reactions and deletes through convex/chat again.
- */
-export const RELAY_ENABLED = true;
-
 /** Files larger than this are refused before they ever reach the relay queue. */
 export const RELAY_MEDIA_LIMIT_BYTES = 2 * 1024 * 1024;
 
@@ -38,8 +32,8 @@ function relayErrorCode(error: unknown): string | undefined {
 }
 
 /**
- * Turns a relay rejection into a sentence the user can act on. Component and
- * upload errors return undefined so the caller keeps its existing mapping.
+ * Turns a relay rejection into a sentence the user can act on. Upload errors
+ * return undefined so the caller keeps its existing mapping.
  */
 export function relayErrorMessage(error: unknown): string | undefined {
   const code = relayErrorCode(error);

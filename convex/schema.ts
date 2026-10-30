@@ -65,19 +65,33 @@ export default defineSchema({
     .index("by_session", ["authSessionId"])
     .index("by_user_device", ["userId", "deviceId"])
     .index("by_pushToken", ["pushToken"]),
-  conversationMeta: defineTable({
-    conversationId: v.string(),
+  /**
+   * The routing record for one conversation. Its document id is the id the
+   * client passes back, so `relayQueue.conversationId` and the preferences
+   * tables stay plain strings.
+   */
+  conversations: defineTable({
     kind: v.union(v.literal("direct"), v.literal("group")),
-    title: v.optional(v.string()),
-    memberSubjectIds: v.array(v.string()),
+    /** Empty for a direct conversation, where the client shows the peer's name. */
+    title: v.string(),
+    /**
+     * `direct:<subjectA>:<subjectB>` with the subjects sorted, so either side
+     * finds the same row. Groups have no key because they cannot be reused.
+     */
+    externalKey: v.optional(v.string()),
     createdBy: v.string(),
     createdAt: v.number(),
-    /**
-     * The last sequence handed out for this conversation. Seeded once from the
-     * chat component so relay messages continue the history that already exists.
-     */
+    /** The last sequence handed out here; absent until the first send. */
     nextSequence: v.optional(v.number()),
-  }).index("by_conversationId", ["conversationId"]),
+  }).index("by_externalKey", ["externalKey"]),
+  /** One row per member. A row is the only proof that a subject belongs. */
+  conversationMembers: defineTable({
+    conversationId: v.id("conversations"),
+    subjectId: v.string(),
+    role: v.union(v.literal("owner"), v.literal("member")),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_subject", ["subjectId"]),
   /**
    * One row per recipient per relayed item. The envelope is the whole message;
    * the row is deleted when the recipient's phone acknowledges its local
@@ -116,18 +130,6 @@ export default defineSchema({
   })
     .index("by_user_conversation", ["userId", "conversationId"])
     .index("by_user", ["userId"]),
-  messageDeletes: defineTable({
-    userId: v.id("users"),
-    conversationId: v.string(),
-    messageId: v.string(),
-    deletedAt: v.number(),
-  })
-    .index("by_user_conversation", ["userId", "conversationId"])
-    .index("by_user_conversation_message", [
-      "userId",
-      "conversationId",
-      "messageId",
-    ]),
   files: defineTable({
     ownerId: v.id("users"),
     storageId: v.id("_storage"),
@@ -138,11 +140,6 @@ export default defineSchema({
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     durationMs: v.optional(v.number()),
-    /**
-     * Message ids that currently reference this blob. Undefined means a
-     * pre-migration row, so deletion leaves the blob alone.
-     */
-    messageRefs: v.optional(v.array(v.string())),
     /**
      * Image uploads record whether responsive widths exist. `pending` and
      * `failed` are reserved for a server-side generator; finalize currently
