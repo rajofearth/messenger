@@ -31,6 +31,8 @@ type Props = {
   chats: Chat[];
   stories: Story[];
   avatar: string;
+  /** The signed-in profile's name, used for the avatar fallback initials. */
+  selfName?: string;
   dark: boolean;
   onOpenChat: (chat: Chat) => void;
   onProfile: (chat: Chat) => void;
@@ -48,6 +50,7 @@ export default function ChatsScreen({
   chats,
   stories,
   avatar,
+  selfName,
   dark,
   onOpenChat,
   onProfile,
@@ -192,8 +195,8 @@ export default function ChatsScreen({
                     ]}
                   >
                     <Avatar
-                      uri={self?.avatar ?? avatar}
-                      name={self?.name ?? "You"}
+                      uri={avatar || self?.avatar}
+                      name={selfName || self?.name}
                       size={58}
                     />
                     <Pressable

@@ -15,6 +15,7 @@ import type * as devTelemetry from "../devTelemetry.js";
 import type * as devices from "../devices.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as lib_blobs from "../lib/blobs.js";
 import type * as lib_conversations from "../lib/conversations.js";
 import type * as lib_identity from "../lib/identity.js";
 import type * as lib_manifest from "../lib/manifest.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   devices: typeof devices;
   files: typeof files;
   http: typeof http;
+  "lib/blobs": typeof lib_blobs;
   "lib/conversations": typeof lib_conversations;
   "lib/identity": typeof lib_identity;
   "lib/manifest": typeof lib_manifest;

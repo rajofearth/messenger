@@ -275,7 +275,12 @@ Verified in this repo or against live docs:
   `extraProguardRules`.
 - Android 13 `POST_NOTIFICATIONS` gates display, not token issuance. A denied
   permission still yields a token and still runs the wake task, but the app
-  cannot post anything.
+  cannot post anything. The app therefore asks for it once per install after
+  sign-in (`requestPermissionOnce` in `src/services/systemNotifications.ts`,
+  remembered with a SecureStore marker): Android never shows the dialog on its
+  own, and a drain that runs before the answer used to drop its notifications.
+  A message whose post was refused stays eligible, so granting the permission
+  later still announces it.
 - The payload parser and its rejection cases, in
   `src/services/pushPayload.test.mjs`.
 - The dev deployment accepts `push:sendTestWakeForUser` from the CLI and

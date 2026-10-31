@@ -2,6 +2,7 @@ import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
+import { deleteBlob } from "./lib/blobs";
 import { normalizeUsername, requireUser, validateUsername } from "./lib/identity";
 import { deleteMediaVariants } from "./lib/mediaVariants";
 
@@ -155,7 +156,9 @@ export const update = mutation({
       current.avatarStorageId !== args.avatarStorageId
     ) {
       await deleteMediaVariants(ctx, current.avatarStorageId);
-      await ctx.storage.delete(current.avatarStorageId);
+      // The previous avatar may already be gone (a wiped deployment, an earlier
+      // cleanup); the new one is saved either way.
+      await deleteBlob(ctx, current.avatarStorageId);
     }
     return await publicProfile(ctx, actor.userId);
   },

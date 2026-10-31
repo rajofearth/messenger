@@ -138,6 +138,7 @@ function MessengerApp() {
     previews: messenger.profile.previews !== false,
     sound: messenger.profile.sound !== false,
     enabled: notificationsEnabled,
+    ready: messenger.loaded,
   });
   /** Mute is stored in both places: the app preference and native suppression. */
   function muteChat(id: string, muted: boolean) {
@@ -418,6 +419,7 @@ function MessengerApp() {
               chats={messenger.chats}
               stories={messenger.stories}
               avatar={messenger.profile.avatar}
+              selfName={messenger.profile.name}
               dark={messenger.dark}
               onOpenChat={openChat}
               onProfile={(contact) =>

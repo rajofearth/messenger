@@ -3,6 +3,7 @@ import type { Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { requireUser } from "./lib/identity";
+import { deleteBlob } from "./lib/blobs";
 import {
   deleteMediaVariants,
   readMediaVariants,
@@ -226,7 +227,7 @@ export const remove = mutation({
     if (!row || row.ownerId !== actor.userId) throw new ConvexError("STORY_FORBIDDEN");
     await deleteMediaVariants(ctx, row.storageId);
     await ctx.db.delete(args.storyId);
-    await ctx.storage.delete(row.storageId);
+    await deleteBlob(ctx, row.storageId);
     return true;
   },
 });
@@ -241,7 +242,7 @@ export const cleanupExpired = internalMutation({
     for (const row of rows) {
       await deleteMediaVariants(ctx, row.storageId);
       await ctx.db.delete(row._id);
-      await ctx.storage.delete(row.storageId);
+      await deleteBlob(ctx, row.storageId);
       const views = await ctx.db
         .query("storyViews")
         .withIndex("by_story_user", (q) => q.eq("storyId", row._id))

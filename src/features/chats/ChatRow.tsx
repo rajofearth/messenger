@@ -35,13 +35,16 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
   // for rows written before that field existed, or for a contact with no
   // messages yet.
   const timestamp = chatTimeLabel(chat.lastMessageAt) ?? chat.time;
+  // A relay drain can surface a conversation before the inbox query has named
+  // it; the preview and unread badge are still worth showing.
+  const name = chat.name || "Conversation";
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${chat.name}, ${chat.unread > 0 ? `${chat.unread} unread messages, ` : ""}${preview}`}
+      accessibilityLabel={`${name}, ${chat.unread > 0 ? `${chat.unread} unread messages, ` : ""}${preview}`}
       accessibilityHint="Long press or use conversation actions for more options"
       accessibilityActions={[
-        { name: "longpress", label: `Conversation actions for ${chat.name}` },
+        { name: "longpress", label: `Conversation actions for ${name}` },
       ]}
       onAccessibilityAction={({ nativeEvent }) => {
         if (nativeEvent.actionName !== "longpress") return;
@@ -64,11 +67,11 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
         pressed && { backgroundColor: colors.card },
       ]}
     >
-      <Avatar uri={chat.avatar} name={chat.name} />
+      <Avatar uri={chat.avatar} name={name} />
       <View style={s.chatBody}>
         <View style={s.rowTop}>
           <Text numberOfLines={1} style={[s.name, { color: colors.fg }]}>
-            {chat.name}
+            {name}
           </Text>
           <Text
             style={[s.time, { color: chat.unread > 0 ? colors.coralInk : colors.muted }]}

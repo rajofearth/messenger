@@ -82,6 +82,45 @@ test("a message-only conversation does not appear in the cached inbox", async ()
   );
 });
 
+test("a relay batch for an unknown conversation reaches the inbox", async () => {
+  const { repository: repo } = await setup();
+  await repo.saveChats([chat("old", { lastMessageAt: 1 })]);
+  const incoming = message("m1", 4, {
+    text: "first from them",
+    createdAt: new Date(1_700_000_500_000).toISOString(),
+  });
+  await repo.saveRelayBatch("new", [incoming], ["q1"]);
+
+  const chats = await repo.loadChats();
+  assert.deepEqual(chats.map((item) => item.id), ["new", "old"]);
+  // No name until the conversation query answers, but the message is visible.
+  assert.equal(chats[0].preview, "first from them");
+  assert.equal(chats[0].unread, 1);
+  assert.equal(chats[0].lastMessageAt, 1_700_000_500_000);
+  assert.deepEqual(
+    (await repo.loadMessages("new")).map((item) => item.id),
+    ["m1"],
+  );
+  assert.deepEqual(await repo.loadPendingAcks(), [
+    { queueId: "q1", conversationId: "new" },
+  ]);
+
+  // The inbox snapshot fills identity while the merged row keeps the drain's
+  // preview, time and unread count.
+  await repo.saveChats([
+    chat("new", {
+      preview: "first from them",
+      unread: 1,
+      lastMessageAt: 1_700_000_500_000,
+    }),
+    chat("old"),
+  ]);
+  const named = (await repo.loadChats()).find((item) => item.id === "new");
+  assert.equal(named.name, "Chat new");
+  assert.equal(named.preview, "first from them");
+  assert.equal(named.unread, 1);
+});
+
 test("a confirmed message keeps reply, reaction, variants, paths and previews", async () => {
   const { repository: repo } = await setup();
   const rich = message("m1", 7, {

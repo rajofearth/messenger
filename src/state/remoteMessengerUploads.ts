@@ -8,9 +8,13 @@ import {
 } from "../services/relayConfig";
 import { uploadLocalFile } from "../services/remoteFiles";
 import {
-  discardPreparedImage,
-  prepareImageVariants,
-  type PreparedImage,
+  PHOTO_MAX_WIDTH,
+  PHOTO_QUALITY,
+  STORY_MAX_WIDTH,
+  STORY_QUALITY,
+  discardPreparedPhoto,
+  preparePhotoUpload,
+  type PreparedPhotoUpload,
 } from "../services/imageVariants";
 import type { RemoteMessage } from "./remoteMessengerTypes";
 
@@ -29,36 +33,25 @@ type CreateStory = (args: {
   height?: number;
 }) => Promise<Id<"stories">>;
 
-/** A failed transform leaves the original as the only upload. */
-async function prepareVariants(
-  uri: string,
-  mimeType?: string,
-): Promise<PreparedImage | undefined> {
-  try {
-    return await prepareImageVariants(uri, mimeType);
-  } catch {
-    return undefined;
-  }
-}
-
-function discardVariants(prepared: PreparedImage | undefined) {
-  for (const variant of prepared?.variants ?? []) {
-    discardPreparedImage(variant.uri);
-  }
-}
-
 function positive(value: number | undefined) {
   return value && value > 0 ? value : undefined;
 }
 
+function fileBytes(uri: string) {
+  try {
+    return new File(uri).size ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * The relay queue costs bytes until delivery, so refuse an oversized source
- * before uploading anything. A retry with a finalized storage id skips this:
- * its bytes are already in Convex and the send is the only step left.
+ * The relay queue costs bytes until delivery, so refuse an oversized blob
+ * before the send. The check runs on the prepared copy, not the picked file:
+ * a 5 MB camera photo becomes a few hundred KB before this is reached.
  */
-function refuseRelayOversize(uri: string) {
-  const size = new File(uri).size ?? 0;
-  if (size > RELAY_MEDIA_LIMIT_BYTES) {
+function refuseRelayOversize(bytes: number) {
+  if (bytes > RELAY_MEDIA_LIMIT_BYTES) {
     throw new Error("QUEUE_MEDIA_TOO_LARGE");
   }
 }
@@ -97,38 +90,42 @@ export async function sendAttachmentMessage({
 }) {
   const { uri, kind } = message;
   if (!uri || !kind) throw new Error("MISSING_ATTACHMENT");
-  if (!message.storageId) refuseRelayOversize(uri);
   const upload = async () => {
-    let prepared: PreparedImage | undefined;
+    let photo: PreparedPhotoUpload | undefined;
     try {
       // A retry that already holds a finalized id points at a source whose
       // variants were attached at finalize time; preparing again would only
       // create bytes nobody references.
       if (kind === "image" && !message.storageId) {
-        prepared = await prepareVariants(uri, message.mimeType);
+        photo = await preparePhotoUpload(uri, message.mimeType, {
+          maxWidth: PHOTO_MAX_WIDTH,
+          quality: PHOTO_QUALITY,
+          filename: message.filename,
+        });
       }
+      const uploadUri = photo?.uri ?? uri;
+      const bytes = photo?.bytes ?? fileBytes(uri);
+      refuseRelayOversize(bytes);
       const uploaded = await uploadLocalFile(
         convexClient,
         api.files.generateUploadUrl,
         api.files.finalizeUpload,
         {
-          uri,
+          uri: uploadUri,
           kind,
-          mimeType: message.mimeType,
-          filename: message.filename,
-          width: message.width ?? positive(prepared?.width),
-          height: message.height ?? positive(prepared?.height),
+          mimeType: photo?.mimeType ?? message.mimeType,
+          filename: photo?.filename ?? message.filename,
+          width: positive(photo?.width) ?? message.width,
+          height: positive(photo?.height) ?? message.height,
           durationMs: message.duration ? message.duration * 1000 : undefined,
-          variants: prepared?.variants.length
-            ? prepared.variants
-            : undefined,
+          variants: photo?.variants.length ? photo.variants : undefined,
           onProgress,
         },
       );
       await onUploaded?.(uploaded);
       return uploaded;
     } finally {
-      discardVariants(prepared);
+      discardPreparedPhoto(photo);
     }
   };
   const send = (storageId: Id<"_storage">) =>
@@ -163,6 +160,9 @@ export async function sendAttachmentMessage({
 /**
  * Uploads one story and returns the confirmed story id. The caller owns the
  * pending row, so a failure can be retried without making the user pick again.
+ * Photos are re-encoded before they leave the phone: a 4096px camera JPEG is
+ * several megabytes, and the same story at 1600px WebP is a fraction of that.
+ * Video is uploaded as picked; the device has no transcoder.
  */
 export async function uploadAndCreateStory(
   story: Story,
@@ -175,25 +175,29 @@ export async function uploadAndCreateStory(
   // its animation into static variants.
   const mimeType =
     story.mimeType ?? (story.video ? "video/mp4" : "image/jpeg");
-  let prepared: PreparedImage | undefined;
+  let photo: PreparedPhotoUpload | undefined;
   try {
-    if (!story.video) prepared = await prepareVariants(story.image, mimeType);
-    const width = story.width ?? positive(prepared?.width);
-    const height = story.height ?? positive(prepared?.height);
+    if (!story.video) {
+      photo = await preparePhotoUpload(story.image, mimeType, {
+        maxWidth: STORY_MAX_WIDTH,
+        quality: STORY_QUALITY,
+        filename: `story-${story.id}`,
+      });
+    }
+    const width = positive(photo?.width) ?? story.width;
+    const height = positive(photo?.height) ?? story.height;
     const storageId = await uploadLocalFile(
       convexClient,
       api.files.generateUploadUrl,
       api.files.finalizeUpload,
       {
-        uri: story.image,
+        uri: photo?.uri ?? story.image,
         kind: "story",
-        mimeType,
-        filename: `story-${story.id}`,
+        mimeType: photo?.mimeType ?? mimeType,
+        filename: photo?.filename ?? `story-${story.id}`,
         width,
         height,
-        variants: prepared?.variants.length
-          ? prepared.variants
-          : undefined,
+        variants: photo?.variants.length ? photo.variants : undefined,
         onProgress,
       },
     );
@@ -205,6 +209,6 @@ export async function uploadAndCreateStory(
       height,
     });
   } finally {
-    discardVariants(prepared);
+    discardPreparedPhoto(photo);
   }
 }

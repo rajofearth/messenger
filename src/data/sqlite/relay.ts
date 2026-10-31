@@ -10,6 +10,7 @@
 
 import { messagePreview } from "../../domain/messageActions";
 import type { MessageRecord } from "../records";
+import { ensureConversation } from "./chats";
 import { writeThread } from "./messages";
 import type { SqlDatabase } from "./types";
 
@@ -133,6 +134,12 @@ export async function writeRelayBatch(
   const unread = fresh.filter(
     (message) => !message.mine && !facts.existingIds.has(message.id),
   ).length;
+  // A drain can be the first thing this device ever hears about a conversation
+  // (the peer created it and sent before the inbox query answered). Without the
+  // row there is nothing for the preview and unread updates below to land on,
+  // so the message would exist in SQLite but never appear in the chat list.
+  // The row starts unnamed; the conversation query fills in identity.
+  await ensureConversation(database, chatId);
   if (unread > 0) {
     await database.runAsync(
       "UPDATE conversations SET unread = unread + ? WHERE id = ? AND hidden_at IS NULL",

@@ -1,4 +1,5 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
+import * as SecureStore from 'expo-secure-store';
 import { PermissionsAndroid, Platform } from 'react-native';
 
 export type NotificationPerson = {
@@ -98,6 +99,28 @@ export async function requestPermission(): Promise<NotificationStatus> {
   return getStatus();
 }
 
+const PERMISSION_ASKED_KEY = 'messenger.notifications.permission-asked';
+
+/**
+ * Asks for POST_NOTIFICATIONS once per install. Android 13+ never shows the
+ * dialog by itself, and a launch that starts draining the queue before the
+ * dialog is answered silently drops every notification. A denied answer is
+ * remembered so the app asks once instead of nagging; the settings screen can
+ * still request again later.
+ */
+export async function requestPermissionOnce(): Promise<NotificationStatus | undefined> {
+  if (!isSystemNotificationsAvailable) return undefined;
+  try {
+    const status = await getStatus();
+    if (status.permissionGranted) return status;
+    if (await SecureStore.getItemAsync(PERMISSION_ASKED_KEY)) return status;
+    await SecureStore.setItemAsync(PERMISSION_ASKED_KEY, '1');
+    return await requestPermission();
+  } catch {
+    return undefined;
+  }
+}
+
 /** Upserts by callId. This displays a call, but does not create/answer one or keep audio alive. */
 export const showCall = (call: CallNotification): Promise<NotificationPostResult> => bridge().showCall(call);
 export const dismissCall = (callId: string): Promise<void> => bridge().dismissCall(callId);
@@ -126,6 +149,6 @@ export function subscribeToActions(listener: (action: SystemNotificationAction) 
 
 export const systemNotifications = {
   isAvailable: isSystemNotificationsAvailable,
-  getStatus, requestPermission, showCall, dismissCall, showMessage, dismissConversation,
+  getStatus, requestPermission, requestPermissionOnce, showCall, dismissCall, showMessage, dismissConversation,
   setConversationMuted, openSettings, getPendingActions, acknowledgeActions, subscribeToActions,
 };

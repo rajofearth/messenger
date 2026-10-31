@@ -114,9 +114,12 @@ on first launch because `PRAGMA user_version` no longer matches.
 
 ## 6. Known gaps
 
-1. A killed app cannot drain. The headless task has no Convex auth session, so a
-   wake records itself and delivery waits for the app to open. Wakes cut latency
-   only while the app is alive.
+1. A killed app cannot drain or notify. The headless task has no Convex auth
+   session, so a wake records itself and delivery waits for the app to open; the
+   notification is posted by the running app in the same pass, which means a
+   swiped-away Messenger shows nothing until it is opened again. Wakes cut
+   latency only while the app is alive. The fix needs a headless drain that can
+   refresh the Convex session without a UI, which is a separate design pass.
 2. One history device per account. A second device starts empty.
 3. An op that arrives before its target message is applied once and not retried.
 4. Groups are create-only: no add, remove, leave or rename.

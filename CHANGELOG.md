@@ -134,6 +134,14 @@ and this project adheres to
   or forces a crop. The upload keeps the picker's real MIME type and filename.
 - A profile update that races profile creation now creates the profile and
   retries once instead of failing the photo save.
+- Message and story photos are re-encoded to WebP on the phone before upload:
+  1600 px at quality 0.80 for a message (the relay cap is checked against the
+  prepared copy, not the picked file) and 1920 px at 0.82 for a story, plus the
+  stored 256/512/1080 px widths. A 5.5 MB, 4096 px camera photo becomes a few
+  hundred kilobytes, so it both fits the 2 MiB relay limit and arrives faster.
+  A failed transform falls back to the original file, GIFs keep their animation,
+  and videos are uploaded as picked because the device has no transcoder. The
+  signed profile photo keeps its own 512 px avatar path.
 - Expo configuration now goes through `app.config.js`, which returns `app.json`
   unchanged unless `APP_VARIANT=dev`. The dev branch only changes the installed
   identity and feed, so production builds keep the same name, package, icons
@@ -157,6 +165,24 @@ and this project adheres to
 
 ### Fixed
 
+- A message that arrived through a relay drain before the inbox query had seen
+  its conversation now reaches the chat list. The drain creates the placeholder
+  conversation row before writing the preview and unread count, the cached inbox
+  includes a nameless row that has a real message time, and it orders by newest
+  message instead of the last inbox snapshot, so a new message moves its chat to
+  the top immediately. The inbox snapshot then fills in the name and avatar
+  without discarding the stored preview.
+- Android notifications now appear for incoming messages. The app asks for
+  `POST_NOTIFICATIONS` once per install after sign-in instead of relying on a
+  permission no one had granted, primes only after the device copy has loaded so
+  a drain that lands at launch is not mistaken for history, announces only a
+  conversation with unread messages, and retries a post that permission refused.
+- The story ring no longer shows a bare "Y": the self avatar keeps the signed-in
+  name for its initials when no picture exists.
+- Saving a profile photo no longer fails when the previous avatar blob is
+  already gone. Cleaning a wiped deployment left a storage id that no longer
+  existed, and deleting it threw; blobs are now deleted only when they still
+  exist, in profiles, stories and the file sweep.
 - The updater now sweeps leftover `.part` fragments, deletes a corrupt cached
   APK before reusing its name, clears the update cache after an install even
   when the app starts offline, closes the socket when a download connection

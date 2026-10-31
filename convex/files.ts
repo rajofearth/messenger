@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import { deleteBlob } from "./lib/blobs";
 import { requireUser } from "./lib/identity";
 import {
   resolveMimeType,
@@ -302,7 +303,7 @@ export const sweepOrphans = internalMutation({
       if (isMessageUpload && unused) {
         await deleteMediaVariants(ctx, row.storageId);
         await ctx.db.delete(row._id);
-        await ctx.storage.delete(row.storageId);
+        await deleteBlob(ctx, row.storageId);
         rows += 1;
         continue;
       }

@@ -74,13 +74,18 @@ export async function listChats(
   database: SqlDatabase,
 ): Promise<ChatRecord[] | undefined> {
   // A message write creates a placeholder conversation before the inbox has
-  // seen it. Those rows have no name and are not threads the reader can open,
-  // so the cached inbox leaves them out until `saveChats` fills them in. A
+  // seen it. Those rows have no name yet but their newest-message timestamp is
+  // real, so a relay drain can put the conversation on screen immediately;
+  // `saveChats` fills in the identity when the conversation query answers. A
   // deleted chat keeps its row but is hidden the same way.
+  //
+  // Newest message first: the drain updates `last_message_at` in place, and the
+  // row must move to the top without waiting for the next inbox snapshot.
   const rows = await database.getAllAsync<ConversationRow>(
     `SELECT * FROM conversations
-     WHERE name <> '' AND hidden_at IS NULL
-     ORDER BY position ASC, id ASC`,
+     WHERE hidden_at IS NULL
+       AND (name <> '' OR last_message_at IS NOT NULL)
+     ORDER BY COALESCE(last_message_at, 0) DESC, position ASC, id ASC`,
   );
   return rows.length ? rows.map(chatFromRow) : undefined;
 }

@@ -15,8 +15,12 @@ import { variantName, variantWidths } from "../domain/imageVariants";
 
 const AVATAR_WIDTH = 512;
 const AVATAR_QUALITY = 0.82;
-const VARIANT_QUALITY = 0.78;
-const MAX_SOURCE_WIDTH = 2048;
+/** Upload cap for photos: enough for a full-screen phone view at 2x. */
+export const PHOTO_MAX_WIDTH = 1600;
+export const PHOTO_QUALITY = 0.8;
+/** Stories are full-bleed, so they keep a little more detail. */
+export const STORY_MAX_WIDTH = 1920;
+export const STORY_QUALITY = 0.82;
 
 export type PreparedImageVariant = {
   name: string;
@@ -27,10 +31,19 @@ export type PreparedImageVariant = {
   mimeType: string;
 };
 
-export type PreparedImage = {
-  variants: PreparedImageVariant[];
+/**
+ * A picked photo re-encoded for upload plus the widths a remote view may ask
+ * for. The original file is never modified.
+ */
+export type PreparedPhotoUpload = {
+  /** The blob to upload instead of the original. */
+  uri: string;
+  mimeType: string;
+  filename: string;
   width: number;
   height: number;
+  bytes: number;
+  variants: PreparedImageVariant[];
 };
 
 export type PreparedAvatar = {
@@ -85,48 +98,77 @@ export async function prepareAvatarImage(
 }
 
 /**
- * One WebP file per stored width below the source size. The source file is
- * left where it is; callers upload the variants and can then discard them.
+ * One WebP file per stored width below the source size, generated from the
+ * same downscaled bitmap the upload uses. Callers discard them after upload.
  */
-export async function prepareImageVariants(
+export async function preparePhotoUpload(
   uri: string,
-  mimeType?: string,
-): Promise<PreparedImage> {
-  const empty: PreparedImage = { variants: [], width: 0, height: 0 };
+  mimeType: string | undefined,
+  options: {
+    maxWidth?: number;
+    quality?: number;
+    /** Name to keep (with a `.webp` extension) for the stored file. */
+    filename?: string;
+  } = {},
+): Promise<PreparedPhotoUpload | undefined> {
   if (
     Platform.OS === "web" ||
     isGif(uri, mimeType) ||
     mimeType?.toLowerCase().startsWith("video/")
   )
-    return empty;
+    return undefined;
+  const maxWidth = options.maxWidth ?? PHOTO_MAX_WIDTH;
+  const saved: string[] = [];
   try {
-    const image = await Image.loadAsync(uri, { maxWidth: MAX_SOURCE_WIDTH });
-    const prepared: PreparedImage = {
-      variants: [],
-      width: image.width,
-      height: image.height,
-    };
-    for (const width of variantWidths(image.width)) {
-      const rendered = await ImageManipulator.manipulate(image)
-        .resize({ width })
+    const image = await Image.loadAsync(uri, { maxWidth });
+    const width = Math.min(image.width, maxWidth);
+    const rendered = await ImageManipulator.manipulate(image)
+      .resize({ width })
+      .renderAsync();
+    const source = await rendered.saveAsync({
+      format: SaveFormat.WEBP,
+      compress: options.quality ?? PHOTO_QUALITY,
+    });
+    saved.push(source.uri);
+    const variants: PreparedImageVariant[] = [];
+    for (const variant of variantWidths(source.width)) {
+      const variantImage = await ImageManipulator.manipulate(image)
+        .resize({ width: variant })
         .renderAsync();
-      const saved = await rendered.saveAsync({
+      const variantSaved = await variantImage.saveAsync({
         format: SaveFormat.WEBP,
-        compress: VARIANT_QUALITY,
+        compress: options.quality ?? PHOTO_QUALITY,
       });
-      prepared.variants.push({
-        name: variantName(width),
-        uri: saved.uri,
-        width: saved.width,
-        height: saved.height,
-        bytes: fileBytes(saved.uri),
+      saved.push(variantSaved.uri);
+      variants.push({
+        name: variantName(variant),
+        uri: variantSaved.uri,
+        width: variantSaved.width,
+        height: variantSaved.height,
+        bytes: fileBytes(variantSaved.uri),
         mimeType: "image/webp",
       });
     }
-    return prepared;
+    return {
+      uri: source.uri,
+      mimeType: "image/webp",
+      filename: webpFilename(options.filename),
+      width: source.width,
+      height: source.height,
+      bytes: fileBytes(source.uri),
+      variants,
+    };
   } catch {
-    return empty;
+    // A partial batch must not leave cache files behind.
+    for (const file of saved) discardPreparedImage(file);
+    return undefined;
   }
+}
+
+/** Keeps the picked name but tells the receiver the truth about the format. */
+function webpFilename(filename: string | undefined): string {
+  const base = (filename ?? "photo").replace(/\.[^./\\]+$/, "").trim();
+  return `${(base || "photo").slice(0, 140)}.webp`;
 }
 
 /** Removes a temporary variant file; files outside app cache are left alone. */
@@ -139,4 +181,11 @@ export function discardPreparedImage(uri: string) {
   } catch {
     // The OS may have cleared the cache first; there is nothing to report.
   }
+}
+
+/** Removes the re-encoded source and every width generated beside it. */
+export function discardPreparedPhoto(photo: PreparedPhotoUpload | undefined) {
+  if (!photo) return;
+  discardPreparedImage(photo.uri);
+  for (const variant of photo.variants) discardPreparedImage(variant.uri);
 }

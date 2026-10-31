@@ -42,7 +42,25 @@ export function syncRelayRows(
   void messengerRepository
     .loadChats()
     .then((stored) => {
-      if (stored) setCachedChats(stored);
+      if (!stored) return;
+      // The stored row owns the preview, time and unread count, but a chat the
+      // inbox has not named yet would otherwise lose the name and avatar the
+      // server already told us. Keep that identity until `saveChats` rewrites
+      // the row.
+      setCachedChats((current) => {
+        const known = new Map(current.map((chat) => [chat.id, chat]));
+        return stored.map((chat) => {
+          const previous = known.get(chat.id);
+          if (!previous) return chat;
+          return {
+            ...chat,
+            name: chat.name || previous.name,
+            avatar: chat.avatar || previous.avatar,
+            username: chat.username ?? previous.username,
+            bio: chat.bio ?? previous.bio,
+          };
+        });
+      });
     })
     .catch(() => {});
 }
