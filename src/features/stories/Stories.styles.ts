@@ -1,18 +1,20 @@
 import { StyleSheet } from "react-native";
-import { coral, onCoral, palette, radius, space } from "../../ui/theme";
+import { radius, space } from "../../ui/theme";
 
-const colors = palette(true);
+const accent = "#111111";
+const onAccent = "#FFFFFF";
+
 const GRID_PADDING = space.md;
 const GRID_GAP = space.xs;
 
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
-  viewer: { flex: 1, backgroundColor: colors.media },
+  viewer: { flex: 1, backgroundColor: "#111111" },
   image: { ...StyleSheet.absoluteFill },
-  imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
-  previewPage: { flex: 1, minHeight: 0, justifyContent: "center", backgroundColor: colors.media },
-  previewVideoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, backgroundColor: colors.card },
-  previewVideoPlaceholderText: { color: "#FFFFFF99", fontFamily: "DMSans_500Medium", fontSize: 13 },
+  imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: "#00000099" },
+  previewPage: { flex: 1, minHeight: 0, justifyContent: "center", backgroundColor: "#111111" },
+  previewVideoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, backgroundColor: "#222222" },
+  previewVideoPlaceholderText: { color: "#FFFFFF99", fontSize: 13 },
   mediaError: {
     color: "white",
     textAlign: "center",
@@ -23,7 +25,6 @@ export const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: {
     flex: 1,
-    fontFamily: "DMSans_600SemiBold",
     color: "white",
     fontSize: 15,
   },
@@ -32,7 +33,6 @@ export const styles = StyleSheet.create({
   statsRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   statsButton: { flexDirection: "row", alignItems: "center", gap: 4 },
   statsText: {
-    fontFamily: "DMSans_500Medium",
     color: "#FFFFFFCC",
     fontSize: 12,
   },
@@ -56,7 +56,7 @@ export const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: coral,
+    backgroundColor: "#FFFFFF",
   },
   uploadFailed: {
     position: "absolute",
@@ -80,12 +80,10 @@ export const styles = StyleSheet.create({
   storyAction: { alignItems: "center", gap: 4, minWidth: 76 },
   storyActionLabel: {
     color: "white",
-    fontFamily: "DMSans_500Medium",
     fontSize: 12,
   },
   saveFeedback: {
     color: "#FFFFFFCC",
-    fontFamily: "DMSans_400Regular",
     fontSize: 11,
     textAlign: "center",
     maxWidth: 170,
@@ -101,7 +99,6 @@ export const styles = StyleSheet.create({
     backgroundColor: "#00000066",
   },
   uploadText: {
-    fontFamily: "DMSans_500Medium",
     color: "white",
     fontSize: 13,
   },
@@ -126,7 +123,7 @@ export const styles = StyleSheet.create({
   },
   viewersSheet: {
     maxHeight: "60%",
-    backgroundColor: colors.card,
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     paddingTop: space.lg,
@@ -139,14 +136,13 @@ export const styles = StyleSheet.create({
     paddingBottom: space.md,
   },
   viewersTitle: {
-    fontFamily: "DMSans_600SemiBold",
-    color: "white",
+    color: "#111111",
     fontSize: 20,
+    fontWeight: "600",
   },
   viewersCount: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
-    color: "#FFFFFFAA",
+    color: "#6B6B6B",
     fontSize: 13,
   },
   viewersList: { maxHeight: 360 },
@@ -157,8 +153,7 @@ export const styles = StyleSheet.create({
   },
   viewersLoading: { paddingVertical: 24 },
   viewersEmpty: {
-    fontFamily: "DMSans_400Regular",
-    color: "#FFFFFFAA",
+    color: "#6B6B6B",
     fontSize: 14,
     paddingVertical: 16,
     textAlign: "center",
@@ -170,31 +165,28 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   viewersEmptyTitle: {
-    color: "white",
-    fontFamily: "DMSans_600SemiBold",
+    color: "#111111",
     fontSize: 16,
+    fontWeight: "600",
   },
   viewerRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   viewerCopy: { flex: 1 },
   viewerName: {
-    fontFamily: "DMSans_600SemiBold",
-    color: "white",
+    color: "#111111",
     fontSize: 14,
+    fontWeight: "600",
   },
   viewerTime: {
-    fontFamily: "DMSans_400Regular",
-    color: "#FFFFFF99",
+    color: "#6B6B6B",
     fontSize: 12,
     marginTop: 2,
   },
   caption: {
-    fontFamily: "DMSans_500Medium",
     color: "white",
     fontSize: 22,
     lineHeight: 30,
   },
   captionInput: {
-    fontFamily: "DMSans_400Regular",
     color: "white",
     fontSize: 16,
     padding: 16,
@@ -205,15 +197,14 @@ export const styles = StyleSheet.create({
     borderColor: "#FFFFFF44",
   },
   share: {
-    backgroundColor: coral,
+    backgroundColor: accent,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderRadius: radius.card,
+    borderRadius: 10,
     alignItems: "center",
   },
   shareText: {
-    fontFamily: "DMSans_600SemiBold",
-    color: onCoral,
+    color: onAccent,
     fontSize: 15,
   },
   sheetWrap: { flex: 1, justifyContent: "flex-end" },
@@ -228,14 +219,14 @@ export const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
   },
-  sheetTitle: { flex: 1, fontFamily: "DMSans_600SemiBold", fontSize: 22 },
+  sheetTitle: { flex: 1, fontSize: 22 },
   choice: {
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
     paddingVertical: 20,
   },
-  choiceText: { fontFamily: "DMSans_500Medium", fontSize: 16 },
+  choiceText: { fontSize: 16 },
   pickerHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,7 +237,6 @@ export const styles = StyleSheet.create({
   pickerTitle: {
     flex: 1,
     textAlign: "center",
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 18,
   },
   pickerHeaderBusy: {
@@ -267,11 +257,9 @@ export const styles = StyleSheet.create({
   },
   pickerLimitedText: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 12,
   },
   pickerLimitedAction: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
   },
   pickerFilters: {
@@ -287,7 +275,6 @@ export const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   pickerChipText: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
   },
   pickerGrid: {
@@ -308,7 +295,6 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   pickerCameraText: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
   },
   pickerBadge: {
@@ -325,13 +311,12 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pickerBadgeSelected: {
-    borderColor: coral,
-    backgroundColor: coral,
+    borderColor: accent,
+    backgroundColor: accent,
   },
   pickerBadgeText: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
-    color: onCoral,
+    color: onAccent,
   },
   pickerVideoBadge: {
     position: "absolute",
@@ -346,7 +331,6 @@ export const styles = StyleSheet.create({
     backgroundColor: "#00000099",
   },
   pickerVideoText: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 11,
     color: "white",
   },
@@ -361,20 +345,18 @@ export const styles = StyleSheet.create({
   },
   pickerSelectedText: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
   },
   pickerNext: {
     minWidth: 104,
-    borderRadius: 999,
-    backgroundColor: coral,
+    borderRadius: 10,
+    backgroundColor: accent,
     paddingHorizontal: 20,
     paddingVertical: 12,
     alignItems: "center",
   },
   pickerNextText: {
-    fontFamily: "DMSans_600SemiBold",
-    color: onCoral,
+    color: onAccent,
     fontSize: 14,
   },
   pickerCenter: {
@@ -392,30 +374,26 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pickerEmptyTitle: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
     textAlign: "center",
   },
   pickerEmptyText: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
   },
   pickerPrimary: {
-    borderRadius: 999,
-    backgroundColor: coral,
+    borderRadius: 10,
+    backgroundColor: accent,
     paddingHorizontal: 24,
     paddingVertical: 13,
     marginTop: 4,
   },
   pickerPrimaryText: {
-    fontFamily: "DMSans_600SemiBold",
-    color: onCoral,
+    color: onAccent,
     fontSize: 14,
   },
   pickerLink: {
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
   },
   pickerFooterSpinner: { paddingVertical: 18 },
@@ -432,7 +410,6 @@ export const styles = StyleSheet.create({
   },
   pickerAlbumTitle: {
     flex: 1,
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
   },
   albumOverlay: {
@@ -458,7 +435,6 @@ export const styles = StyleSheet.create({
   },
   albumTitle: {
     flex: 1,
-    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
   },
   albumList: { paddingHorizontal: 16, paddingBottom: 28, gap: 8 },
@@ -481,7 +457,6 @@ export const styles = StyleSheet.create({
   albumCover: { width: 52, height: 52, borderRadius: 12 },
   albumRowTitle: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 16,
   },
 });

@@ -349,7 +349,7 @@ export function StoryViewer(props: Props) {
                 <IconButton
                   name="close"
                   label="Close viewers"
-                  color="white"
+                  color="#111111"
                   onPress={() => setViewersOpen(false)}
                 />
               </View>
@@ -359,10 +359,10 @@ export function StoryViewer(props: Props) {
                 showsVerticalScrollIndicator={false}
               >
                 {viewers === undefined ? (
-                  <ActivityIndicator color="white" style={s.viewersLoading} />
+                  <ActivityIndicator color="#111111" style={s.viewersLoading} />
                 ) : viewers.length === 0 ? (
                   <View style={s.viewersEmptyState}>
-                    <Ionicons name="eye-outline" size={34} color="#FFFFFF88" />
+                    <Ionicons name="eye-outline" size={34} color="#6B6B6B" />
                     <Text style={s.viewersEmptyTitle}>0 views yet</Text>
                     <Text style={s.viewersEmpty}>Viewers appear here when they watch.</Text>
                   </View>

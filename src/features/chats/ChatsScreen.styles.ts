@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { radius, space, typeScale } from "../../ui/theme";
+import { radius, space } from "../../ui/theme";
 
 export const s = StyleSheet.create({
   screen: { flex: 1 },
@@ -12,7 +12,9 @@ export const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   title: {
-    ...typeScale.display,
+    fontFamily: "sans-serif-medium",
+    fontSize: 28,
+    lineHeight: 34,
   },
   newChat: {
     width: 52,
@@ -38,7 +40,7 @@ export const s = StyleSheet.create({
     marginHorizontal: space.xxl,
     marginBottom: space.xl,
     minHeight: 56,
-    borderRadius: radius.card,
+    borderRadius: space.lg,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: space.lg,
@@ -46,7 +48,7 @@ export const s = StyleSheet.create({
   searchInput: {
     flex: 1,
     paddingHorizontal: space.md,
-    fontFamily: "DMSans_400Regular",
+    fontFamily: "sans-serif",
     fontSize: 14,
   },
   list: { paddingBottom: 112 },
@@ -77,7 +79,12 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  storyName: { ...typeScale.caption, marginTop: space.sm },
+  storyName: {
+    fontFamily: "sans-serif",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: space.sm,
+  },
   tabs: {
     marginHorizontal: space.xxl,
     padding: space.xs,
@@ -94,7 +101,11 @@ export const s = StyleSheet.create({
     gap: space.sm,
     flexDirection: "row",
   },
-  tabText: { ...typeScale.label },
+  tabText: {
+    fontFamily: "sans-serif-medium",
+    fontSize: 13,
+    lineHeight: 18,
+  },
   tabCount: {
     minWidth: 24,
     height: 24,
@@ -105,15 +116,43 @@ export const s = StyleSheet.create({
   },
   tabCountText: {
     fontSize: 10,
-    fontFamily: "DMSans_600SemiBold",
+    fontFamily: "sans-serif-medium",
   },
   chatRow: {
     paddingHorizontal: space.xxl,
-    paddingVertical: space.md,
+    paddingVertical: space.sm,
     flexDirection: "row",
     alignItems: "center",
   },
-  chatBody: { flex: 1, marginLeft: space.lg },
+  avatarWrap: { position: "relative" },
+  presence: {
+    position: "absolute",
+    right: -1,
+    bottom: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2,
+  },
+  groupAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    padding: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignContent: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  groupAvatarCell: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatBody: { flex: 1, marginLeft: space.lg, minWidth: 0 },
   nameLine: {
     flex: 1,
     flexDirection: "row",
@@ -128,10 +167,16 @@ export const s = StyleSheet.create({
   },
   name: {
     flexShrink: 1,
-    ...typeScale.bodyStrong,
+    fontFamily: "sans-serif-medium",
+    fontSize: 15,
+    lineHeight: 20,
   },
-  unreadName: { fontFamily: "DMSans_600SemiBold" },
-  time: { ...typeScale.caption },
+  unreadName: { fontFamily: "sans-serif-medium" },
+  time: {
+    fontFamily: "sans-serif",
+    fontSize: 12,
+    lineHeight: 16,
+  },
   rowBottom: {
     flexDirection: "row",
     alignItems: "center",
@@ -139,7 +184,12 @@ export const s = StyleSheet.create({
     marginTop: space.xs,
     minHeight: 20,
   },
-  preview: { flex: 1, ...typeScale.caption },
+  preview: {
+    flex: 1,
+    fontFamily: "sans-serif",
+    fontSize: 12,
+    lineHeight: 16,
+  },
   unreadDot: {
     width: 8,
     height: 8,
@@ -151,10 +201,15 @@ export const s = StyleSheet.create({
     paddingVertical: 48,
     gap: space.md,
   },
-  emptyTitle: { ...typeScale.title },
+  emptyTitle: {
+    fontFamily: "sans-serif-medium",
+    fontSize: 20,
+    lineHeight: 26,
+  },
   emptyText: {
-    ...typeScale.body,
-    textAlign: "center",
+    fontFamily: "sans-serif",
+    fontSize: 15,
     lineHeight: 22,
+    textAlign: "center",
   },
 });

@@ -39,7 +39,16 @@ export default function NewConversationScreen({
 }: NewConversationScreenProps) {
   const [search, setSearch] = useState("");
   const base = palette(dark);
-  const colors = { ...base, text: base.fg, input: base.card };
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    text: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    input: dark ? "#202020" : "#F4F4F4",
+    tint: dark ? "#242424" : "#F4F4F4",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+  };
   const query = search.trim().toLowerCase();
   const people = contacts.filter((chat) => !chat.group);
   const filtered = people.filter((chat) =>
@@ -196,7 +205,7 @@ const s = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: space.lg,
+    paddingHorizontal: space.xxl,
     paddingTop: space.md,
     paddingBottom: space.xl,
     gap: space.sm,
@@ -207,7 +216,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { flex: 1, fontFamily: "DMSans_500Medium", fontSize: 24 },
+  title: { flex: 1, fontSize: 24, fontWeight: "600" },
   search: {
     flexDirection: "row",
     alignItems: "center",
@@ -215,7 +224,7 @@ const s = StyleSheet.create({
     marginBottom: space.lg,
     paddingLeft: space.lg,
     paddingRight: space.xs,
-    borderRadius: radius.control,
+    borderRadius: 16,
     minHeight: 52,
     gap: space.sm,
   },
@@ -223,7 +232,6 @@ const s = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     paddingVertical: space.md,
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
   clearButton: {
@@ -247,18 +255,17 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { flex: 1, fontFamily: "DMSans_500Medium", fontSize: 17 },
+  name: { flex: 1, fontSize: 17, fontWeight: "600" },
   section: {
     borderTopWidth: 1,
     marginTop: space.lg,
     paddingTop: space.xxl,
     paddingBottom: space.sm,
   },
-  sectionLabel: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  sectionLabel: { fontSize: 14, fontWeight: "600" },
   empty: {
     textAlign: "center",
     paddingVertical: space.xxxl + space.sm,
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
   pressed: { opacity: 0.55 },

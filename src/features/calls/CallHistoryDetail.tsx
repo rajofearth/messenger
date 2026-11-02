@@ -5,7 +5,7 @@ import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { formatDuration } from "../../domain/model";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette, radius, space } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 
 export type CallHistoryDetailProps = {
   chat: Chat;
@@ -70,7 +70,7 @@ export function CallHistoryList({
           </View>
           <IconButton
             name={record.video ? "videocam-outline" : "call-outline"}
-            color={colors.coralInk}
+            color={colors.fg}
             label={`Start ${record.video ? "video" : "voice"} call with ${chat.name}`}
             onPress={() => onCall(record.video)}
           />
@@ -98,7 +98,7 @@ export function CallHistoryActions({
           <Ionicons
             name={video ? "videocam-outline" : "call-outline"}
             size={23}
-            color={colors.coralInk}
+            color={colors.fg}
           />
           <Text style={[s.label, { color: colors.fg }]}>
             {video ? "Video call" : "Voice call"}
@@ -159,14 +159,14 @@ const s = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.lg },
   content: { padding: space.xl, paddingBottom: 60 },
-  heading: { fontFamily: "DMSans_600SemiBold", fontSize: 20 },
+  heading: { fontSize: 20, fontWeight: "600" },
   profile: { alignItems: "center", gap: space.md, paddingVertical: space.xl },
-  name: { fontFamily: "DMSans_600SemiBold", fontSize: 26, textAlign: "center" },
+  name: { fontSize: 26, fontWeight: "600", textAlign: "center" },
   actions: { flexDirection: "row", gap: space.md, marginVertical: space.xl },
   action: {
     flex: 1,
     padding: space.lg,
-    borderRadius: radius.card,
+    borderRadius: 10,
     alignItems: "center",
     gap: 10,
   },
@@ -178,7 +178,7 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1 },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: space.xs },
-  empty: { fontFamily: "DMSans_400Regular", paddingVertical: space.xxl },
+  label: { fontSize: 14, fontWeight: "600" },
+  caption: { fontSize: 12, marginTop: space.xs },
+  empty: { paddingVertical: space.xxl },
 });

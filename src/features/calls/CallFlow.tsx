@@ -145,7 +145,7 @@ const s = StyleSheet.create({
     marginHorizontal: space.lg,
     marginTop: space.sm,
     marginBottom: space.xs,
-    backgroundColor: colors.card,
+    backgroundColor: "#222222",
     borderRadius: radius.card,
     flexDirection: "row",
     alignItems: "center",
@@ -154,14 +154,13 @@ const s = StyleSheet.create({
     paddingLeft: space.lg,
   },
   dot: { width: 8, height: 8, backgroundColor: colors.success, borderRadius: 4 },
-  pillName: { fontFamily: "DMSans_600SemiBold", color: colors.fg, fontSize: 12 },
+  pillName: { fontWeight: "600", color: colors.fg, fontSize: 12 },
   pillStatus: {
-    fontFamily: "DMSans_400Regular",
-    color: colors.muted,
+    color: "#BDBDBD",
     fontSize: 10,
     marginTop: space.xs,
   },
-  ringing: { flex: 1, paddingTop: 48, paddingHorizontal: space.xl, backgroundColor: colors.media },
+  ringing: { flex: 1, paddingTop: 48, paddingHorizontal: space.xl, backgroundColor: "#111111" },
   center: {
     flex: 1,
     justifyContent: "center",
@@ -170,14 +169,13 @@ const s = StyleSheet.create({
   },
   name: {
     color: "#FFF",
-    fontFamily: "DMSans_600SemiBold",
+    fontWeight: "600",
     fontSize: 30,
     marginTop: space.xl,
   },
-  status: { color: colors.muted, fontFamily: "DMSans_400Regular", marginTop: space.sm },
+  status: { color: "#BDBDBD", marginTop: space.sm },
   demo: {
-    color: colors.muted,
-    fontFamily: "DMSans_400Regular",
+    color: "#BDBDBD",
     fontSize: 11,
     marginTop: space.xl,
   },
@@ -190,7 +188,6 @@ const s = StyleSheet.create({
   action: { alignItems: "center", gap: space.md },
   caption: {
     color: "#FFFFFFC0",
-    fontFamily: "DMSans_400Regular",
     fontSize: 11,
   },
 });

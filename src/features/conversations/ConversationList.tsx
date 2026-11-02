@@ -55,7 +55,7 @@ export default function ConversationList({
   onOpenAlbum,
   onRetry,
 }: ConversationListProps) {
-  const { muted, coralInk } = palette(dark);
+  const { muted, fg } = palette(dark);
   const rows = useMemo(() => groupMediaMessages(messages), [messages]);
   // One label per row: the first row of a local day gets a chip, later rows on
   // the same day get none. A row without a timestamp never starts a day.
@@ -198,7 +198,7 @@ export default function ConversationList({
           >
             <Text
               accessibilityLiveRegion="polite"
-              style={[s.emptyThread, { color: loadingOlder ? muted : coralInk }]}
+              style={[s.emptyThread, { color: loadingOlder ? muted : fg }]}
             >
               {loadingOlder
                 ? "Loading older messages…"

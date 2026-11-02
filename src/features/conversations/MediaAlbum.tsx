@@ -71,25 +71,23 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
   const last = messages[messages.length - 1];
   const {
     card,
-    coralInk,
     fg,
     muted,
+    line,
     media,
     onImage,
     scrim,
-    outgoingBg,
-    outgoingFg,
-    outgoingMuted,
   } =
     palette(dark);
+  const albumSurface = dark ? "#2A2A2A" : "#F4F4F4";
   const overflow = albumOverflowCount(messages.length);
   return (
     <View style={[s.row, first.mine && { alignItems: "flex-end" }]}>
-      <View style={[s.album, { backgroundColor: first.mine ? outgoingBg : card }]}>
+      <View style={[s.album, { backgroundColor: first.mine ? albumSurface : card }]}>
         {first.replyTo && (
-          <View style={[s.reply, { borderLeftColor: first.mine ? outgoingMuted : coralInk }]}>
-            <Text style={{ color: first.mine ? outgoingMuted : muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
-            <Text numberOfLines={2} style={{ color: first.mine ? outgoingFg : fg }}>{first.replyTo.text}</Text>
+          <View style={[s.reply, { borderLeftColor: line }]}>
+            <Text style={{ color: muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
+            <Text numberOfLines={2} style={{ color: fg }}>{first.replyTo.text}</Text>
           </View>
         )}
         <View style={s.grid}>
@@ -152,7 +150,7 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
       {showTimestamp && (
         <View style={s.meta}>
           <Text style={{ color: muted, fontSize: 11 }}>{last.time}</Text>
-          {last.mine && <Ionicons name="checkmark" size={15} color={coralInk} />}
+          {last.mine && <Ionicons name="checkmark" size={15} color={muted} />}
         </View>
       )}
     </View>
@@ -161,7 +159,7 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
 
 const s = StyleSheet.create({
   row: { alignItems: "flex-start", marginBottom: space.sm },
-  album: { width: "82%", maxWidth: 340, borderRadius: radius.sheet, padding: space.xs, overflow: "hidden" },
+  album: { width: "82%", maxWidth: 340, borderRadius: radius.control, padding: space.xs, overflow: "hidden" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   tile: { width: "49%", flexGrow: 1, aspectRatio: 1, borderRadius: radius.badge, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   menu: { position: "absolute", top: space.sm, right: space.sm, borderRadius: radius.control, paddingHorizontal: space.xs, paddingVertical: space.xs, zIndex: 2 },
@@ -169,6 +167,6 @@ const s = StyleSheet.create({
   count: { fontSize: 32, fontWeight: "600" },
   caption: { position: "absolute", bottom: 0, left: 0, right: 0, padding: space.xs, fontSize: 12 },
   reaction: { position: "absolute", bottom: space.xs, right: space.xs, borderRadius: radius.control, padding: space.xs },
-  reply: { borderLeftWidth: 4, borderRadius: radius.badge, padding: space.sm, marginBottom: space.xs },
+  reply: { borderLeftWidth: 2, borderRadius: radius.badge, padding: space.sm, marginBottom: space.xs },
   meta: { flexDirection: "row", gap: space.xs, marginTop: space.xs },
 });

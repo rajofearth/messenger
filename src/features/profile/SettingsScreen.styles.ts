@@ -10,7 +10,24 @@ export function settingsColors(dark: boolean) {
   const colors = palette(dark);
   return {
     ...colors,
-    text: colors.fg,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    line: dark ? "#2A2A2A" : "#E8E8E8",
+    tint: dark ? "#242424" : "#F4F4F4",
+    input: dark ? "#202020" : "#F4F4F4",
+    selected: dark ? "#2A2A2A" : "#EEEEEE",
+    media: "#111111",
+    scrim: dark ? "rgba(0,0,0,0.72)" : "rgba(0,0,0,0.45)",
+    onImage: "#FFFFFF",
+    shadow: "#000000",
+    switchTrackOff: dark ? "#4A4A4A" : "#D6D6D6",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    switchThumb: dark ? "#111111" : "#FFFFFF",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+    text: dark ? "#F5F5F5" : "#111111",
   };
 }
 
@@ -29,19 +46,19 @@ export const styles = StyleSheet.create({
 
   headerTitle: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 20,
+    fontWeight: "600",
   },
 
   content: { paddingHorizontal: space.xxl, paddingBottom: space.xxxl },
 
   profile: {
-    borderRadius: radius.sheet,
+    borderRadius: 0,
     alignItems: "center",
     padding: space.xxl,
   },
   avatarWrap: { marginBottom: space.lg },
-  avatar: { width: 88, height: 88, borderRadius: radius.sheet },
+  avatar: { width: 88, height: 88, borderRadius: 44 },
   avatarFallback: { alignItems: "center", justifyContent: "center" },
   camera: {
     position: "absolute",
@@ -55,12 +72,11 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   profileName: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 22,
+    fontWeight: "600",
     textAlign: "center",
   },
   bio: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 13,
     lineHeight: 20,
     marginTop: space.xs,
@@ -73,18 +89,18 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: space.lg,
     minHeight: 44,
-    borderRadius: radius.pill,
+    borderRadius: radius.control,
   },
-  editText: { fontFamily: "DMSans_500Medium", fontSize: 12 },
+  editText: { fontSize: 12, fontWeight: "600" },
   loader: { marginTop: space.md },
   section: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
+    fontWeight: "600",
     marginTop: space.xl,
     marginBottom: space.md,
     marginLeft: space.xs,
   },
-  card: { borderRadius: radius.card, overflow: "hidden" },
+  card: { borderRadius: 0, overflow: "hidden" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -100,9 +116,8 @@ export const styles = StyleSheet.create({
     alignItems: "center",
   },
   rowCopy: { flex: 1, minWidth: 0 },
-  rowTitle: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  rowTitle: { fontSize: 14, fontWeight: "600" },
   rowSubtitle: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 11,
     lineHeight: 17,
     marginTop: space.xs,
@@ -119,7 +134,7 @@ export const styles = StyleSheet.create({
     marginTop: -space.xs,
     marginBottom: space.lg,
     padding: space.xs,
-    borderRadius: radius.card,
+    borderRadius: radius.control,
   },
   segmentOption: {
     flex: 1,
@@ -129,9 +144,8 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   segmentActive: {},
-  segmentText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
+  segmentText: { fontSize: 13, fontWeight: "600" },
   note: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 11,
     lineHeight: 17,
     marginHorizontal: space.xs,
@@ -140,7 +154,7 @@ export const styles = StyleSheet.create({
   call: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: radius.card,
+    borderRadius: 0,
     padding: space.lg,
     gap: space.md,
     marginTop: space.xxl,
@@ -162,7 +176,7 @@ export const styles = StyleSheet.create({
     paddingVertical: space.xxxl,
   },
   modal: {
-    borderRadius: radius.sheet,
+    borderRadius: radius.control,
     padding: space.xxl,
     maxHeight: "100%",
     width: "100%",
@@ -177,12 +191,11 @@ export const styles = StyleSheet.create({
   },
   modalTitle: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 20,
+    fontWeight: "600",
   },
   modalContent: { paddingBottom: 2 },
   modalBody: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 14,
     lineHeight: 23,
     marginBottom: space.lg,
@@ -190,21 +203,20 @@ export const styles = StyleSheet.create({
   modalSymbol: {
     width: 62,
     height: 62,
-    borderRadius: 22,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: space.xl,
   },
   label: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
+    fontWeight: "600",
     marginBottom: 9,
     marginTop: 5,
   },
   input: {
     borderRadius: radius.control,
     padding: space.md,
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
     marginBottom: space.lg,
   },
@@ -214,7 +226,6 @@ export const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   counter: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 11,
     textAlign: "right",
     marginBottom: space.xl,
@@ -227,7 +238,7 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: space.xs,
   },
-  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  primaryText: { fontSize: 14, fontWeight: "600" },
   secondary: {
     alignItems: "center",
     justifyContent: "center",
@@ -236,5 +247,5 @@ export const styles = StyleSheet.create({
     borderColor: "transparent",
     minHeight: 46,
   },
-  secondaryText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
+  secondaryText: { fontSize: 13, fontWeight: "600" },
 });

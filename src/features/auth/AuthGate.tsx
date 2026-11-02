@@ -40,7 +40,19 @@ function AuthForm({ dark }: { dark: boolean }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    tint: dark ? "#242424" : "#F4F4F4",
+    input: dark ? "#202020" : "#F4F4F4",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+  };
 
   async function submit() {
     if (!username.trim() || !password) {
@@ -249,7 +261,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const dark = resolveDark(storedTheme, scheme);
 
   if (isLoading) {
-    const colors = palette(dark);
+    const colors = {
+      ...palette(dark),
+      bg: dark ? "#111111" : "#FFFFFF",
+      coralInk: dark ? "#F5F5F5" : "#111111",
+    };
     return (
       <SafeAreaView style={[s.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.coralInk} size="large" />
@@ -275,19 +291,18 @@ const s = StyleSheet.create({
     alignSelf: "center",
     width: 76,
     height: 76,
-    borderRadius: radius.sheet,
+    borderRadius: 38,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: space.sm,
   },
   title: {
     textAlign: "center",
-    fontFamily: "DMSans_500Medium",
     fontSize: 28,
+    fontWeight: "600",
   },
   subtitle: {
     textAlign: "center",
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 22,
     marginBottom: space.md,
@@ -296,7 +311,6 @@ const s = StyleSheet.create({
     borderRadius: radius.control,
     paddingHorizontal: space.lg,
     paddingVertical: space.lg,
-    fontFamily: "DMSans_400Regular",
     fontSize: 16,
   },
   passwordRow: {
@@ -308,7 +322,6 @@ const s = StyleSheet.create({
     flex: 1,
     paddingLeft: space.lg,
     paddingVertical: space.lg,
-    fontFamily: "DMSans_400Regular",
     fontSize: 16,
   },
   reveal: { paddingHorizontal: space.lg, paddingVertical: space.lg },
@@ -319,16 +332,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginTop: space.xs,
   },
-  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 16 },
+  primaryText: { fontSize: 16, fontWeight: "600" },
   link: {
     textAlign: "center",
-    fontFamily: "DMSans_500Medium",
     fontSize: 14,
+    fontWeight: "600",
     paddingVertical: space.xs,
   },
   note: {
     textAlign: "center",
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 18,
     marginTop: space.sm,

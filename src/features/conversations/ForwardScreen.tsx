@@ -60,10 +60,10 @@ export default function ForwardScreen({
       <View
         style={[
           s.preview,
-          { backgroundColor: colors.card, borderLeftColor: colors.coralInk },
+          { backgroundColor: colors.input, borderLeftColor: colors.line },
         ]}
       >
-        <Text style={[s.label, { color: colors.coralInk }]}>Forwarding</Text>
+        <Text style={[s.label, { color: colors.muted }]}>Forwarding</Text>
         <Text numberOfLines={2} style={[s.text, { color: colors.fg }]}>
           {summary}
         </Text>
@@ -74,7 +74,7 @@ export default function ForwardScreen({
         value={query}
         onChangeText={setQuery}
         placeholderTextColor={colors.muted}
-        style={[s.input, { backgroundColor: colors.card, color: colors.fg }]}
+        style={[s.input, { backgroundColor: colors.input, color: colors.fg, borderColor: colors.line }]}
       />
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -109,7 +109,7 @@ export default function ForwardScreen({
                   ? "checkmark-circle"
                   : "ellipse-outline"
               }
-              color={selected.includes(chat.id) ? colors.coralInk : colors.muted}
+              color={selected.includes(chat.id) ? colors.fg : colors.muted}
               size={25}
             />
           </Pressable>
@@ -125,10 +125,10 @@ export default function ForwardScreen({
         accessibilityState={{ disabled: !selected.length }}
         disabled={!selected.length}
         onPress={() => onForward(selected)}
-        style={[s.send, { backgroundColor: colors.switchTrackOn, opacity: selected.length ? 1 : 0.4 }]}
+        style={[s.send, { backgroundColor: colors.fg, opacity: selected.length ? 1 : 0.4 }]}
       >
-        <Ionicons name="arrow-redo" size={20} color={colors.onCoral} />
-        <Text style={[s.sendText, { color: colors.onCoral }]}>
+        <Ionicons name="arrow-redo" size={20} color={colors.bg} />
+        <Text style={[s.sendText, { color: colors.bg }]}>
           Forward{selected.length ? ` · ${selected.length}` : ""}
         </Text>
       </Pressable>
@@ -138,22 +138,23 @@ export default function ForwardScreen({
 const s = StyleSheet.create({
   root: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", padding: space.md, gap: space.sm },
-  title: { fontFamily: "DMSans_500Medium", fontSize: 23 },
+  title: { fontFamily: "sans-serif-medium", fontSize: 20 },
   preview: {
     margin: space.xl,
     marginTop: space.xs,
-    borderRadius: radius.card,
+    borderRadius: radius.control,
     borderLeftWidth: 3,
     padding: space.lg,
     gap: space.xs,
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 12 },
-  text: { fontFamily: "DMSans_400Regular", fontSize: 13, lineHeight: 20 },
+  label: { fontFamily: "sans-serif-medium", fontSize: 12 },
+  text: { fontFamily: "sans-serif", fontSize: 13, lineHeight: 20 },
   input: {
     marginHorizontal: space.xl,
     padding: space.lg,
-    borderRadius: radius.card,
-    fontFamily: "DMSans_400Regular",
+    borderRadius: radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    fontFamily: "sans-serif",
     marginBottom: space.sm,
   },
   row: {
@@ -164,16 +165,16 @@ const s = StyleSheet.create({
     paddingVertical: space.md,
   },
   body: { flex: 1, gap: space.xs },
-  name: { fontFamily: "DMSans_500Medium", fontSize: 15 },
+  name: { fontFamily: "sans-serif-medium", fontSize: 15 },
   empty: { textAlign: "center", margin: space.xxxl },
   send: {
     margin: space.xl,
-    borderRadius: radius.pill,
+    borderRadius: radius.control,
     padding: space.lg,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: space.sm,
   },
-  sendText: { fontFamily: "DMSans_500Medium", fontSize: 15 },
+  sendText: { fontFamily: "sans-serif-medium", fontSize: 15 },
 });

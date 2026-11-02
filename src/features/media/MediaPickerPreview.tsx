@@ -160,7 +160,7 @@ function PreviewPage({
         onPress={onToggle}
         style={[s.previewSelectBadge, selected && s.previewSelectBadgeSelected]}
       >
-        {selected && <Ionicons name="checkmark" size={20} color={colors.onCoral} />}
+        {selected && <Ionicons name="checkmark" size={20} color={colors.bg} />}
       </Pressable>
     </View>
   );

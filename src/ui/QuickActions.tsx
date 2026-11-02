@@ -89,7 +89,7 @@ export default function QuickActions({
   });
   const plus = (
     <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-      <Ionicons name="add" size={29} color={colors.onCoral} />
+      <Ionicons name="add" size={29} color={colors.bg} />
     </Animated.View>
   );
 
@@ -101,7 +101,7 @@ export default function QuickActions({
           accessibilityLabel="Open quick actions"
           accessibilityState={{ expanded: visible }}
           onPress={open}
-          style={[s.fab, { backgroundColor: colors.switchTrackOn }]}
+          style={[s.fab, { backgroundColor: colors.fg }]}
         >
           {plus}
         </Pressable>
@@ -158,7 +158,7 @@ export default function QuickActions({
                 ]}
               >
                 <View style={[s.icon, { backgroundColor: colors.tint }]}>
-                  <Ionicons name={icon} size={21} color={colors.coralInk} />
+                  <Ionicons name={icon} size={21} color={colors.fg} />
                 </View>
                 <Text style={[s.label, { color: colors.fg }]}>{label}</Text>
               </Pressable>
@@ -171,7 +171,7 @@ export default function QuickActions({
             onPress={() => dismiss()}
             style={[
               s.fab,
-              { backgroundColor: colors.switchTrackOn },
+              { backgroundColor: colors.fg },
               { position: "absolute", left: position.x, top: position.y },
             ]}
           >
@@ -224,5 +224,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 15, flexShrink: 1 },
+  label: {
+    fontFamily: "sans-serif-medium",
+    fontSize: 15,
+    flexShrink: 1,
+  },
 });

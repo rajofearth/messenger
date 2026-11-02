@@ -46,8 +46,8 @@ export function MediaAlbumSheet(props: Props) {
             <RefreshControl
               refreshing={props.refreshing}
               onRefresh={props.onRefresh}
-              colors={[props.colors.coralInk]}
-              tintColor={props.colors.coralInk}
+              colors={[props.colors.fg]}
+              tintColor={props.colors.fg}
             />
           }
         >
@@ -107,7 +107,7 @@ function AlbumRow({
         />
       ) : (
         <View style={[s.albumIcon, { backgroundColor: colors.line }]}>
-          <Ionicons name="images-outline" size={24} color={colors.coralInk} />
+          <Ionicons name="images-outline" size={24} color={colors.fg} />
         </View>
       )}
       <Text style={[s.albumRowTitle, { color: colors.fg }]} numberOfLines={1}>
@@ -118,7 +118,7 @@ function AlbumRow({
           {count}
         </Text>
       )}
-      {selected && <Ionicons name="checkmark" size={22} color={colors.coralInk} />}
+      {selected && <Ionicons name="checkmark" size={22} color={colors.fg} />}
     </Pressable>
   );
 }

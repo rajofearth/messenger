@@ -54,7 +54,16 @@ export default function ChatProfileShared({
   messages: Message[];
   dark: boolean;
 }) {
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    line: dark ? "#2A2A2A" : "#E8E8E8",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+  };
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState<"Media" | "Docs" | "Links">("Media");
   const [selected, setSelected] = useState<Message | null>(null);
@@ -262,8 +271,8 @@ export default function ChatProfileShared({
 
 const s = StyleSheet.create({
   heading: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 20,
+    fontWeight: "600",
     marginTop: space.xxl,
   },
   tabs: { flexDirection: "row", marginVertical: space.lg },
@@ -273,13 +282,12 @@ const s = StyleSheet.create({
     paddingVertical: space.md,
     borderBottomWidth: 2,
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  label: { fontSize: 14, fontWeight: "600" },
   caption: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     marginTop: space.sm,
   },
-  empty: { fontFamily: "DMSans_400Regular", paddingVertical: space.xl },
+  empty: { paddingVertical: space.xl },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   tile: {
     width: "31%",
@@ -297,7 +305,7 @@ const s = StyleSheet.create({
     right: 0,
     padding: space.xs,
   },
-  tileText: { fontSize: 11, fontFamily: "DMSans_500Medium" },
+  tileText: { fontSize: 11, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,10 +328,10 @@ const s = StyleSheet.create({
   },
   viewerTitle: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
+    fontWeight: "600",
     padding: space.md,
   },
-  viewerTime: { padding: space.lg, fontFamily: "DMSans_400Regular" },
+  viewerTime: { padding: space.lg },
   imageScroll: { flex: 1, width: "100%" },
   imageContent: { flexGrow: 1, alignItems: "center", justifyContent: "center" },
   fullImage: { width: "100%", height: "100%", minHeight: 300 },

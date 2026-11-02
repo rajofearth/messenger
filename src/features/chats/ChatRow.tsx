@@ -14,9 +14,42 @@ type Props = {
   onActions: (chat: Chat, x?: number, y?: number) => void;
 };
 
+type ChatPresence = Chat & {
+  /** Optional fields are accepted for backends that expose live presence. */
+  online?: boolean;
+  isOnline?: boolean;
+  presence?: boolean | "online" | "offline";
+};
+
+function GroupAvatar({ dark }: { dark: boolean }) {
+  const colors = palette(dark);
+  return (
+    <View
+      accessible={false}
+      style={[s.groupAvatar, { backgroundColor: colors.input }]}
+    >
+      {[0, 1, 2, 3].map((index) => (
+        <View
+          key={index}
+          accessible={false}
+          style={[s.groupAvatarCell, { backgroundColor: colors.card }]}
+        >
+          <Ionicons name="person" size={10} color={colors.muted} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /** Memoized row so an open action menu does not re-render the whole list. */
 function ChatRow({ chat, dark, onOpen, onActions }: Props) {
   const colors = palette(dark);
+  const presence = chat as ChatPresence;
+  const online =
+    presence.online === true ||
+    presence.isOnline === true ||
+    presence.presence === true ||
+    presence.presence === "online";
   const longPressed = useRef(false);
   const pending =
     chat.lastMessageStatus === "sending" || chat.lastMessageStatus === "failed";
@@ -64,10 +97,25 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
       }}
       style={({ pressed }) => [
         s.chatRow,
-        pressed && { backgroundColor: colors.card },
+        pressed && { backgroundColor: colors.input },
       ]}
     >
-      <Avatar uri={chat.avatar} name={name} size={56} dark={dark} />
+      <View style={s.avatarWrap}>
+        {chat.group ? (
+          <GroupAvatar dark={dark} />
+        ) : (
+          <Avatar uri={chat.avatar} name={name} size={56} dark={dark} />
+        )}
+        {online && (
+          <View
+            accessible={false}
+            style={[
+              s.presence,
+              { backgroundColor: colors.online, borderColor: colors.bg },
+            ]}
+          />
+        )}
+      </View>
       <View style={s.chatBody}>
         <View style={s.rowTop}>
           <View style={s.nameLine}>

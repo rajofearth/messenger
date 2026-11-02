@@ -2,19 +2,19 @@ import { StyleSheet } from "react-native";
 import { radius, space } from "../../ui/theme";
 
 export const styles = StyleSheet.create({
-  body: { fontFamily: "DMSans_400Regular", fontSize: 14 },
-  tiny: { fontFamily: "DMSans_500Medium", fontSize: 11 },
-  messageRow: { alignItems: "flex-start", marginTop: space.sm },
+  body: { fontFamily: "sans-serif", fontSize: 14 },
+  tiny: { fontFamily: "sans-serif-medium", fontSize: 11 },
+  messageRow: { alignItems: "flex-start", marginTop: space.xs },
   bubble: {
     maxWidth: "83%",
-    borderRadius: radius.sheet,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
+    borderRadius: radius.control,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
   bubbleMine: { borderBottomRightRadius: radius.badge },
   bubbleTheirs: { borderBottomLeftRadius: radius.badge },
   messageText: {
-    fontFamily: "DMSans_400Regular",
+    fontFamily: "sans-serif",
     fontSize: 15,
     lineHeight: 22,
   },
@@ -26,7 +26,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: space.xs,
     marginBottom: space.xs,
   },
-  chatImage: { width: 220, height: 250, borderRadius: radius.card },
+  chatImage: { width: 220, height: 250, borderRadius: radius.control },
   forwarded: { flexDirection: "row", alignItems: "center", gap: space.xs },
   reaction: {
     position: "absolute",

@@ -62,7 +62,7 @@ export default function MessageActions({
   const { width, height } = useWindowDimensions();
   const [menuHeight, setMenuHeight] = useState(200);
   const insets = useSafeAreaInsets();
-  const { card, fg, danger, scrim } = palette(dark);
+  const { card, fg, danger, scrim, line } = palette(dark);
   if (!target) return null;
   const { message, rect } = target;
   const summary = messageSummary(message);
@@ -103,6 +103,7 @@ export default function MessageActions({
             styles.menu,
             {
               backgroundColor: card,
+              borderColor: line,
               width: menuWidth,
               left: Math.max(
                 insets.left + 8,
@@ -183,9 +184,10 @@ const styles = StyleSheet.create({
   overlay: { flex: 1 },
   menu: {
     position: "absolute",
-    borderRadius: radius.sheet,
+    borderRadius: radius.control,
     padding: space.xs,
     overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
   },
   emojis: { flexDirection: "row", justifyContent: "space-between" },
   emoji: {

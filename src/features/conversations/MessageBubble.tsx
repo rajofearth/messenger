@@ -26,8 +26,8 @@ const VoiceNote = React.forwardRef<
   const player = useAudioPlayer(message.uri ?? null);
   const status = useAudioPlayerStatus(player);
   const colors = palette(dark);
-  const color = message.mine ? colors.outgoingFg : colors.fg;
-  const activeWave = message.mine ? color : colors.coralInk;
+  const color = colors.fg;
+  const activeWave = colors.fg;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   useEffect(() => {
@@ -67,11 +67,11 @@ const VoiceNote = React.forwardRef<
 
   return (
     <View style={s.voice}>
-      <View style={[s.voicePlay, { backgroundColor: colors.tint }]}>
+      <View style={[s.voicePlay, { backgroundColor: colors.selected }]}>
         <Ionicons
           name={status.playing ? "pause" : "play"}
           size={18}
-          color={colors.coralInk}
+          color={colors.fg}
         />
       </View>
       <View style={s.wave}>
@@ -179,15 +179,13 @@ export default function MessageBubble({
     fg,
     muted,
     card,
-    tint,
     media,
-    outgoingBg,
-    outgoingFg,
-    outgoingMuted,
-    coralInk,
+    line,
     onImage,
   } =
     palette(dark);
+  const neutralSurface = dark ? "#2A2A2A" : "#F4F4F4";
+  const neutralWell = dark ? "#242424" : "#F4F4F4";
   const bubble = useRef<View>(null);
   const voice = useRef<VoiceNoteHandle>(null);
   const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -312,7 +310,7 @@ export default function MessageBubble({
         onPress={handleTap}
         style={[
           s.bubble,
-          { backgroundColor: m.mine ? outgoingBg : card },
+          { backgroundColor: m.mine ? neutralSurface : card },
           m.mine ? s.bubbleMine : s.bubbleTheirs,
           m.kind === "image" && { padding: space.xs },
         ]}
@@ -322,9 +320,9 @@ export default function MessageBubble({
             <Ionicons
               name="arrow-redo"
               size={14}
-              color={m.mine ? outgoingMuted : muted}
+              color={muted}
             />
-            <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
+            <Text style={[s.tiny, { color: muted }]}>
               Forwarded
             </Text>
           </View>
@@ -333,17 +331,17 @@ export default function MessageBubble({
           <View
             style={{
               borderLeftWidth: 4,
-              borderLeftColor: m.mine ? outgoingMuted : coralInk,
-              backgroundColor: tint,
+              borderLeftColor: line,
+              backgroundColor: neutralWell,
               borderRadius: radius.badge,
               padding: space.sm,
               marginBottom: space.sm,
             }}
           >
-            <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
+            <Text style={[s.tiny, { color: muted }]}>
               {m.replyTo.mine ? "You" : "Reply"}
             </Text>
-            <Text numberOfLines={2} style={{ color: m.mine ? outgoingFg : fg }}>
+            <Text numberOfLines={2} style={{ color: fg }}>
               {m.replyTo.text}
             </Text>
           </View>
@@ -392,22 +390,22 @@ export default function MessageBubble({
             <Ionicons
               name="document-text-outline"
               size={28}
-              color={m.mine ? outgoingFg : coralInk}
+              color={fg}
             />
             <Text
               numberOfLines={2}
-              style={[s.body, { color: m.mine ? outgoingFg : fg, flex: 1 }]}
+              style={[s.body, { color: fg, flex: 1 }]}
             >
               {m.filename}
             </Text>
             <Ionicons
               name="open-outline"
               size={17}
-              color={m.mine ? outgoingMuted : muted}
+              color={muted}
             />
           </View>
         ) : (
-          <Text style={[s.messageText, { color: m.mine ? outgoingFg : fg }]}>
+          <Text style={[s.messageText, { color: fg }]}>
             {m.text}
           </Text>
         )}

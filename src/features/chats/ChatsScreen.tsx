@@ -194,7 +194,7 @@ export default function ChatsScreen({
                         borderColor: self
                           ? self.seen
                             ? colors.line
-                            : colors.coralInk
+                            : colors.unread
                           : colors.line,
                         borderStyle: self ? "solid" : "dashed",
                       },
@@ -213,15 +213,15 @@ export default function ChatsScreen({
                         event.stopPropagation();
                         onAddStory();
                       }}
-                      style={[
+                        style={[
                         s.storyPlus,
                         {
                           borderColor: colors.bg,
-                          backgroundColor: colors.switchTrackOn,
+                          backgroundColor: colors.fg,
                         },
                       ]}
                     >
-                      <Ionicons name="add" size={17} color={colors.onCoral} />
+                      <Ionicons name="add" size={17} color={colors.bg} />
                     </Pressable>
                   </View>
                   <Text style={[s.storyName, { color: colors.muted }]}>
@@ -240,7 +240,11 @@ export default function ChatsScreen({
                       <View
                         style={[
                           s.storyRing,
-                          { borderColor: story.seen ? colors.line : colors.coralInk },
+                          {
+                            borderColor: story.seen
+                              ? colors.line
+                              : colors.unread,
+                          },
                         ]}
                       >
                         <Avatar
@@ -304,11 +308,11 @@ export default function ChatsScreen({
                         <View
                           style={[
                             s.tabCount,
-                            { backgroundColor: colors.switchTrackOn },
+                            { backgroundColor: colors.unread },
                           ]}
                         >
                           <Text
-                            style={[s.tabCountText, { color: colors.onCoral }]}
+                            style={[s.tabCountText, { color: colors.bg }]}
                           >
                             {unread}
                           </Text>

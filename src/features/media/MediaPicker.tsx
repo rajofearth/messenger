@@ -13,7 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
 import type { AssetMetadata } from "expo-media-library";
 import { IconButton, tap } from "../../ui/primitives";
-import { coral, onCoral, palette } from "../../ui/theme";
+import { palette } from "../../ui/theme";
 import {
   toggleStorySelection,
   MEDIA_PICKER_LIMIT,
@@ -253,12 +253,12 @@ export function MediaPicker(props: Props) {
             <Ionicons
               name="images-outline"
               size={16}
-              color={colors.coralInk}
+              color={colors.fg}
             />
             <Text style={[s.pickerLimitedText, { color: colors.fg }]}>
               Showing selected media
             </Text>
-            <Text style={[s.pickerLimitedAction, { color: colors.coralInk }]}>
+            <Text style={[s.pickerLimitedAction, { color: colors.fg }]}>
               Manage
             </Text>
           </Pressable>
@@ -269,7 +269,7 @@ export function MediaPicker(props: Props) {
           onPress={openAlbums}
           style={[s.pickerAlbumButton, { borderColor: colors.line }]}
         >
-          <Ionicons name="folder-open-outline" size={18} color={colors.coralInk} />
+          <Ionicons name="folder-open-outline" size={18} color={colors.fg} />
           <Text style={[s.pickerAlbumTitle, { color: colors.fg }]} numberOfLines={1}>
             {currentAlbumTitle}
           </Text>
@@ -286,14 +286,14 @@ export function MediaPicker(props: Props) {
                 onPress={() => chooseFilter(item.id)}
                 style={[
                   s.pickerChip,
-                  { borderColor: active ? coral : colors.line },
-                  active && { backgroundColor: coral },
+                  { borderColor: active ? colors.fg : colors.line },
+                  active && { backgroundColor: colors.fg },
                 ]}
               >
                 <Text
                   style={[
                     s.pickerChipText,
-                    { color: active ? onCoral : colors.muted },
+                    { color: active ? colors.bg : colors.muted },
                   ]}
                 >
                   {item.label}
@@ -352,7 +352,7 @@ export function MediaPicker(props: Props) {
             style={[s.pickerNext, { opacity: preparing ? 0.6 : 1 }]}
           >
             {preparing ? (
-              <ActivityIndicator color={onCoral} />
+              <ActivityIndicator color={colors.bg} />
             ) : (
               <Text style={s.pickerNextText}>Next</Text>
             )}

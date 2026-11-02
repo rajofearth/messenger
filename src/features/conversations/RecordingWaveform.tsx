@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { coral } from "../../ui/theme";
 
 const STATIC_BARS = [8, 12, 18, 10, 22, 14, 9, 17, 24, 13, 20, 11, 16, 8, 19, 12, 22, 10];
 
 export default function RecordingWaveform({
   metering,
-  color = coral,
+  color = "#111111",
 }: {
   metering?: number;
   color?: string;

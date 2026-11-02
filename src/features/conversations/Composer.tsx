@@ -40,8 +40,9 @@ export default function Composer({
   setAttachmentOpen: (open: boolean) => void;
   disabled: boolean;
 }) {
-  const { card, coralInk, fg, muted, onCoral, switchTrackOn, danger } =
-    palette(dark);
+  const { fg, muted, input: inputSurface, line, danger } = palette(dark);
+  const actionBackground = dark ? "#F4F4F4" : fg;
+  const actionForeground = dark ? "#111111" : "#FFFFFF";
   const input = useRef<TextInput>(null);
   const [top, setTop] = useState(260);
   const host = useRef<View>(null);
@@ -66,16 +67,16 @@ export default function Composer({
           style={{
             marginHorizontal: space.xl,
             borderLeftWidth: 4,
-            borderLeftColor: coralInk,
-            backgroundColor: card,
+            borderLeftColor: line,
+            backgroundColor: inputSurface,
             paddingLeft: space.md,
             flexDirection: "row",
             alignItems: "center",
-            borderRadius: radius.badge,
+            borderRadius: radius.control,
           }}
         >
           <View style={{ flex: 1, paddingVertical: space.sm }}>
-            <Text style={{ color: coralInk, fontSize: 12 }}>
+            <Text style={{ color: muted, fontSize: 12, fontFamily: "sans-serif-medium" }}>
               Replying to {reply.mine ? "yourself" : "message"}
             </Text>
             <Text numberOfLines={2} style={{ color: fg }}>
@@ -90,7 +91,7 @@ export default function Composer({
           />
         </View>
       )}
-      <View style={[s.composer, { backgroundColor: card }]}>
+      <View style={[s.composer, { backgroundColor: inputSurface, borderColor: line }]}>
         {disabled ? (
           <>
             <Ionicons name="lock-closed-outline" size={17} color={muted} />
@@ -110,7 +111,7 @@ export default function Composer({
             <View style={[s.liveDot, { backgroundColor: danger }]} />
             <RecordingWaveform
               metering={media.metering}
-              color={coralInk}
+              color={fg}
             />
             <Text style={{ color: fg }}>
               {formatDuration(Math.floor(media.durationMillis / 1000))}
@@ -118,8 +119,8 @@ export default function Composer({
             <IconButton
               name="send"
               label="Send voice note"
-              background={switchTrackOn}
-              color={onCoral}
+              background={actionBackground}
+              color={actionForeground}
               onPress={() => void media.record()}
             />
           </>
@@ -169,8 +170,8 @@ export default function Composer({
             <IconButton
               name={draft.trim() ? "arrow-up" : "mic-outline"}
               label={draft.trim() ? "Send message" : "Record voice note"}
-              background={switchTrackOn}
-              color={onCoral}
+              background={actionBackground}
+              color={actionForeground}
               onPress={() => {
                 if (!disabled) {
                   setAttachmentOpen(false);

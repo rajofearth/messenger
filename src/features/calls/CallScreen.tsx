@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { CORAL, styles } from "./CallScreen.styles";
+import { CALL_ACCENT, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
 import CallScreenCamera from "./CallScreenCamera";
 import { Avatar } from "../../ui/primitives";
@@ -218,7 +218,7 @@ export default function CallScreen({
                   <Ionicons
                     name={speaker ? "volume-high-outline" : "ear-outline"}
                     size={23}
-                    color={CORAL}
+                    color={CALL_ACCENT}
                   />
                 </View>
                 <View style={styles.optionCopy}>
@@ -230,7 +230,7 @@ export default function CallScreen({
                 <Switch
                   value={speaker}
                   onValueChange={onSpeakerChange}
-                  trackColor={{ false: "#4A4D52", true: CORAL }}
+                  trackColor={{ false: "#4A4D52", true: CALL_ACCENT }}
                   thumbColor="#FFFFFF"
                   accessibilityLabel="Use speaker"
                 />
@@ -248,7 +248,7 @@ export default function CallScreen({
                   <Ionicons
                     name="camera-reverse-outline"
                     size={24}
-                    color={CORAL}
+                    color={CALL_ACCENT}
                   />
                 </View>
                 <View style={styles.optionCopy}>
@@ -265,7 +265,7 @@ export default function CallScreen({
                 <Ionicons
                   name="information-circle-outline"
                   size={20}
-                  color={CORAL}
+                  color={CALL_ACCENT}
                 />
                 <Text style={styles.simulationText}>
                   Live preview only. No video is recorded or sent. Audio

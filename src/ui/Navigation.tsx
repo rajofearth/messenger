@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Avatar, tap } from "./primitives";
-import { palette, radius, space, typeScale } from "./theme";
+import { palette, space } from "./theme";
 export type Tab = "chats" | "calls" | "settings";
 export default function Navigation({
   active,
@@ -60,14 +60,14 @@ export default function Navigation({
               <Ionicons
                 name={active === item.id ? item.filled : item.icon}
                 size={23}
-                color={active === item.id ? colors.coralInk : colors.muted}
+                color={active === item.id ? colors.unread : colors.muted}
               />
             )}
           </View>
           <Text
             style={[
               s.label,
-              { color: active === item.id ? colors.coralInk : colors.muted },
+              { color: active === item.id ? colors.unread : colors.muted },
             ]}
           >
             {item.label}
@@ -81,7 +81,6 @@ const s = StyleSheet.create({
   nav: {
     flexDirection: "row",
     borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: space.sm,
     paddingVertical: space.sm,
     paddingHorizontal: space.sm,
   },
@@ -95,9 +94,12 @@ const s = StyleSheet.create({
   icon: {
     width: 32,
     height: 28,
-    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
-  label: { ...typeScale.caption },
+  label: {
+    fontFamily: "sans-serif",
+    fontSize: 12,
+    lineHeight: 16,
+  },
 });

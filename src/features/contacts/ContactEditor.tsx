@@ -28,7 +28,16 @@ export default function ContactEditor({
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+  };
   useEffect(() => {
     setName("");
     setHandle("");
@@ -145,8 +154,8 @@ const s = StyleSheet.create({
     backgroundColor: "transparent",
   },
   sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopLeftRadius: radius.control,
+    borderTopRightRadius: radius.control,
     padding: space.xxl,
     paddingBottom: space.xxxl,
     gap: space.lg,
@@ -156,11 +165,10 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_500Medium", fontSize: 22 },
+  title: { fontSize: 22, fontWeight: "600" },
   input: {
     borderRadius: radius.control,
     padding: space.lg,
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
   members: { minHeight: 92, textAlignVertical: "top" },
@@ -169,5 +177,5 @@ const s = StyleSheet.create({
     borderRadius: radius.control,
     alignItems: "center",
   },
-  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  primaryText: { fontSize: 14, fontWeight: "600" },
 });

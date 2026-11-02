@@ -10,7 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Chat } from "../../domain/data";
-import { palette, radius, space, typeScale } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export type ChatActionTarget = { chat: Chat; x?: number; y?: number };
 
@@ -177,7 +177,12 @@ const s = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 8,
   },
-  title: { ...typeScale.bodyStrong, padding: space.md },
+  title: {
+    fontFamily: "sans-serif-medium",
+    fontSize: 15,
+    lineHeight: 20,
+    padding: space.md,
+  },
   option: {
     flexDirection: "row",
     alignItems: "center",
@@ -186,9 +191,13 @@ const s = StyleSheet.create({
     paddingHorizontal: space.md,
     borderRadius: radius.control,
   },
-  label: { flexShrink: 1, fontFamily: "DMSans_500Medium", fontSize: 14 },
+  label: {
+    flexShrink: 1,
+    fontFamily: "sans-serif-medium",
+    fontSize: 14,
+  },
   message: {
-    fontFamily: "DMSans_400Regular",
+    fontFamily: "sans-serif",
     fontSize: 14,
     lineHeight: 21,
     paddingHorizontal: space.md,

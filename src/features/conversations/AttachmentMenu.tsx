@@ -19,7 +19,7 @@ export default function AttachmentMenu({
   onFile: () => void;
   onRecord: () => void;
 }) {
-  const { card, coralInk, fg } = palette(dark);
+  const { card, fg, line } = palette(dark);
   const actions: { icon: IconName; title: string; run: () => void }[] = [
     {
       icon: "images-outline",
@@ -32,7 +32,7 @@ export default function AttachmentMenu({
   ];
   return (
     <View
-      style={[styles.popup, { backgroundColor: card, maxHeight }]}
+      style={[styles.popup, { backgroundColor: card, maxHeight, borderColor: line }]}
       accessibilityViewIsModal
     >
       <ScrollView keyboardShouldPersistTaps="always">
@@ -47,7 +47,7 @@ export default function AttachmentMenu({
               run();
             }}
           >
-            <Ionicons name={icon} size={23} color={coralInk} />
+            <Ionicons name={icon} size={23} color={fg} />
             <Text style={{ color: fg, fontSize: 15 }}>{title}</Text>
           </Pressable>
         ))}
@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
     left: 16,
     width: 240,
     borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: space.xs,
     zIndex: 10,
   },

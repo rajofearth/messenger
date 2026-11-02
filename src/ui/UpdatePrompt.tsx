@@ -34,7 +34,20 @@ export default function UpdatePrompt({
   dark: boolean;
   visible: boolean;
 }) {
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    line: dark ? "#2A2A2A" : "#E8E8E8",
+    tint: dark ? "#242424" : "#F4F4F4",
+    scrim: dark ? "rgba(0,0,0,0.72)" : "rgba(0,0,0,0.45)",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+  };
   const { manifest, progress, download, dismissible } = updates;
   const showing = visible && updates.promptVisible;
   const [notesExpanded, setNotesExpanded] = useState(true);
@@ -282,7 +295,7 @@ const s = StyleSheet.create({
     paddingVertical: space.xxl,
   },
   card: {
-    borderRadius: radius.sheet,
+    borderRadius: radius.control,
     width: "100%",
     maxWidth: 400,
     maxHeight: "100%",
@@ -306,11 +319,10 @@ const s = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontFamily: "DMSans_500Medium",
     fontSize: 20,
+    fontWeight: "600",
   },
   body: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 14,
     lineHeight: 20,
     marginBottom: space.sm,
@@ -322,17 +334,16 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     gap: space.md,
   },
-  notesLabel: { fontFamily: "DMSans_500Medium", fontSize: 13 },
+  notesLabel: { fontSize: 13, fontWeight: "600" },
   notes: { maxHeight: 180, marginBottom: space.sm },
   hint: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 19,
     marginBottom: space.md,
   },
   error: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 13,
+    fontWeight: "600",
     lineHeight: 20,
     marginBottom: space.lg,
   },
@@ -344,7 +355,6 @@ const s = StyleSheet.create({
   },
   fill: { height: "100%", borderRadius: radius.pill },
   progress: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     marginTop: space.sm,
     marginBottom: space.lg,
@@ -357,7 +367,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     marginTop: space.sm,
   },
-  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  primaryText: { fontSize: 14, fontWeight: "600" },
   secondary: {
     alignItems: "center",
     justifyContent: "center",
@@ -365,5 +375,5 @@ const s = StyleSheet.create({
     minHeight: 40,
     marginTop: space.xs,
   },
-  secondaryText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
+  secondaryText: { fontSize: 13, fontWeight: "600" },
 });

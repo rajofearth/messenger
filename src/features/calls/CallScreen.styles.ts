@@ -1,11 +1,11 @@
 import { StyleSheet } from "react-native";
-import { coral, palette, radius, space } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 const colors = palette(true);
-export const CORAL = coral;
+export const CALL_ACCENT = "#BDBDBD";
 
 export const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.media },
+  screen: { flex: 1, backgroundColor: "#111111" },
   safeArea: { flex: 1 },
   header: {
     flexDirection: "row",
@@ -111,11 +111,11 @@ export const styles = StyleSheet.create({
     gap: space.md,
   },
   callNote: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  smallDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: CORAL },
+  smallDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: CALL_ACCENT },
   callNoteText: {
     fontSize: 11,
     fontWeight: "500",
-    color: "#E2D3CC",
+    color: "#BDBDBD",
   },
   dock: {
     width: "100%",
@@ -142,8 +142,8 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  controlActive: { backgroundColor: `${coral}26` },
-  hangup: { backgroundColor: colors.danger },
+  controlActive: { backgroundColor: "#FFFFFF26" },
+  hangup: { backgroundColor: "#D84A4A" },
   hangupIcon: { transform: [{ rotate: "135deg" }] },
   controlLabel: { color: "#D9DBDF", fontSize: 10, fontWeight: "500" },
   endLabel: { color: "#FFB5A5" },
@@ -151,12 +151,12 @@ export const styles = StyleSheet.create({
 
   modalRoot: {
     flex: 1,
-    backgroundColor: colors.scrim,
+    backgroundColor: "#00000088",
     justifyContent: "flex-end",
   },
   sheet: {
     maxHeight: "85%",
-    backgroundColor: colors.card,
+    backgroundColor: "#222222",
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     paddingHorizontal: space.xl,
@@ -202,18 +202,18 @@ export const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: radius.control,
-    backgroundColor: colors.tint,
+    backgroundColor: "#333333",
     alignItems: "center",
     justifyContent: "center",
   },
   optionCopy: { flex: 1, gap: space.xs },
-  optionTitle: { color: "#F6F3F0", fontSize: 16, fontWeight: "500" },
-  optionSubtitle: { color: "#A9AFB6", fontSize: 12 },
+  optionTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "500" },
+  optionSubtitle: { color: "#BDBDBD", fontSize: 12 },
   simulationNotice: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: colors.tint,
+    backgroundColor: "#333333",
     padding: space.md,
     borderRadius: radius.card,
     marginTop: space.xl,

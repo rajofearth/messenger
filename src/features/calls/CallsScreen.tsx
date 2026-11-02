@@ -11,7 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette, coral, onCoral, radius, space } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
 import QuickActions from "../../ui/QuickActions";
 export default function CallsScreen({
@@ -117,14 +117,14 @@ export default function CallsScreen({
               <Ionicons
                 name={record.video ? "videocam-outline" : "call-outline"}
                 size={23}
-                color={colors.coralInk}
+                color={colors.fg}
               />
             </Pressable>
           </Pressable>
         ))}
         {!filtered.length && (
           <View style={s.empty}>
-            <Ionicons name="call-outline" size={32} color={colors.coralInk} />
+            <Ionicons name="call-outline" size={32} color={colors.muted} />
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
               {query.trim() ? "No matching calls" : "No recent calls"}
             </Text>
@@ -152,11 +152,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_600SemiBold", fontSize: 32 },
+  title: { fontSize: 30, fontWeight: "600" },
   search: {
     marginHorizontal: space.xl,
     marginBottom: space.lg,
-    borderRadius: radius.card,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     paddingLeft: space.md,
@@ -164,7 +164,6 @@ const s = StyleSheet.create({
   input: {
     flex: 1,
     padding: 12,
-    fontFamily: "DMSans_400Regular",
     fontSize: 13,
   },
   row: {
@@ -180,11 +179,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  name: { fontSize: 15, fontWeight: "600" },
   meta: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: space.sm },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12 },
+  caption: { fontSize: 12 },
   empty: { padding: space.xxxl, alignItems: "center", gap: space.xl },
-  emptyTitle: { fontFamily: "DMSans_500Medium", fontSize: 18 },
-  primary: { backgroundColor: coral, padding: space.lg, borderRadius: radius.control },
-  primaryText: { fontFamily: "DMSans_600SemiBold", color: onCoral, fontSize: 14 },
+  emptyTitle: { fontSize: 18, fontWeight: "600" },
+  primary: { backgroundColor: "#111111", padding: space.lg, borderRadius: 10 },
+  primaryText: { fontWeight: "600", color: "#FFFFFF", fontSize: 14 },
 });

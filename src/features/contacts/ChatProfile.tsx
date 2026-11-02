@@ -51,7 +51,20 @@ export default function ChatProfile({
   onClearHistory,
   onOpenChat,
 }: ChatProfileProps) {
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    line: dark ? "#2A2A2A" : "#E8E8E8",
+    tint: dark ? "#242424" : "#F4F4F4",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+    switchTrackOff: dark ? "#4A4A4A" : "#D6D6D6",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    switchThumb: dark ? "#111111" : "#FFFFFF",
+  };
   const date = profileDate(chat, chat.group ? [] : messages);
   const membership = profileMembership(chat);
   const mutualGroups = chats.filter(
@@ -396,35 +409,32 @@ const s = StyleSheet.create({
     gap: space.sm,
     padding: space.lg,
   },
-  heading: { fontFamily: "DMSans_500Medium", fontSize: 20 },
+  heading: { fontSize: 20, fontWeight: "600" },
   content: { paddingHorizontal: space.xxl, paddingBottom: space.xxxl * 2 },
   hero: { alignItems: "center", gap: space.sm, paddingTop: space.lg },
   name: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 26,
+    fontWeight: "600",
     textAlign: "center",
     marginTop: space.sm,
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
+  label: { fontSize: 14, fontWeight: "600" },
   caption: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     marginTop: space.xs,
   },
   note: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 19,
     marginTop: space.md,
     marginHorizontal: space.xs,
   },
   description: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 23,
     marginVertical: space.md,
   },
-  card: { padding: space.xl, borderRadius: radius.card },
+  card: { padding: space.xl, borderRadius: 0 },
   section: { marginTop: space.xxxl },
   row: {
     flexDirection: "row",
@@ -435,14 +445,13 @@ const s = StyleSheet.create({
   },
   body: { flex: 1 },
   badge: {
-    fontFamily: "DMSans_500Medium",
     fontSize: 11,
+    fontWeight: "600",
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
     borderRadius: radius.badge,
   },
   empty: {
-    fontFamily: "DMSans_400Regular",
     paddingVertical: space.xl,
     lineHeight: 21,
   },
