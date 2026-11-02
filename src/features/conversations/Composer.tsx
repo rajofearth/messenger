@@ -6,6 +6,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardMediaInput } from "../../ui/KeyboardMediaInput";
 import type { Message } from "../../domain/data";
@@ -47,6 +48,7 @@ export default function Composer({
   const [top, setTop] = useState(260);
   const host = useRef<View>(null);
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   return (
     <View
       ref={host}
@@ -64,22 +66,13 @@ export default function Composer({
       )}
       {reply && !disabled && (
         <View
-          style={{
-            marginHorizontal: space.xl,
-            borderLeftWidth: 4,
-            borderLeftColor: line,
-            backgroundColor: inputSurface,
-            paddingLeft: space.md,
-            flexDirection: "row",
-            alignItems: "center",
-            borderRadius: radius.control,
-          }}
+          style={[s.replyPreview, { borderLeftColor: line, backgroundColor: inputSurface }]}
         >
           <View style={{ flex: 1, paddingVertical: space.sm }}>
-            <Text style={{ color: muted, fontSize: 12, fontFamily: "sans-serif-medium" }}>
+            <Text style={[s.replyLabel, { color: muted }]}>
               Replying to {reply.mine ? "yourself" : "message"}
             </Text>
-            <Text numberOfLines={2} style={{ color: fg }}>
+            <Text numberOfLines={2} style={[s.replyText, { color: fg }]}>
               {reply.text}
             </Text>
           </View>
@@ -91,17 +84,27 @@ export default function Composer({
           />
         </View>
       )}
-      <View style={[s.composer, { backgroundColor: inputSurface, borderColor: line }]}>
+      <View
+        accessibilityLabel={media.recording ? "Voice note recording" : "Message composer"}
+        style={[
+          s.composer,
+          {
+            backgroundColor: inputSurface,
+            borderColor: line,
+            marginBottom: space.md + insets.bottom,
+          },
+        ]}
+      >
         {disabled ? (
-          <>
+          <View style={s.recordingState}>
             <Ionicons name="lock-closed-outline" size={17} color={muted} />
             <Text style={[s.blockedText, { color: muted }]}>
               This contact is blocked. Unblock them in chat details to send
               messages.
             </Text>
-          </>
+          </View>
         ) : media.recording ? (
-          <>
+          <View style={s.recordingState}>
             <IconButton
               name="trash-outline"
               label="Cancel recording"
@@ -109,11 +112,11 @@ export default function Composer({
               onPress={() => void media.cancelRecord()}
             />
             <View style={[s.liveDot, { backgroundColor: danger }]} />
-            <RecordingWaveform
-              metering={media.metering}
-              color={fg}
-            />
-            <Text style={{ color: fg }}>
+            <RecordingWaveform metering={media.metering} color={fg} />
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[s.composerMeta, { color: fg }]}
+            >
               {formatDuration(Math.floor(media.durationMillis / 1000))}
             </Text>
             <IconButton
@@ -123,7 +126,7 @@ export default function Composer({
               color={actionForeground}
               onPress={() => void media.record()}
             />
-          </>
+          </View>
         ) : (
           <>
             <IconButton
@@ -142,7 +145,7 @@ export default function Composer({
               onMediaError={({ message }) =>
                 Alert.alert("Keyboard attachment unavailable", message)
               }
-              accessibilityLabel="Message"
+               accessibilityLabel="Message text"
               editable={!disabled}
               value={draft}
               onChangeText={setDraft}
@@ -152,8 +155,9 @@ export default function Composer({
               }
               placeholderTextColor={muted}
               style={[s.messageInput, { color: fg }]}
-              multiline
-              maxLength={4000}
+               multiline
+               maxLength={4000}
+               textAlignVertical="top"
             />
             <IconButton
               name="keypad-outline"

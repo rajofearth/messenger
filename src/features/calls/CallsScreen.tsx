@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
@@ -38,9 +39,14 @@ export default function CallsScreen({
     record.chat.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
       <View style={s.header}>
-        <Text style={[s.title, { color: colors.fg }]}>Calls</Text>
+        <Text
+          accessibilityRole="header"
+          style={[s.title, { color: colors.fg }]}
+        >
+          Calls
+        </Text>
         <IconButton
           name="search-outline"
           color={colors.fg}
@@ -73,6 +79,16 @@ export default function CallsScreen({
               setQuery("");
             }}
           />
+          {!!query.trim() && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear call search"
+              onPress={() => setQuery("")}
+              style={s.clearSearch}
+            >
+              <Text style={[s.clearSearchText, { color: colors.muted }]}>Clear</Text>
+            </Pressable>
+          )}
         </View>
       )}
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
@@ -101,7 +117,7 @@ export default function CallsScreen({
                   {record.missed
                     ? "Missed call"
                     : formatDuration(record.seconds)}{" "}
-                  · {record.time}
+                  ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {record.time}
                 </Text>
               </View>
             </View>
@@ -123,13 +139,27 @@ export default function CallsScreen({
           </Pressable>
         ))}
         {!filtered.length && (
-          <View style={s.empty}>
+          <View
+            style={s.empty}
+            accessible
+            accessibilityLabel={query.trim() ? "No matching calls" : "No recent calls"}
+          >
             <Ionicons name="call-outline" size={32} color={colors.muted} />
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
               {query.trim() ? "No matching calls" : "No recent calls"}
             </Text>
+            <Text style={[s.emptyText, { color: colors.muted }]}>
+              {query.trim()
+                ? "Try a different name or clear your search."
+                : "Calls you make or receive will appear here."}
+            </Text>
             {!query.trim() && (
-              <Pressable onPress={onVoiceCall} style={s.primary}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Start a voice call"
+                onPress={onVoiceCall}
+                style={s.primary}
+              >
                 <Text style={s.primaryText}>Start a call</Text>
               </Pressable>
             )}
@@ -142,7 +172,7 @@ export default function CallsScreen({
         onVoiceCall={onVoiceCall}
         onVideoCall={onVideoCall}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 const s = StyleSheet.create({
@@ -161,6 +191,12 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingLeft: space.md,
   },
+  clearSearch: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: space.sm,
+  },
+  clearSearchText: { fontSize: 13, fontWeight: "500" },
   input: {
     flex: 1,
     padding: 12,
@@ -184,6 +220,7 @@ const s = StyleSheet.create({
   caption: { fontSize: 12 },
   empty: { padding: space.xxxl, alignItems: "center", gap: space.xl },
   emptyTitle: { fontSize: 18, fontWeight: "600" },
+  emptyText: { fontSize: 13, textAlign: "center", lineHeight: 19, maxWidth: 260 },
   primary: { backgroundColor: "#111111", padding: space.lg, borderRadius: 10 },
   primaryText: { fontWeight: "600", color: "#FFFFFF", fontSize: 14 },
 });

@@ -9,6 +9,9 @@ import { s } from "./ChatsScreen.styles";
 
 type Props = {
   chat: Chat;
+  members: Chat[];
+  selfAvatar: string;
+  selfName?: string;
   dark: boolean;
   onOpen: (chat: Chat) => void;
   onActions: (chat: Chat, x?: number, y?: number) => void;
@@ -21,28 +24,62 @@ type ChatPresence = Chat & {
   presence?: boolean | "online" | "offline";
 };
 
-function GroupAvatar({ dark }: { dark: boolean }) {
+type GroupAvatarMember = {
+  uri: string | undefined;
+  name: string | undefined;
+};
+
+function GroupAvatar({
+  chat,
+  members,
+  selfAvatar,
+  selfName,
+  dark,
+}: {
+  chat: Chat;
+  members: Chat[];
+  selfAvatar: string;
+  selfName?: string;
+  dark: boolean;
+}) {
   const colors = palette(dark);
+  const byId = new Map(members.map((member) => [member.id, member]));
+  const avatars = (chat.memberIds ?? [])
+    .slice(0, 4)
+    .map<GroupAvatarMember | null>((id) => {
+      if (id === "self") return { uri: selfAvatar, name: selfName || "You" };
+      const member = byId.get(id);
+      return member ? { uri: member.avatar, name: member.name } : null;
+    })
+    .filter((member): member is GroupAvatarMember => member !== null);
   return (
     <View
       accessible={false}
       style={[s.groupAvatar, { backgroundColor: colors.input }]}
     >
-      {[0, 1, 2, 3].map((index) => (
-        <View
-          key={index}
-          accessible={false}
-          style={[s.groupAvatarCell, { backgroundColor: colors.card }]}
-        >
-          <Ionicons name="person" size={10} color={colors.muted} />
-        </View>
-      ))}
+      {avatars.length > 0 ? (
+        avatars.map((member, index) => (
+          <View key={`${member.name ?? "member"}-${index}`} style={s.groupAvatarCell}>
+            <Avatar uri={member.uri} name={member.name} size={17} dark={dark} />
+          </View>
+        ))
+      ) : (
+        <Ionicons name="people-outline" size={24} color={colors.muted} />
+      )}
     </View>
   );
 }
 
 /** Memoized row so an open action menu does not re-render the whole list. */
-function ChatRow({ chat, dark, onOpen, onActions }: Props) {
+function ChatRow({
+  chat,
+  members,
+  selfAvatar,
+  selfName,
+  dark,
+  onOpen,
+  onActions,
+}: Props) {
   const colors = palette(dark);
   const presence = chat as ChatPresence;
   const online =
@@ -102,7 +139,13 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
     >
       <View style={s.avatarWrap}>
         {chat.group ? (
-          <GroupAvatar dark={dark} />
+          <GroupAvatar
+            chat={chat}
+            members={members}
+            selfAvatar={selfAvatar}
+            selfName={selfName}
+            dark={dark}
+          />
         ) : (
           <Avatar uri={chat.avatar} name={name} size={56} dark={dark} />
         )}

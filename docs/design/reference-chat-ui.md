@@ -31,6 +31,25 @@ markers, and green presence dots.
 - Bottom navigation is white with a hairline top rule, five visual slots only if
   the product has five real destinations. Messenger currently has three real
   destinations, so keep three slots and use the same icon-over-label treatment.
+- The active bottom-navigation icon and label are primary black; blue is reserved
+  for unread indicators so navigation state is not confused with message state.
+
+## Deeper-screen UX contract
+
+- Conversations keep the same quiet hierarchy: a clear back/profile/call header,
+  date separators, readable empty and loading states, explicit reply and media
+  composer states, and delivery/retry feedback for local sends.
+- Contact and group details lead with identity, then real actions, metadata,
+  members, shared media, and settings. Group rows show the first four known
+  member avatars; unavailable membership stays explicitly unavailable rather
+  than using fake people. `Add members` is visible, but does not claim to mutate
+  an existing group while the backend has no membership mutation.
+- Calls, stories, and media expose their state transitions: permission, loading,
+  preview, playback, upload, save, failure, retry, close, and back actions are
+  visible and accessible where the underlying flow supports them.
+- Auth, settings, and update prompts use grouped hierarchy, inline validation,
+  honest errors, keyboard-friendly controls, and explicit retry or dismissal
+  behavior without inventing unsupported account flows.
 
 ## Reference tokens
 
@@ -59,6 +78,9 @@ field r    16px
 - [ ] Conversations, profile, calls, stories, media, and auth use the same white
       surface, system-like typography, icon weight, spacing, and muted hierarchy.
 - [ ] Existing Messenger behavior remains available: read clearing, unread counts,
-      search, long-press actions, calls, stories, media, settings, and auth.
+      one unified conversation list, search, long-press actions, calls, stories,
+      media, settings, and auth.
 - [ ] No UI claims a request flow or destination that the data model does not yet
       support.
+- [ ] Deep screens expose state, recovery, and navigation affordances without
+      adding backend behavior that does not exist.

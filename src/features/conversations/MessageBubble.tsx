@@ -120,7 +120,21 @@ function DeliveryMeta({
       : null;
   if (!showTimestamp && !pending) return null;
   return (
-    <View style={s.messageMeta}>
+    <View
+      accessible
+      accessibilityLabel={
+        message.status === "failed"
+          ? "Not sent. Tap to retry."
+          : message.status === "sending"
+            ? uploading === null
+              ? "Sending"
+              : `Uploading ${uploading}%`
+            : message.mine
+              ? "Sent"
+              : message.time
+      }
+      style={s.messageMeta}
+    >
       <Text style={[s.tiny, { color: muted }]}>{message.time}</Text>
       {message.mine && message.status === "failed" ? (
         <>
@@ -310,7 +324,11 @@ export default function MessageBubble({
         onPress={handleTap}
         style={[
           s.bubble,
-          { backgroundColor: m.mine ? neutralSurface : card },
+          {
+            backgroundColor: m.mine ? neutralSurface : card,
+            borderColor: line,
+            borderWidth: m.mine ? 0 : 1,
+          },
           m.mine ? s.bubbleMine : s.bubbleTheirs,
           m.kind === "image" && { padding: space.xs },
         ]}
@@ -352,17 +370,23 @@ export default function MessageBubble({
           </Text>
         ) : m.kind === "video" ? (
           <View
-            style={[
-              s.chatImage,
-              {
-                backgroundColor: media,
-                justifyContent: "center",
-                alignItems: "center",
-              },
-            ]}
+            style={[s.videoPreview, { backgroundColor: media }]}
           >
-            <Ionicons name="play-circle" size={56} color={onImage} />
-            <Text style={{ color: onImage }}>Video · Tap to play</Text>
+            {m.previewUri ? (
+              <ResponsiveImage
+                uri={m.previewUri}
+                previewUri={m.previewUri}
+                previewWidth={m.previewWidth}
+                displayWidth={220}
+                style={s.videoPreview}
+                contentFit="cover"
+                recyclingKey={`${m.id}-preview`}
+              />
+            ) : null}
+            <View style={[s.videoShade, { backgroundColor: m.previewUri ? "rgba(0,0,0,0.24)" : media }]}>
+              <Ionicons name="play-circle" size={56} color={onImage} />
+              <Text style={{ color: onImage }}>Video · Tap to play</Text>
+            </View>
           </View>
         ) : m.kind === "image" ? (
           <ResponsiveImage
@@ -408,6 +432,9 @@ export default function MessageBubble({
           <Text style={[s.messageText, { color: fg }]}>
             {m.text}
           </Text>
+        )}
+        {(m.kind === "image" || m.kind === "video") && !!m.text && !m.deleted && (
+          <Text style={[s.mediaCaption, { color: fg }]}>{m.text}</Text>
         )}
         {m.reaction && !m.deleted && (
           <View style={[s.reaction, { backgroundColor: card }]}>

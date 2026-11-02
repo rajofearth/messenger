@@ -40,6 +40,8 @@ export default function AttachmentMenu({
           <Pressable
             key={title}
             accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityHint="Choose an attachment"
             style={styles.row}
             onPress={() => {
               tap();
@@ -66,5 +68,12 @@ const styles = StyleSheet.create({
     padding: space.xs,
     zIndex: 10,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md },
+  row: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
 });

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -28,6 +27,7 @@ export default function ContactEditor({
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
+  const [error, setError] = useState("");
   const base = palette(dark);
   const colors = {
     ...base,
@@ -41,17 +41,18 @@ export default function ContactEditor({
   useEffect(() => {
     setName("");
     setHandle("");
+    setError("");
   }, [kind]);
   function save() {
     if (!name.trim() || !handle.trim()) {
-      Alert.alert(
-        "Missing details",
+      setError(
         kind === "group"
           ? "Enter a group name and at least one member username"
           : "Enter a name and username",
       );
       return;
     }
+    setError("");
     onSave(name.trim(), handle.trim(), kind === "group");
   }
   return (
@@ -78,7 +79,10 @@ export default function ContactEditor({
           contentContainerStyle={[s.sheet, { backgroundColor: colors.bg }]}
         >
           <View style={s.header}>
-            <Text style={[s.title, { color: colors.fg }]}>
+            <Text
+              accessibilityRole="header"
+              style={[s.title, { color: colors.fg }]}
+            >
               {kind === "group" ? "Create group" : "New contact"}
             </Text>
             <IconButton
@@ -96,7 +100,10 @@ export default function ContactEditor({
             placeholder={kind === "group" ? "Group name" : "Full name"}
             placeholderTextColor={colors.muted}
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              setError("");
+              setName(value);
+            }}
             maxLength={70}
             style={[
               s.input,
@@ -109,7 +116,10 @@ export default function ContactEditor({
               placeholder="@username"
               placeholderTextColor={colors.muted}
               value={handle}
-              onChangeText={setHandle}
+              onChangeText={(value) => {
+                setError("");
+                setHandle(value);
+              }}
               autoCapitalize="none"
               maxLength={100}
               style={[
@@ -123,7 +133,10 @@ export default function ContactEditor({
               placeholder="Member @usernames, separated by commas"
               placeholderTextColor={colors.muted}
               value={handle}
-              onChangeText={setHandle}
+              onChangeText={(value) => {
+                setError("");
+                setHandle(value);
+              }}
               autoCapitalize="none"
               multiline
               maxLength={400}
@@ -134,8 +147,16 @@ export default function ContactEditor({
               ]}
             />
           )}
+          <Text style={[s.helper, { color: error ? colors.danger : colors.muted }]}
+          >
+            {error ||
+              (kind === "group"
+                ? "Separate member usernames with commas"
+                : "Use the username they use on Messenger")}
+          </Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={kind === "group" ? "Create group" : "Add contact"}
             onPress={save}
             style={[s.primary, { backgroundColor: colors.switchTrackOn }]}
           >
@@ -172,6 +193,7 @@ const s = StyleSheet.create({
     fontSize: 15,
   },
   members: { minHeight: 92, textAlignVertical: "top" },
+  helper: { fontSize: 12, lineHeight: 18, marginTop: -space.sm },
   primary: {
     padding: space.lg,
     borderRadius: radius.control,

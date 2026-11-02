@@ -61,6 +61,8 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
   const current = useRef(DEFAULT_PREFERENCES);
   const writes = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -70,6 +72,7 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => {
     let active = true;
+    setLoadError(false);
     void (async () => {
       try {
         const stored = await messengerRepository.loadSettings();
@@ -101,11 +104,13 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
           }
         }
       } catch {
-        if (active)
+        if (active) {
+          setLoadError(true);
           Alert.alert(
             "Could not load settings",
             "Your saved settings could not be read. You can still make and save changes",
           );
+        }
       } finally {
         if (active) setReady(true);
       }
@@ -113,7 +118,7 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     if (!ready) return;
@@ -237,6 +242,11 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
     setSheet("profile");
   }
 
+  function retryLoad() {
+    setReady(false);
+    setLoadAttempt((attempt) => attempt + 1);
+  }
+
   async function saveProfile() {
     if (!ready || saving || picking) return;
     if (!name.trim()) {
@@ -281,6 +291,8 @@ export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
   return {
     preferences,
     ready,
+    loadError,
+    retryLoad,
     sheet,
     setSheet,
     name,

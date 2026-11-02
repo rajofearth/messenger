@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -57,8 +58,22 @@ export default function SettingsDialogs({
   }, [sheet]);
   /** Avatar photos are shared by UI and notifications; this frees that space. */
   function clearAvatars() {
-    clearAvatarCache();
-    setAvatarsCleared(true);
+    if (avatarsCleared) return;
+    Alert.alert(
+      "Clear downloaded avatars?",
+      "Messenger will download them again when they are needed. Your profile photo will not be deleted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear avatars",
+          style: "destructive",
+          onPress: () => {
+            clearAvatarCache();
+            setAvatarsCleared(true);
+          },
+        },
+      ],
+    );
   }
   const busy = saving || picking;
   const icon = (
@@ -276,6 +291,11 @@ export default function SettingsDialogs({
                 {sheet === "privacy" && (
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityLabel={
+                      avatarsCleared
+                        ? "Downloaded avatars cleared"
+                        : "Clear downloaded avatars"
+                    }
                     onPress={clearAvatars}
                     style={[
                       styles.secondary,

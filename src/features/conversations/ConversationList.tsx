@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   FlatList,
   Pressable,
+  StyleSheet,
   Text,
   View,
   type ListRenderItemInfo,
@@ -55,7 +56,7 @@ export default function ConversationList({
   onOpenAlbum,
   onRetry,
 }: ConversationListProps) {
-  const { muted, fg } = palette(dark);
+  const { muted, fg, input, line } = palette(dark);
   const rows = useMemo(() => groupMediaMessages(messages), [messages]);
   // One label per row: the first row of a local day gets a chip, later rows on
   // the same day get none. A row without a timestamp never starts a day.
@@ -143,7 +144,12 @@ export default function ConversationList({
       return (
         <View>
           <View style={s.dateChip}>
-            <Text style={[s.tiny, { color: muted }]}>{label}</Text>
+            <Text
+              accessibilityRole="header"
+              style={[s.dateLabel, { color: muted, backgroundColor: input }]}
+            >
+              {label}
+            </Text>
           </View>
           {content}
         </View>
@@ -170,7 +176,9 @@ export default function ConversationList({
       keyExtractor={keyExtractor}
       renderItem={renderItem}
       contentContainerStyle={s.messageList}
+      showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       onScrollBeginDrag={onScrollBeginDrag}
       onScroll={onScroll}
       scrollEventThrottle={32}
@@ -198,7 +206,15 @@ export default function ConversationList({
           >
             <Text
               accessibilityLiveRegion="polite"
-              style={[s.emptyThread, { color: loadingOlder ? muted : fg }]}
+              style={[
+                s.loadOlder,
+                {
+                  color: loadingOlder ? muted : fg,
+                  backgroundColor: input,
+                  borderColor: line,
+                  borderWidth: StyleSheet.hairlineWidth,
+                },
+              ]}
             >
               {loadingOlder
                 ? "Loading older messages…"
@@ -210,9 +226,14 @@ export default function ConversationList({
         ) : null
       }
       ListEmptyComponent={
-        <Text style={[s.emptyThread, { color: muted }]}>
-          No messages yet. Say hello.
-        </Text>
+        <View style={s.emptyState} accessible accessibilityLabel="No messages yet. Say hello to start the conversation.">
+          <Text accessibilityRole="header" style={[s.emptyTitle, { color: fg }]}>
+            No messages yet
+          </Text>
+          <Text style={[s.emptyText, { color: muted }]}>
+            Say hello to start the conversation.
+          </Text>
+        </View>
       }
     />
   );

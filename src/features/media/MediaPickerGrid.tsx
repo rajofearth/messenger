@@ -76,6 +76,8 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Allow photo library access"
+          accessibilityHint="Grant access so Messenger can show media to choose"
           onPress={props.onAllowAccess}
           style={s.pickerPrimary}
         >
@@ -95,6 +97,7 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Try loading media again"
           onPress={props.onRetry}
           style={s.pickerPrimary}
         >
@@ -114,6 +117,7 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open camera to create media"
           onPress={props.onOpenCamera}
           style={s.pickerPrimary}
         >
@@ -190,7 +194,11 @@ export function MediaPickerGrid(props: Props) {
             </Pressable>
             <Pressable
               accessibilityRole="checkbox"
-              accessibilityLabel={selected ? "Deselect media" : "Select media"}
+              accessibilityLabel={
+                selected
+                  ? `Deselect ${asset.mediaType === MediaType.VIDEO ? "video" : "photo"}`
+                  : `Select ${asset.mediaType === MediaType.VIDEO ? "video" : "photo"}`
+              }
               accessibilityState={{ checked: selected }}
               onPress={() => props.onToggle(asset.id)}
               hitSlop={8}

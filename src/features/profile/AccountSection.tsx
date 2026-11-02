@@ -113,6 +113,21 @@ export default function AccountSection({ colors }: { colors: SettingsColors }) {
     }
   }
 
+  function confirmRemoveDevice(device: { id: string; label: string }) {
+    Alert.alert(
+      `Sign out ${device.label}?`,
+      "That device will lose access to this account the next time it connects.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out device",
+          style: "destructive",
+          onPress: () => void removeDevice(device.id),
+        },
+      ],
+    );
+  }
+
   function confirmSignOut() {
     Alert.alert(
       "Sign out?",
@@ -162,6 +177,8 @@ export default function AccountSection({ colors }: { colors: SettingsColors }) {
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Opens this account option"
         onPress={action}
         style={({ pressed }) => [styles.row, { opacity: pressed ? 0.65 : 1 }]}
       >
@@ -363,8 +380,9 @@ export default function AccountSection({ colors }: { colors: SettingsColors }) {
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`Sign out ${device.label}`}
+                        accessibilityHint="Requires confirmation"
                         disabled={!canManage || revoking === device.id}
-                        onPress={() => void removeDevice(device.id)}
+                        onPress={() => confirmRemoveDevice(device)}
                         style={{
                           opacity: canManage ? 1 : 0.35,
                           paddingHorizontal: space.sm,

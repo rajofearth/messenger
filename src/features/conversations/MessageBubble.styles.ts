@@ -27,6 +27,13 @@ export const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   chatImage: { width: 220, height: 250, borderRadius: radius.control },
+  videoPreview: { width: 220, height: 180, borderRadius: radius.control, overflow: "hidden" },
+  videoShade: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mediaCaption: { marginTop: space.sm, fontFamily: "sans-serif", fontSize: 14, lineHeight: 20 },
   forwarded: { flexDirection: "row", alignItems: "center", gap: space.xs },
   reaction: {
     position: "absolute",

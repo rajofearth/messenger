@@ -24,6 +24,7 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFFFFF19",
   },
+  backCopy: { color: "#FFFFFF", fontSize: 14, fontWeight: "500", marginLeft: -space.sm },
   headerIdentity: { flex: 1, gap: space.sm },
   name: {
     color: "#FFFFFF",
@@ -104,6 +105,16 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   youText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+  cameraAction: {
+    minHeight: 44,
+    minWidth: 132,
+    paddingHorizontal: space.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.control,
+    backgroundColor: "#FFFFFF18",
+  },
+  disabledAction: { opacity: 0.55 },
   bottom: {
     paddingHorizontal: space.lg,
     paddingBottom: space.md,

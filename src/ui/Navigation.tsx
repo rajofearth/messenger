@@ -60,14 +60,14 @@ export default function Navigation({
               <Ionicons
                 name={active === item.id ? item.filled : item.icon}
                 size={23}
-                color={active === item.id ? colors.unread : colors.muted}
+                color={active === item.id ? colors.fg : colors.muted}
               />
             )}
           </View>
           <Text
             style={[
               s.label,
-              { color: active === item.id ? colors.unread : colors.muted },
+              { color: active === item.id ? colors.fg : colors.muted },
             ]}
           >
             {item.label}

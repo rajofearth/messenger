@@ -93,6 +93,22 @@ export const styles = StyleSheet.create({
   },
   editText: { fontSize: 12, fontWeight: "600" },
   loader: { marginTop: space.md },
+  error: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: space.md,
+    textAlign: "center",
+  },
+  retry: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: radius.control,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: space.lg,
+    marginTop: space.md,
+  },
+  retryText: { fontSize: 12, fontWeight: "600" },
   section: {
     fontSize: 13,
     fontWeight: "600",

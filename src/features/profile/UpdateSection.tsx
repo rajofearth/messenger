@@ -70,6 +70,8 @@ export default function UpdateSection({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Performs this update action"
         onPress={() => {
           tap();
           run();

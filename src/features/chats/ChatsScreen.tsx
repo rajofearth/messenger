@@ -18,8 +18,8 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Story } from "../../domain/data";
-import { filterConversations, unreadConversations } from "../../domain/model";
-import { Avatar, IconButton, tap } from "../../ui/primitives";
+import { filterConversations } from "../../domain/model";
+import { Avatar, IconButton } from "../../ui/primitives";
 import { palette } from "../../ui/theme";
 import { s } from "./ChatsScreen.styles";
 import { groupStories } from "../../domain/stories";
@@ -63,16 +63,16 @@ export default function ChatsScreen({
   onVideoCall,
 }: Props) {
   const colors = palette(dark);
-  const [tab, setTab] = useState<"private" | "group">("private");
   const [query, setQuery] = useState("");
   const list = useRef<FlatList<Chat>>(null);
   const term = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
-      filterConversations(chats, query, tab).sort(
-        (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
-      ),
-    [chats, query, tab],
+      filterConversations(chats, query)
+        .sort(
+          (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+        ),
+    [chats, query],
   );
   const groups = groupStories(stories);
   const selfIndex = groups.findIndex((group) => group.id === "self");
@@ -81,7 +81,7 @@ export default function ChatsScreen({
 
   useEffect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [term, tab]);
+  }, [term]);
 
   function closeSearch() {
     setQuery("");
@@ -95,12 +95,15 @@ export default function ChatsScreen({
     ({ item }: ListRenderItemInfo<Chat>) => (
       <ChatRow
         chat={item}
+        members={chats}
+        selfAvatar={avatar}
+        selfName={selfName}
         dark={dark}
         onOpen={onOpenChat}
         onActions={onRowActions}
       />
     ),
-    [dark, onOpenChat, onRowActions],
+    [avatar, chats, dark, onOpenChat, onRowActions, selfName],
   );
 
   return (
@@ -263,65 +266,6 @@ export default function ChatsScreen({
                   ),
                 )}
               </ScrollView>
-              <View
-                style={[
-                  s.tabs,
-                  { backgroundColor: colors.input },
-                ]}
-              >
-                {(["private", "group"] as const).map((item) => {
-                  const selected = tab === item;
-                  const unread = unreadConversations(chats, item);
-                  const color = selected ? colors.fg : colors.muted;
-                  return (
-                    <Pressable
-                      key={item}
-                      accessibilityRole="tab"
-                      accessibilityLabel={
-                        item === "private"
-                          ? "Private conversations"
-                          : "Group conversations"
-                      }
-                      accessibilityState={{ selected }}
-                      onPress={() => {
-                        tap();
-                        setTab(item);
-                      }}
-                      style={[
-                        s.tab,
-                        selected && { backgroundColor: colors.selected },
-                      ]}
-                    >
-                      <Ionicons
-                        name={
-                          item === "private"
-                            ? "chatbubble-outline"
-                            : "people-outline"
-                        }
-                        size={15}
-                        color={color}
-                      />
-                      <Text style={[s.tabText, { color }]}>
-                        {item === "private" ? "Private" : "Groups"}
-                      </Text>
-                      {unread > 0 && (
-                        <View
-                          style={[
-                            s.tabCount,
-                            { backgroundColor: colors.unread },
-                          ]}
-                        >
-                          <Text
-                            style={[s.tabCountText, { color: colors.bg }]}
-                          >
-                            {unread}
-                          </Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
             </>
           )
         }

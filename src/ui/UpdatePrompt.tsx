@@ -78,9 +78,17 @@ export default function UpdatePrompt({
   const installed = updates.installed?.versionName;
   const title = updates.forced ? "Update required" : "Update available";
 
-  const primary = (label: string, action: () => void, disabled = false) => (
+  const primary = (
+    label: string,
+    action: () => void,
+    disabled = false,
+    hint?: string,
+  ) => (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => {
         tap();
@@ -98,9 +106,11 @@ export default function UpdatePrompt({
     </Pressable>
   );
 
-  const secondary = (label: string, action: () => void) => (
+  const secondary = (label: string, action: () => void, hint?: string) => (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
       onPress={() => {
         tap();
         action();
@@ -114,7 +124,9 @@ export default function UpdatePrompt({
     </Pressable>
   );
 
-  const later = dismissible ? secondary("Later", updates.dismiss) : null;
+  const later = dismissible
+    ? secondary("Later", updates.dismiss, "Keep using this version")
+    : null;
 
   function actions() {
     if (download.stage === "downloading") {
@@ -131,15 +143,29 @@ export default function UpdatePrompt({
               ]}
             />
           </View>
-          <Text
-            accessibilityLiveRegion="polite"
-            style={[s.progress, { color: colors.muted }]}
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel="Update download progress"
+            accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: percent === null ? undefined : Math.round(percent * 100),
+              text:
+                percent === null
+                  ? formatBytes(progress?.done ?? 0)
+                  : `${Math.round(percent * 100)}%`,
+            }}
           >
-            {percent === null
-              ? `Downloading… ${formatBytes(progress?.done ?? 0)}`
-              : `Downloading… ${Math.round(percent * 100)}% of ${size}`}
-          </Text>
-          {secondary("Cancel download", updates.stopDownload)}
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[s.progress, { color: colors.muted }]}
+            >
+              {percent === null
+                ? `Downloading… ${formatBytes(progress?.done ?? 0)}`
+                : `Downloading… ${Math.round(percent * 100)}% of ${size}`}
+            </Text>
+          </View>
+          {secondary("Cancel download", updates.stopDownload, "Keep using this version")}
         </>
       );
     }
@@ -147,9 +173,10 @@ export default function UpdatePrompt({
       return (
         <>
           <Text style={[s.hint, { color: colors.muted }]}>
-            Android needs your permission before it can install the update.
+            The update is downloaded and verified. Allow installs in Android
+            settings, then return here to install it.
           </Text>
-          {primary("Allow installs", updates.openInstallSettings)}
+          {primary("Allow installs", updates.openInstallSettings, false, "Open Android settings")}
           {later}
         </>
       );
@@ -158,10 +185,10 @@ export default function UpdatePrompt({
       return (
         <>
           <Text style={[s.hint, { color: colors.muted }]}>
-            Downloaded and verified ({size}). Android will ask you to confirm,
-            and your chats and settings stay in place.
+            Downloaded and verified ({size}). Android will ask you to confirm;
+            your chats and settings stay in place.
           </Text>
-          {primary("Install update", () => void updates.install())}
+          {primary("Install update", () => void updates.install(), false, "Open Android's installer")}
           {later}
         </>
       );
@@ -169,23 +196,35 @@ export default function UpdatePrompt({
     if (download.stage === "installing") {
       return (
         <>
-          <ActivityIndicator color={colors.coralInk} style={s.spinner} />
+          <ActivityIndicator
+            accessibilityLabel="Waiting for Android's installer"
+            color={colors.coralInk}
+            style={s.spinner}
+          />
           <Text style={[s.hint, { color: colors.muted }]}>
             Finish in Android's installer. The app reopens on the new version.
           </Text>
-          {dismissible ? secondary("Close", updates.dismiss) : null}
+          {dismissible
+            ? secondary("Close", updates.dismiss, "Return to Messenger")
+            : null}
         </>
       );
     }
     if (download.stage === "failed") {
+      const hasVerifiedFile = Boolean(download.path);
       return (
         <>
-          <Text style={[s.error, { color: colors.muted }]}>
-            {download.message ?? "The update could not be downloaded"}
+          <Text accessibilityRole="alert" style={[s.error, { color: colors.danger }]}>
+            {download.message ?? "The update could not be completed."}
           </Text>
-          {!updates.canInstall
-            ? primary("Allow installs", updates.openInstallSettings)
-            : primary("Try again", () => void updates.startDownload())}
+          {hasVerifiedFile && !updates.canInstall
+            ? primary("Allow installs", updates.openInstallSettings, false, "Open Android settings")
+            : hasVerifiedFile
+              ? primary("Try install again", () => void updates.install(), false, "Open Android's installer")
+              : primary("Try again", () => void updates.startDownload(), false, "Retry the download")}
+          {hasVerifiedFile && !updates.canInstall
+            ? secondary("Download again", () => void updates.startDownload(), "Replace the verified download")
+            : null}
           {later}
         </>
       );
@@ -194,7 +233,8 @@ export default function UpdatePrompt({
       <>
         {!updates.canInstall ? (
           <Text style={[s.hint, { color: colors.muted }]}>
-            Android needs your permission before it can install the update.
+            Android needs your permission before it can install updates. You
+            can grant it in settings before downloading.
           </Text>
         ) : null}
         {primary(
@@ -202,6 +242,10 @@ export default function UpdatePrompt({
           updates.canInstall
             ? () => void updates.startDownload()
             : updates.openInstallSettings,
+          false,
+          updates.canInstall
+            ? "Download and verify this release"
+            : "Open Android settings",
         )}
         {later}
       </>
@@ -221,6 +265,7 @@ export default function UpdatePrompt({
       <SafeAreaView style={[s.overlay, { backgroundColor: colors.scrim }]}>
         <View
           accessibilityViewIsModal
+          accessibilityLabel={title}
           style={[s.card, { backgroundColor: colors.card }]}
         >
           <ScrollView

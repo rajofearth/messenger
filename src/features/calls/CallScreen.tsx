@@ -98,6 +98,7 @@ export default function CallScreen({
           >
             <Ionicons name="chevron-back" size={25} color="#FFFFFF" />
           </Pressable>
+          <Text style={styles.backCopy}>Back</Text>
           <View style={styles.headerIdentity}>
             <Text style={styles.name} numberOfLines={1}>
               {displayName}

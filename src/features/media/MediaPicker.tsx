@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
 import type { AssetMetadata } from "expo-media-library";
-import { IconButton, tap } from "../../ui/primitives";
+import { tap } from "../../ui/primitives";
 import { palette } from "../../ui/theme";
 import {
   toggleStorySelection,
@@ -219,12 +219,15 @@ export function MediaPicker(props: Props) {
         style={s.flex}
       >
         <View style={s.pickerHeader}>
-          <IconButton
-            name="close"
-            label="Cancel story"
-            color={colors.fg}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel media selection"
             onPress={props.onClose}
-          />
+            style={s.pickerHeaderAction}
+          >
+            <Ionicons name="close" size={21} color={colors.fg} />
+            <Text style={[s.pickerHeaderActionText, { color: colors.fg }]}>Cancel</Text>
+          </Pressable>
           <Text
             style={[s.pickerTitle, { color: colors.fg }]}
           >
@@ -235,12 +238,15 @@ export function MediaPicker(props: Props) {
               <ActivityIndicator color={colors.fg} />
             </View>
           ) : (
-            <IconButton
-              name="camera-outline"
-              label="Take a photo or video"
-              color={colors.fg}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Take a photo or video"
               onPress={() => void openCamera()}
-            />
+              style={s.pickerHeaderAction}
+            >
+              <Ionicons name="camera-outline" size={20} color={colors.fg} />
+              <Text style={[s.pickerHeaderActionText, { color: colors.fg }]}>Camera</Text>
+            </Pressable>
           )}
         </View>
         {access === "ready" && limited && (
@@ -342,10 +348,12 @@ export function MediaPicker(props: Props) {
           ]}
         >
           <Text style={[s.pickerSelectedText, { color: colors.muted }]}>
-            {selection.length} selected
+            {selection.length} of {limit} selected
           </Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Review selected media"
+            accessibilityHint="Open a preview of the selected media"
             accessibilityState={{ disabled: preparing }}
             disabled={preparing}
             onPress={() => void next()}
@@ -354,7 +362,7 @@ export function MediaPicker(props: Props) {
             {preparing ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={s.pickerNextText}>Next</Text>
+              <Text style={s.pickerNextText}>Review</Text>
             )}
           </Pressable>
         </SafeAreaView>

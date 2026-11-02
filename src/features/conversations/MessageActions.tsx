@@ -62,7 +62,7 @@ export default function MessageActions({
   const { width, height } = useWindowDimensions();
   const [menuHeight, setMenuHeight] = useState(200);
   const insets = useSafeAreaInsets();
-  const { card, fg, danger, scrim, line } = palette(dark);
+  const { card, fg, muted, danger, scrim, line } = palette(dark);
   if (!target) return null;
   const { message, rect } = target;
   const summary = messageSummary(message);
@@ -114,6 +114,15 @@ export default function MessageActions({
           ]}
         >
           <ScrollView keyboardShouldPersistTaps="always">
+            <View
+              accessibilityRole="header"
+              style={[styles.heading, { borderBottomColor: line }]}
+            >
+              <Text style={[styles.headingLabel, { color: fg }]}>Message actions</Text>
+              <Text numberOfLines={2} style={[styles.headingSummary, { color: muted }]}>
+                {summary}
+              </Text>
+            </View>
             {serverMessage ? (
               <View style={styles.emojis}>
                 {reactionEmojis.map((emoji) => (
@@ -162,7 +171,7 @@ export default function MessageActions({
                 accessibilityRole="button"
                 accessibilityLabel={`${label}: ${summary}`}
                 onPress={() => run(action)}
-                style={styles.action}
+                style={({ pressed }) => [styles.action, { opacity: pressed ? 0.55 : 1 }]}
               >
                 <Text
                   style={{
@@ -198,5 +207,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  action: { paddingHorizontal: space.lg, paddingVertical: space.sm },
+  heading: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: space.xs,
+  },
+  headingLabel: { fontFamily: "sans-serif-medium", fontSize: 13, lineHeight: 18 },
+  headingSummary: { fontFamily: "sans-serif", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  action: { minHeight: 48, justifyContent: "center", paddingHorizontal: space.lg, paddingVertical: space.sm },
 });

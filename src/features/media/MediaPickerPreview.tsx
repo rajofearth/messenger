@@ -1,5 +1,5 @@
 import React from "react";
-import { BackHandler, FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, BackHandler, FlatList, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Asset, MediaType } from "expo-media-library";
@@ -9,7 +9,6 @@ import { StatusBar } from "expo-status-bar";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Colors } from "../../ui/theme";
-import { IconButton } from "../../ui/primitives";
 import { getMediaThumbnail } from "../../services/mediaThumbnails";
 import { trackDevEvent } from "../../services/devTelemetry";
 import { styles as s } from "./MediaPicker.styles";
@@ -49,11 +48,19 @@ export function MediaPickerPreview(props: Props) {
       <StatusBar style="light" />
       <NavigationBar style="dark" />
       <View style={s.previewHeader}>
-        <IconButton name="close" label="Close preview" color="white" onPress={props.onClose} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back to media selection"
+          onPress={props.onClose}
+          style={s.previewBackAction}
+        >
+          <Ionicons name="arrow-back" size={21} color="white" />
+          <Text style={s.previewBackText}>Back</Text>
+        </Pressable>
         <Text style={s.previewTitle} numberOfLines={1}>
           {index + 1} / {props.assets.length}
         </Text>
-        <View style={{ width: 44 }} />
+        <View style={{ width: 76 }} />
       </View>
       <FlatList
         data={props.assets}
@@ -121,30 +128,49 @@ function PreviewPage({
 }) {
   const [thumbnailUri, setThumbnailUri] = React.useState<string | null>(null);
   const [uri, setUri] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(active);
+  const [error, setError] = React.useState(false);
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let alive = true;
     const startedAt = Date.now();
     setThumbnailUri(null);
     setUri(null);
+    setLoading(active);
+    setError(false);
     if (!active) {
       return () => {
         alive = false;
       };
     }
+    let settled = 0;
+    let found = false;
+    const settle = () => {
+      settled += 1;
+      if (settled < 2 || !alive) return;
+      setLoading(false);
+      if (!found) setError(true);
+    };
     void getMediaThumbnail(asset.id, 384).then((next) => {
       if (alive) {
         setThumbnailUri(next);
+        found = found || !!next;
         trackDevEvent("media_preview_thumbnail_loaded", { durationMs: Date.now() - startedAt, video: asset.mediaType === MediaType.VIDEO });
       }
+      settle();
     });
     void new Asset(asset.id).getUri().then((next) => {
-      if (alive) setUri(next);
-    }).catch(() => {});
+      if (alive) {
+        setUri(next);
+        found = true;
+      }
+      settle();
+    }).catch(() => settle());
     return () => {
       alive = false;
     };
-  }, [active, asset.id, asset.mediaType]);
+  }, [active, asset.id, asset.mediaType, attempt]);
 
   return (
     <View style={[s.previewStage, { width }]}>
@@ -153,6 +179,25 @@ function PreviewPage({
       ) : thumbnailUri ? (
         <Image source={{ uri: asset.mediaType === MediaType.VIDEO ? thumbnailUri : uri ?? (Platform.OS === "android" ? asset.id : thumbnailUri) }} contentFit="contain" cachePolicy="memory-disk" allowDownscaling style={s.previewMedia} />
       ) : null}
+      {loading && (
+        <View style={s.previewLoading}>
+          <ActivityIndicator color="white" />
+          <Text style={s.previewStatusText}>Loading preview…</Text>
+        </View>
+      )}
+      {error && !loading && (
+        <View style={s.previewError}>
+          <Text style={s.previewErrorText}>Preview unavailable</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry media preview"
+            onPress={() => setAttempt((value) => value + 1)}
+            style={s.previewRetry}
+          >
+            <Text style={s.previewRetryText}>Try again</Text>
+          </Pressable>
+        </View>
+      )}
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: selected }}

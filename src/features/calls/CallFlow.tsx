@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import CallScreen from "./CallScreen";
 import type { Call } from "./useCalls";
 import { Avatar, IconButton } from "../../ui/primitives";
@@ -91,13 +92,16 @@ export default function CallFlow({
       />
     );
   return (
-    <View style={s.ringing}>
-      <IconButton
-        name="chevron-back"
-        color="white"
-        label="Back to app"
-        onPress={onBack}
-      />
+    <SafeAreaView style={s.ringing} edges={["top", "bottom", "left", "right"]}>
+      <View style={s.ringingHeader}>
+        <IconButton
+          name="chevron-back"
+          color="white"
+          label="Back to app"
+          onPress={onBack}
+        />
+        <Text style={s.backLabel}>Back</Text>
+      </View>
       <View style={s.center}>
         <Avatar uri={call.chat.avatar} name={call.chat.name} size={124} />
         <Text style={s.name}>{call.chat.name}</Text>
@@ -137,7 +141,7 @@ export default function CallFlow({
           </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 const s = StyleSheet.create({
@@ -161,6 +165,8 @@ const s = StyleSheet.create({
     marginTop: space.xs,
   },
   ringing: { flex: 1, paddingTop: 48, paddingHorizontal: space.xl, backgroundColor: "#111111" },
+  ringingHeader: { flexDirection: "row", alignItems: "center", marginLeft: -space.sm },
+  backLabel: { color: "#FFFFFF", fontSize: 14, fontWeight: "500", marginLeft: -space.sm },
   center: {
     flex: 1,
     justifyContent: "center",

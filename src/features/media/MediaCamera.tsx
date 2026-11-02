@@ -6,7 +6,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { PickedMedia } from "./mediaPickerModel";
-import { styles as s } from "./MediaPicker.styles";
+import { styles as s } from "./MediaCamera.styles";
 import { trackDevEvent } from "../../services/devTelemetry";
 
 type Props = {
@@ -25,6 +25,7 @@ export function MediaCamera(props: Props) {
   const [recordingSeconds, setRecordingSeconds] = React.useState(0);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [cameraKey, setCameraKey] = React.useState(0);
 
   React.useEffect(() => {
     if (!recording) {
@@ -99,7 +100,8 @@ export function MediaCamera(props: Props) {
   return (
     <View style={s.cameraRoot}>
       <StatusBar style="light" hidden />
-        <CameraView
+      <CameraView
+        key={cameraKey}
         ref={camera}
         style={s.cameraView}
         facing={facing}
@@ -117,8 +119,9 @@ export function MediaCamera(props: Props) {
       />
       <SafeAreaView edges={["top", "bottom", "left", "right"]} style={s.cameraChrome}>
         <View style={s.cameraTopBar}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close camera" onPress={props.onClose} style={s.cameraIconButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close camera" onPress={props.onClose} style={s.cameraCloseAction}>
             <Ionicons name="close" size={30} color="white" />
+            <Text style={s.cameraCloseText}>Close</Text>
           </Pressable>
           <Text style={s.cameraModeTitle}>{mode === "video" ? "Video" : "Photo"}</Text>
           <View style={s.cameraTopActions}>
@@ -134,7 +137,21 @@ export function MediaCamera(props: Props) {
           </View>
         </View>
         <View style={s.cameraBottomBar}>
-          {error ? <Text style={s.cameraError}>{error}</Text> : recording ? (
+          {error ? <View style={s.cameraErrorWrap}>
+            <Text style={s.cameraError}>{error}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry camera"
+              onPress={() => {
+                setError(null);
+                setReady(false);
+                setCameraKey((value) => value + 1);
+              }}
+              style={s.cameraRetry}
+            >
+              <Text style={s.cameraRetryText}>Try again</Text>
+            </Pressable>
+          </View> : recording ? (
             <View style={s.cameraRecordingStatus}>
               <View style={s.cameraRecordingDot} />
               <Text style={s.cameraRecordingText}>{String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}</Text>

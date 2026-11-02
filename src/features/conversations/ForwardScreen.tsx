@@ -13,6 +13,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { palette, radius, space } from "../../ui/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function ForwardScreen({
   chats,
   message,
@@ -27,6 +28,7 @@ export default function ForwardScreen({
   onForward: (ids: string[]) => void;
 }) {
   const colors = palette(dark);
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const filtered = chats.filter(
@@ -48,7 +50,7 @@ export default function ForwardScreen({
       style={[s.root, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + space.sm }]}>
         <IconButton
           name="arrow-back"
           label="Cancel forwarding"
@@ -125,7 +127,14 @@ export default function ForwardScreen({
         accessibilityState={{ disabled: !selected.length }}
         disabled={!selected.length}
         onPress={() => onForward(selected)}
-        style={[s.send, { backgroundColor: colors.fg, opacity: selected.length ? 1 : 0.4 }]}
+        style={[
+          s.send,
+          {
+            backgroundColor: colors.fg,
+            opacity: selected.length ? 1 : 0.4,
+            marginBottom: space.lg + insets.bottom,
+          },
+        ]}
       >
         <Ionicons name="arrow-redo" size={20} color={colors.bg} />
         <Text style={[s.sendText, { color: colors.bg }]}>

@@ -1,8 +1,8 @@
 import React from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { AssetMetadata } from "expo-media-library";
-import { IconButton } from "../../ui/primitives";
 import type { Colors } from "../../ui/theme";
 import { filterNonEmptyAlbums } from "./mediaPickerModel";
 import type { MediaAlbum } from "./mediaAlbums";
@@ -29,15 +29,21 @@ export function MediaAlbumSheet(props: Props) {
         onPress={props.onClose}
         style={s.albumScrim}
       />
-      <View style={[s.albumSheet, { backgroundColor: props.colors.bg }]}>
+      <SafeAreaView
+        edges={["bottom", "left", "right"]}
+        style={[s.albumSheet, { backgroundColor: props.colors.bg }]}
+      >
         <View style={s.albumHeader}>
           <Text style={[s.albumTitle, { color: props.colors.fg }]}>Select album</Text>
-          <IconButton
-            name="close"
-            label="Close albums"
-            color={props.colors.fg}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close albums"
             onPress={props.onClose}
-          />
+            style={s.albumCloseAction}
+          >
+            <Ionicons name="close" size={21} color={props.colors.fg} />
+            <Text style={[s.albumCloseText, { color: props.colors.fg }]}>Close</Text>
+          </Pressable>
         </View>
         <ScrollView
           contentContainerStyle={s.albumList}
@@ -69,8 +75,14 @@ export function MediaAlbumSheet(props: Props) {
               onPress={() => props.onSelect(item.id)}
             />
           ))}
+          {!filterNonEmptyAlbums(props.albums).length && (
+            <View style={s.albumEmpty}>
+              <Text style={[s.albumEmptyTitle, { color: props.colors.fg }]}>No other albums</Text>
+              <Text style={[s.albumEmptyText, { color: props.colors.muted }]}>Albums with media will appear here.</Text>
+            </View>
+          )}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </View>
   );
 }

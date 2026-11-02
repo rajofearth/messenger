@@ -4,6 +4,7 @@ import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { palette, space } from "../../ui/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AlbumItem } from "./MediaAlbum";
 import type { MessageBubbleProps } from "./MessageBubble";
 import VideoAttachment from "./VideoAttachment";
@@ -19,6 +20,7 @@ type Props = Pick<MessageBubbleProps, "onActions"> & {
 export default function AlbumViewer({ messages, initialId, dark, visible, onClose, onActions }: Props) {
   const [selectedId, setSelectedId] = useState(initialId);
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const colors = palette(dark);
   const found = messages.findIndex((message) => message.id === selectedId);
   const index = Math.max(0, found);
@@ -30,9 +32,23 @@ export default function AlbumViewer({ messages, initialId, dark, visible, onClos
       supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
       onRequestClose={onClose}
     >
-      <View style={[s.root, { backgroundColor: colors.media }]}>
+      <View
+        style={[
+          s.root,
+          {
+            backgroundColor: colors.media,
+            paddingTop: insets.top + space.sm,
+            paddingBottom: insets.bottom + space.md,
+          },
+        ]}
+      >
         <View style={s.toolbar}>
-          <Text accessibilityLiveRegion="polite" style={[s.text, { color: colors.onImage }]}>{index + 1} of {messages.length}</Text>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[s.text, { color: colors.onImage }]}
+          >
+            {index + 1} of {messages.length}
+          </Text>
           <IconButton name="close" label="Close album" color={colors.onImage} onPress={onClose} />
         </View>
         {visible && message && (
@@ -82,7 +98,7 @@ export default function AlbumViewer({ messages, initialId, dark, visible, onClos
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, paddingTop: 48, paddingBottom: space.xxl, alignItems: "center" },
+  root: { flex: 1, alignItems: "center" },
   toolbar: { width: "100%", paddingHorizontal: space.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   text: { fontSize: 16 },
   media: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },

@@ -81,12 +81,20 @@ export default function ChatProfileShared({
   };
   return (
     <View>
-      <Text style={[s.heading, { color: colors.fg }]}>Shared with you</Text>
+      <Text
+        accessibilityRole="header"
+        style={[s.heading, { color: colors.fg }]}
+      >
+        Shared with you
+      </Text>
       <View accessibilityRole="tablist" style={s.tabs}>
         {(["Media", "Docs", "Links"] as const).map((name) => (
           <Pressable
             key={name}
             accessibilityRole="tab"
+            accessibilityLabel={`${name}, ${counts[name]} ${
+              counts[name] === 1 ? "item" : "items"
+            }`}
             accessibilityState={{ selected: tab === name }}
             onPress={() => setTab(name)}
             style={[
@@ -146,9 +154,13 @@ export default function ChatProfileShared({
                 />
               ) : (
                 <Ionicons
-                  name="videocam-outline"
+                  name={
+                    message.kind === "video"
+                      ? "videocam-outline"
+                      : "images-outline"
+                  }
                   size={32}
-                  color={colors.coralInk}
+                  color={message.uri ? colors.coralInk : colors.muted}
                 />
               )}
               <View style={[s.tileLabel, { backgroundColor: colors.scrim }]}>
@@ -160,7 +172,11 @@ export default function ChatProfileShared({
                   />
                 ) : null}
                 <Text style={[s.tileText, { color: colors.onImage }]}>
-                  {message.kind === "video" ? "Video" : "Image"}
+                  {!message.uri
+                    ? "Unavailable"
+                    : message.kind === "video"
+                      ? "Video"
+                      : "Image"}
                 </Text>
               </View>
             </Pressable>

@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
@@ -119,7 +120,7 @@ export default function CallHistoryDetail({
 }: CallHistoryDetailProps) {
   const colors = palette(dark);
   return (
-    <View style={[s.screen, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[s.screen, { backgroundColor: colors.bg }]} edges={["top", "left", "right"]}>
       <View style={s.header}>
         <IconButton
           name="arrow-back"
@@ -127,6 +128,7 @@ export default function CallHistoryDetail({
           color={colors.fg}
           onPress={onBack}
         />
+        <Text style={[s.backLabel, { color: colors.fg }]}>Back</Text>
         <Text style={[s.heading, { color: colors.fg }]}>Call history</Text>
       </View>
       <ScrollView contentContainerStyle={s.content}>
@@ -151,13 +153,14 @@ export default function CallHistoryDetail({
           onCall={onCall}
         />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.lg },
+  backLabel: { fontSize: 14, fontWeight: "500", marginLeft: -space.sm },
   content: { padding: space.xl, paddingBottom: 60 },
   heading: { fontSize: 20, fontWeight: "600" },
   profile: { alignItems: "center", gap: space.md, paddingVertical: space.xl },

@@ -72,6 +72,8 @@ export default function SettingsScreen({
   const {
     preferences,
     ready,
+    loadError,
+    retryLoad,
     setSheet,
     picking,
     avatarFailed,
@@ -89,13 +91,9 @@ export default function SettingsScreen({
         ? "Always dark"
         : "Always light";
 
-  const icon = (
-    name: React.ComponentProps<typeof Ionicons>["name"],
-    size = 21,
-  ) => <Ionicons name={name} size={size} color={colors.text} />;
-  const section = (title: string) => (
-    <Text style={[styles.section, { color: colors.muted }]}>{title}</Text>
-  );
+  const icon = (name: React.ComponentProps<typeof Ionicons>["name"], size = 21) =>
+    <Ionicons accessible={false} name={name} size={size} color={colors.text} />;
+  const section = (title: string) => <Text accessibilityRole="header" style={[styles.section, { color: colors.muted }]}>{title}</Text>;
   function row(
     title: string,
     subtitle: string,
@@ -105,6 +103,8 @@ export default function SettingsScreen({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Opens this section"
         onPress={() => {
           tap();
           action();
@@ -145,6 +145,7 @@ export default function SettingsScreen({
         </View>
         <Switch
           accessibilityLabel={title}
+          accessibilityState={{ checked: value, disabled }}
           value={value}
           onValueChange={change}
           disabled={disabled}
@@ -172,9 +173,7 @@ export default function SettingsScreen({
             color={colors.text}
             onPress={() => setPage("profile")}
           />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Settings
-          </Text>
+          <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
         </View>
       )}
       <ScrollView
@@ -230,9 +229,7 @@ export default function SettingsScreen({
                   )}
                 </View>
               </Pressable>
-              <Text style={[styles.profileName, { color: colors.text }]}>
-                {preferences.name}
-              </Text>
+              <Text accessibilityRole="header" style={[styles.profileName, { color: colors.text }]}>{preferences.name}</Text>
               <Text style={[styles.bio, { color: colors.muted }]}>
                 {preferences.username
                   ? `@${preferences.username}`
@@ -267,6 +264,19 @@ export default function SettingsScreen({
                   color={colors.coralInk}
                   accessibilityLabel="Loading settings"
                 />
+              )}
+              {loadError && (
+                <>
+                  <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>Saved settings could not be loaded.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Try loading settings again"
+                    onPress={retryLoad}
+                    style={[styles.retry, { borderColor: colors.line }]}
+                  >
+                    <Text style={[styles.retryText, { color: colors.text }]}>Try again</Text>
+                  </Pressable>
+                </>
               )}
             </View>
 
@@ -306,6 +316,7 @@ export default function SettingsScreen({
                     <Pressable
                       key={option.value}
                       accessibilityRole="button"
+                      accessibilityLabel={`${option.label} theme`}
                       accessibilityState={{ selected: active }}
                       onPress={() => {
                         tap();

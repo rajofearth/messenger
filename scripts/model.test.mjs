@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   filterConversations,
-  unreadConversations,
   formatDuration,
   markChatRead,
   updateChatPreview,
@@ -29,30 +28,21 @@ const fixture = () => [
     color: "",
   },
 ];
-test("empty search preserves private/group tabs, typed search crosses both tabs", () => {
+test("empty search preserves the unified list and typed search matches both kinds", () => {
   const chats = fixture();
   assert.deepEqual(
-    filterConversations(chats, "  ", "private").map((c) => c.id),
-    ["a"],
+    filterConversations(chats, "  ").map((c) => c.id),
+    ["a", "b"],
   );
   assert.deepEqual(
-    filterConversations(chats, "", "group").map((c) => c.id),
+    filterConversations(chats, " FRIENDS ").map((c) => c.id),
     ["b"],
   );
   assert.deepEqual(
-    filterConversations(chats, " FRIENDS ", "private").map((c) => c.id),
-    ["b"],
-  );
-  assert.deepEqual(
-    filterConversations(chats, "hello", "group").map((c) => c.id),
+    filterConversations(chats, "hello").map((c) => c.id),
     ["a"],
   );
-  assert.equal(filterConversations(chats, "no match", "private").length, 0);
-});
-test("unread counts exclude zero and keep private/group counts separate", () => {
-  assert.equal(unreadConversations(fixture(), "private"), 1);
-  assert.equal(unreadConversations(fixture(), "group"), 0);
-  assert.equal(unreadConversations(markChatRead(fixture(), "a"), "private"), 0);
+  assert.equal(filterConversations(chats, "no match").length, 0);
 });
 
 const update = (patch = {}) => ({

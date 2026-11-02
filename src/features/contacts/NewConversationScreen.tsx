@@ -179,12 +179,21 @@ export default function NewConversationScreen({
         renderItem={({ item: chat }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={chat.name}
+            accessibilityLabel={`${chat.name}${
+              chat.username ? `, @${chat.username.replace(/^@/, "")}` : ""
+            }`}
             onPress={() => onSelect(chat)}
             style={({ pressed }) => [s.row, pressed && s.pressed]}
           >
             <Avatar uri={chat.avatar} name={chat.name} size={52} />
-            <Text style={[s.name, { color: colors.text }]}>{chat.name}</Text>
+            <View style={s.rowCopy}>
+              <Text style={[s.name, { color: colors.text }]}>{chat.name}</Text>
+              {!!chat.username && (
+                <Text style={[s.handle, { color: colors.muted }]}>
+                  @{chat.username.replace(/^@/, "")}
+                </Text>
+              )}
+            </View>
           </Pressable>
         )}
         ListEmptyComponent={
@@ -255,7 +264,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  rowCopy: { flex: 1, minWidth: 0 },
   name: { flex: 1, fontSize: 17, fontWeight: "600" },
+  handle: { fontSize: 12, marginTop: space.xs },
   section: {
     borderTopWidth: 1,
     marginTop: space.lg,

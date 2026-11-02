@@ -3,23 +3,12 @@ import type { Chat } from "./data";
 export function filterConversations(
   chats: Chat[],
   query: string,
-  tab: "private" | "group",
 ): Chat[] {
   const term = query.trim().toLowerCase();
-  return chats.filter((chat) =>
-    term
-      ? `${chat.name} ${chat.preview}`.toLowerCase().includes(term)
-      : Boolean(chat.group) === (tab === "group"),
-  );
-}
-
-export function unreadConversations(
-  chats: Chat[],
-  tab: "private" | "group",
-): number {
   return chats.filter(
-    (chat) => Boolean(chat.group) === (tab === "group") && chat.unread > 0,
-  ).length;
+    (chat) =>
+      !term || `${chat.name} ${chat.preview}`.toLowerCase().includes(term),
+  );
 }
 
 export function formatDuration(seconds: number): string {

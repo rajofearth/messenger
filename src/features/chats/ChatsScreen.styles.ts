@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { radius, space } from "../../ui/theme";
+import { space } from "../../ui/theme";
 
 export const s = StyleSheet.create({
   screen: { flex: 1 },
@@ -84,39 +84,6 @@ export const s = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     marginTop: space.sm,
-  },
-  tabs: {
-    marginHorizontal: space.xxl,
-    padding: space.xs,
-    flexDirection: "row",
-    borderRadius: radius.control,
-    marginBottom: space.sm,
-  },
-  tab: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: radius.control,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    flexDirection: "row",
-  },
-  tabText: {
-    fontFamily: "sans-serif-medium",
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  tabCount: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: radius.badge,
-    paddingHorizontal: space.xs,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabCountText: {
-    fontSize: 10,
-    fontFamily: "sans-serif-medium",
   },
   chatRow: {
     paddingHorizontal: space.xxl,

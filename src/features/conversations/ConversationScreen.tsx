@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
@@ -69,6 +70,7 @@ export default function ConversationScreen({
   onLoadOlder,
 }: ConversationScreenProps) {
   const { bg, fg, muted, line, media: mediaBg, onImage } = palette(dark);
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
@@ -177,7 +179,15 @@ export default function ConversationScreen({
       style={[s.root, { backgroundColor: bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={[s.chatHeader, { borderBottomColor: line }]}>
+      <View
+        style={[
+          s.chatHeader,
+          {
+            borderBottomColor: line,
+            paddingTop: space.sm + Math.min(insets.top, space.xl),
+          },
+        ]}
+      >
         <IconButton
           name="chevron-back"
           label="Back to chats"
@@ -197,15 +207,22 @@ export default function ConversationScreen({
           accessibilityLabel={`View ${chat.name}'s profile`}
           onPress={() => guardRecording(onProfile)}
         >
-          <Text numberOfLines={1} style={[s.name, { color: fg }]}>
+          <Text
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={[s.name, { color: fg }]}
+          >
             {chat.name}
-            {chat.muted ? " · Muted" : ""}
           </Text>
-          {(chat.blocked || chat.group) && (
-            <Text style={[s.tiny, { color: muted, marginTop: space.xs }]}>
-              {chat.blocked ? "Blocked" : "Group"}
-            </Text>
-          )}
+          <Text style={[s.headerStatus, { color: muted }]}>
+            {chat.blocked
+              ? "Blocked"
+              : chat.group
+                ? "Group chat"
+                : chat.muted
+                  ? "Muted"
+                  : "Conversation"}
+          </Text>
         </Pressable>
         {!chat.group && (
           <>
@@ -325,8 +342,11 @@ export default function ConversationScreen({
         animationType="fade"
         onRequestClose={() => setViewer(null)}
       >
-        <View style={[s.imageViewer, { backgroundColor: mediaBg }]}>
-          <View style={s.imageClose}>
+         <View
+           accessibilityViewIsModal
+           style={[s.imageViewer, { backgroundColor: mediaBg }]}
+         >
+           <View style={[s.imageClose, { top: insets.top + space.sm }]}>
             <IconButton
               name="close"
               label="Close media"
