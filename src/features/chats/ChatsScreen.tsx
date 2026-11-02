@@ -18,10 +18,9 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Story } from "../../domain/data";
-import { filterConversations, unreadConversations } from "../../domain/model";
-import { Avatar, IconButton, tap } from "../../ui/primitives";
+import { filterConversations } from "../../domain/model";
+import { Avatar, IconButton } from "../../ui/primitives";
 import { palette } from "../../ui/theme";
-import QuickActions from "../../ui/QuickActions";
 import { s } from "./ChatsScreen.styles";
 import { groupStories } from "../../domain/stories";
 import ChatListActions, { type ChatActionTarget } from "./ChatListActions";
@@ -64,17 +63,16 @@ export default function ChatsScreen({
   onVideoCall,
 }: Props) {
   const colors = palette(dark);
-  const [tab, setTab] = useState<"private" | "group">("private");
-  const [search, setSearch] = useState(false);
   const [query, setQuery] = useState("");
   const list = useRef<FlatList<Chat>>(null);
   const term = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
-      filterConversations(chats, query, tab).sort(
-        (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
-      ),
-    [chats, query, tab],
+      filterConversations(chats, query)
+        .sort(
+          (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+        ),
+    [chats, query],
   );
   const groups = groupStories(stories);
   const selfIndex = groups.findIndex((group) => group.id === "self");
@@ -83,11 +81,10 @@ export default function ChatsScreen({
 
   useEffect(() => {
     list.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [term, tab]);
+  }, [term]);
 
   function closeSearch() {
     setQuery("");
-    setSearch(false);
   }
 
   const onRowActions = useCallback((chat: Chat, x?: number, y?: number) => {
@@ -98,58 +95,70 @@ export default function ChatsScreen({
     ({ item }: ListRenderItemInfo<Chat>) => (
       <ChatRow
         chat={item}
+        members={chats}
+        selfAvatar={avatar}
+        selfName={selfName}
         dark={dark}
         onOpen={onOpenChat}
         onActions={onRowActions}
       />
     ),
-    [dark, onOpenChat, onRowActions],
+    [avatar, chats, dark, onOpenChat, onRowActions, selfName],
   );
 
   return (
     <KeyboardAvoidingView
       style={[s.screen, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      enabled={search}
+      enabled
     >
       <View style={s.header}>
         <Text
           accessibilityRole="header"
           style={[s.title, { color: colors.fg }]}
         >
-          Messages
+          Chats
         </Text>
-        <IconButton
-          name="search-outline"
-          label={search ? "Close search" : "Search conversations"}
-          color={colors.fg}
-          background={colors.card}
-          onPress={() => (search ? closeSearch() : setSearch(true))}
-        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New conversation"
+          onPress={onNewConversation}
+          style={({ pressed }) => [
+            s.newChat,
+            { backgroundColor: colors.fg, opacity: pressed ? 0.72 : 1 },
+          ]}
+        >
+          <View style={s.newChatIcon}>
+            <Ionicons name="chatbubble-outline" size={24} color={colors.bg} />
+            <View style={[s.newChatPlus, { backgroundColor: colors.bg }]}>
+              <Ionicons name="add" size={11} color={colors.fg} />
+            </View>
+          </View>
+        </Pressable>
       </View>
-      {search && (
-        <View style={[s.search, { backgroundColor: colors.card }]}>
-          <Ionicons name="search-outline" size={19} color={colors.muted} />
-          <TextInput
-            autoFocus
-            accessibilityLabel="Search conversations"
-            placeholder="Find a person or conversation"
-            placeholderTextColor={colors.muted}
-            value={query}
-            onChangeText={setQuery}
-            style={[s.searchInput, { color: colors.fg }]}
-            autoCorrect={false}
-            returnKeyType="search"
-          />
+      <View style={[s.search, { backgroundColor: colors.input }]}>
+        <Ionicons name="search-outline" size={19} color={colors.muted} />
+        <TextInput
+          autoFocus={false}
+          accessibilityLabel="Search conversations"
+          placeholder="Search"
+          placeholderTextColor={colors.muted}
+          value={query}
+          onChangeText={setQuery}
+          style={[s.searchInput, { color: colors.fg }]}
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {query.length > 0 && (
           <IconButton
             name="close"
             size={18}
-            label="Clear and close search"
+            label="Clear search"
             color={colors.muted}
             onPress={closeSearch}
           />
-        </View>
-      )}
+        )}
+      </View>
       <FlatList
         ref={list}
         data={filtered}
@@ -188,7 +197,7 @@ export default function ChatsScreen({
                         borderColor: self
                           ? self.seen
                             ? colors.line
-                            : colors.coralInk
+                            : colors.unread
                           : colors.line,
                         borderStyle: self ? "solid" : "dashed",
                       },
@@ -197,7 +206,7 @@ export default function ChatsScreen({
                     <Avatar
                       uri={avatar || self?.avatar}
                       name={selfName || self?.name}
-                      size={58}
+                      size={56}
                     />
                     <Pressable
                       accessibilityRole="button"
@@ -207,9 +216,15 @@ export default function ChatsScreen({
                         event.stopPropagation();
                         onAddStory();
                       }}
-                      style={[s.storyPlus, { borderColor: colors.bg }]}
+                        style={[
+                        s.storyPlus,
+                        {
+                          borderColor: colors.bg,
+                          backgroundColor: colors.fg,
+                        },
+                      ]}
                     >
-                      <Ionicons name="add" size={17} color={colors.onCoral} />
+                      <Ionicons name="add" size={17} color={colors.bg} />
                     </Pressable>
                   </View>
                   <Text style={[s.storyName, { color: colors.muted }]}>
@@ -228,13 +243,17 @@ export default function ChatsScreen({
                       <View
                         style={[
                           s.storyRing,
-                          { borderColor: story.seen ? colors.line : colors.coralInk },
+                          {
+                            borderColor: story.seen
+                              ? colors.line
+                              : colors.unread,
+                          },
                         ]}
                       >
                         <Avatar
                           uri={story.avatar}
                           name={story.name}
-                          size={58}
+                          size={56}
                         />
                       </View>
                       <Text
@@ -247,65 +266,13 @@ export default function ChatsScreen({
                   ),
                 )}
               </ScrollView>
-              <View
-                style={[
-                  s.tabs,
-                  { backgroundColor: dark ? colors.card : "#F0EFEA" },
-                ]}
-              >
-                {(["private", "group"] as const).map((item) => {
-                  const selected = tab === item;
-                  const unread = unreadConversations(chats, item);
-                  const color = selected ? colors.fg : colors.muted;
-                  return (
-                    <Pressable
-                      key={item}
-                      accessibilityRole="tab"
-                      accessibilityLabel={
-                        item === "private"
-                          ? "Private conversations"
-                          : "Group conversations"
-                      }
-                      accessibilityState={{ selected }}
-                      onPress={() => {
-                        tap();
-                        setTab(item);
-                      }}
-                      style={[
-                        s.tab,
-                        selected && {
-                          backgroundColor: dark ? colors.line : colors.card,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={
-                          item === "private"
-                            ? "chatbubble-outline"
-                            : "people-outline"
-                        }
-                        size={15}
-                        color={color}
-                      />
-                      <Text style={[s.tabText, { color }]}>
-                        {item === "private" ? "Private" : "Groups"}
-                      </Text>
-                      {unread > 0 && (
-                        <View style={s.tabCount}>
-                          <Text style={s.tabCountText}>{unread}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
             </>
           )
         }
         ListEmptyComponent={
           <View style={s.empty}>
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
-              {term ? "No conversations found" : "A little quiet here"}
+              {term ? "No conversations found" : "No conversations"}
             </Text>
             <Text style={[s.emptyText, { color: colors.muted }]}>
               {term
@@ -314,12 +281,6 @@ export default function ChatsScreen({
             </Text>
           </View>
         }
-      />
-      <QuickActions
-        dark={dark}
-        onNewConversation={onNewConversation}
-        onVoiceCall={onVoiceCall}
-        onVideoCall={onVideoCall}
       />
       <ChatListActions
         target={actions}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import type { ImageVariant } from "../../domain/data";
@@ -20,6 +20,9 @@ type Props = {
   crop?: "fit" | "fill";
   posterPlaceholder?: boolean;
   videoSurface?: boolean;
+  retryKey?: number;
+  onRetry?: () => void;
+  onError?: () => void;
   onProgress?: (progress: number) => void;
   onEnd?: () => void;
 };
@@ -31,7 +34,7 @@ function StoryVideo(props: Props) {
         <Image source={{ uri: props.poster }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />
       ) : props.posterPlaceholder ? (
         <View style={s.previewVideoPlaceholder}>
-          <Text style={s.previewVideoPlaceholderText}>Loading video preview…</Text>
+          <Text style={s.previewVideoPlaceholderText}>Loading preview…</Text>
         </View>
       ) : null}
       {props.videoSurface !== false && <StoryVideoSurface key={props.uri} {...props} />}
@@ -63,6 +66,7 @@ function StoryVideoSurface(props: Props) {
     });
     const status = player.addListener("statusChange", ({ status }) => {
       setError(status === "error");
+      if (status === "error") latest.current.onError?.();
     });
     return () => {
       progress.remove();
@@ -97,9 +101,19 @@ function StoryVideoSurface(props: Props) {
         />
       </Animated.View>
       {error && (
-        <Text style={s.mediaError}>
-          Couldn't play this video. Tap to continue.
-        </Text>
+        <View style={s.mediaErrorWrap} pointerEvents="box-none">
+          <Text style={s.mediaError}>Video unavailable.</Text>
+          {props.onRetry && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry video"
+              onPress={props.onRetry}
+              style={s.mediaRetry}
+            >
+              <Text style={s.mediaRetryText}>Retry</Text>
+            </Pressable>
+          )}
+        </View>
       )}
     </>
   );
@@ -108,7 +122,7 @@ function StoryVideoSurface(props: Props) {
 export function StoryMedia(props: Props) {
   const { width } = useWindowDimensions();
   return props.video ? (
-    <StoryVideo {...props} />
+    <StoryVideo key={`${props.uri}-${props.retryKey ?? 0}`} {...props} />
   ) : (
     <ResponsiveImage
       uri={props.uri}

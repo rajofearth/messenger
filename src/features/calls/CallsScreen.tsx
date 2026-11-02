@@ -7,11 +7,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette, coral, onCoral } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
 import QuickActions from "../../ui/QuickActions";
 export default function CallsScreen({
@@ -38,9 +39,14 @@ export default function CallsScreen({
     record.chat.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
       <View style={s.header}>
-        <Text style={[s.title, { color: colors.fg }]}>Calls</Text>
+        <Text
+          accessibilityRole="header"
+          style={[s.title, { color: colors.fg }]}
+        >
+          Calls
+        </Text>
         <IconButton
           name="search-outline"
           color={colors.fg}
@@ -73,6 +79,16 @@ export default function CallsScreen({
               setQuery("");
             }}
           />
+          {!!query.trim() && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear call search"
+              onPress={() => setQuery("")}
+              style={s.clearSearch}
+            >
+              <Text style={[s.clearSearchText, { color: colors.muted }]}>Clear</Text>
+            </Pressable>
+          )}
         </View>
       )}
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
@@ -94,20 +110,14 @@ export default function CallsScreen({
                   name={record.missed ? "arrow-down" : "arrow-up"}
                   size={13}
                   color={
-                    record.missed
-                      ? dark
-                        ? "#FFB4AB"
-                        : "#B3261E"
-                      : dark
-                        ? "#9FD0B2"
-                        : "#2F6A4B"
+                    record.missed ? colors.danger : colors.success
                   }
                 />
                 <Text style={[s.caption, { color: colors.muted }]}>
                   {record.missed
                     ? "Missed call"
                     : formatDuration(record.seconds)}{" "}
-                  · {record.time}
+                  ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {record.time}
                 </Text>
               </View>
             </View>
@@ -123,19 +133,33 @@ export default function CallsScreen({
               <Ionicons
                 name={record.video ? "videocam-outline" : "call-outline"}
                 size={23}
-                color={colors.coralInk}
+                color={colors.fg}
               />
             </Pressable>
           </Pressable>
         ))}
         {!filtered.length && (
-          <View style={s.empty}>
-            <Ionicons name="call-outline" size={32} color={colors.coralInk} />
+          <View
+            style={s.empty}
+            accessible
+            accessibilityLabel={query.trim() ? "No matching calls" : "No recent calls"}
+          >
+            <Ionicons name="call-outline" size={32} color={colors.muted} />
             <Text style={[s.emptyTitle, { color: colors.fg }]}>
               {query.trim() ? "No matching calls" : "No recent calls"}
             </Text>
+            <Text style={[s.emptyText, { color: colors.muted }]}>
+              {query.trim()
+                ? "Try a different name or clear your search."
+                : "Calls you make or receive will appear here."}
+            </Text>
             {!query.trim() && (
-              <Pressable onPress={onVoiceCall} style={s.primary}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Start a voice call"
+                onPress={onVoiceCall}
+                style={s.primary}
+              >
                 <Text style={s.primaryText}>Start a call</Text>
               </Pressable>
             )}
@@ -148,49 +172,55 @@ export default function CallsScreen({
         onVoiceCall={onVoiceCall}
         onVideoCall={onVideoCall}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 const s = StyleSheet.create({
   header: {
-    padding: 25,
+    padding: space.xl,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 36, letterSpacing: -1.6 },
+  title: { fontSize: 30, fontWeight: "600" },
   search: {
-    marginHorizontal: 25,
-    marginBottom: 18,
-    borderRadius: 14,
+    marginHorizontal: space.xl,
+    marginBottom: space.lg,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 13,
+    paddingLeft: space.md,
   },
+  clearSearch: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: space.sm,
+  },
+  clearSearchText: { fontSize: 13, fontWeight: "500" },
   input: {
     flex: 1,
     padding: 12,
-    fontFamily: "DMSans_400Regular",
     fontSize: 13,
   },
   row: {
     paddingHorizontal: 25,
-    paddingVertical: 15,
+    paddingVertical: space.md,
     flexDirection: "row",
     alignItems: "center",
   },
-  body: { flex: 1, marginLeft: 15 },
+  body: { flex: 1, marginLeft: space.md },
   callButton: {
     width: 44,
     height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  meta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12 },
-  empty: { padding: 60, alignItems: "center", gap: 20 },
-  emptyTitle: { fontFamily: "DMSans_500Medium", fontSize: 18 },
-  primary: { backgroundColor: coral, padding: 16, borderRadius: 17 },
-  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
+  name: { fontSize: 15, fontWeight: "600" },
+  meta: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: space.sm },
+  caption: { fontSize: 12 },
+  empty: { padding: space.xxxl, alignItems: "center", gap: space.xl },
+  emptyTitle: { fontSize: 18, fontWeight: "600" },
+  emptyText: { fontSize: 13, textAlign: "center", lineHeight: 19, maxWidth: 260 },
+  primary: { backgroundColor: "#111111", padding: space.lg, borderRadius: 10 },
+  primaryText: { fontWeight: "600", color: "#FFFFFF", fontSize: 14 },
 });

@@ -12,7 +12,8 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, onCoral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function ForwardScreen({
   chats,
   message,
@@ -27,6 +28,7 @@ export default function ForwardScreen({
   onForward: (ids: string[]) => void;
 }) {
   const colors = palette(dark);
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const filtered = chats.filter(
@@ -48,7 +50,7 @@ export default function ForwardScreen({
       style={[s.root, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + space.sm }]}>
         <IconButton
           name="arrow-back"
           label="Cancel forwarding"
@@ -60,10 +62,10 @@ export default function ForwardScreen({
       <View
         style={[
           s.preview,
-          { backgroundColor: colors.card, borderLeftColor: colors.coralInk },
+          { backgroundColor: colors.input, borderLeftColor: colors.line },
         ]}
       >
-        <Text style={[s.label, { color: colors.coralInk }]}>Forwarding</Text>
+        <Text style={[s.label, { color: colors.muted }]}>Forwarding</Text>
         <Text numberOfLines={2} style={[s.text, { color: colors.fg }]}>
           {summary}
         </Text>
@@ -74,7 +76,7 @@ export default function ForwardScreen({
         value={query}
         onChangeText={setQuery}
         placeholderTextColor={colors.muted}
-        style={[s.input, { backgroundColor: colors.card, color: colors.fg }]}
+        style={[s.input, { backgroundColor: colors.input, color: colors.fg, borderColor: colors.line }]}
       />
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -109,7 +111,7 @@ export default function ForwardScreen({
                   ? "checkmark-circle"
                   : "ellipse-outline"
               }
-              color={selected.includes(chat.id) ? colors.coralInk : colors.muted}
+              color={selected.includes(chat.id) ? colors.fg : colors.muted}
               size={25}
             />
           </Pressable>
@@ -125,10 +127,17 @@ export default function ForwardScreen({
         accessibilityState={{ disabled: !selected.length }}
         disabled={!selected.length}
         onPress={() => onForward(selected)}
-        style={[s.send, { opacity: selected.length ? 1 : 0.4 }]}
+        style={[
+          s.send,
+          {
+            backgroundColor: colors.fg,
+            opacity: selected.length ? 1 : 0.4,
+            marginBottom: space.lg + insets.bottom,
+          },
+        ]}
       >
-        <Ionicons name="arrow-redo" size={20} color={onCoral} />
-        <Text style={s.sendText}>
+        <Ionicons name="arrow-redo" size={20} color={colors.bg} />
+        <Text style={[s.sendText, { color: colors.bg }]}>
           Forward{selected.length ? ` · ${selected.length}` : ""}
         </Text>
       </Pressable>
@@ -137,44 +146,44 @@ export default function ForwardScreen({
 }
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", padding: 13, gap: 10 },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 23 },
+  header: { flexDirection: "row", alignItems: "center", padding: space.md, gap: space.sm },
+  title: { fontFamily: "sans-serif-medium", fontSize: 20 },
   preview: {
-    margin: 20,
-    marginTop: 4,
-    borderRadius: 14,
+    margin: space.xl,
+    marginTop: space.xs,
+    borderRadius: radius.control,
     borderLeftWidth: 3,
-    padding: 15,
-    gap: 6,
+    padding: space.lg,
+    gap: space.xs,
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 12 },
-  text: { fontFamily: "DMSans_400Regular", fontSize: 13, lineHeight: 20 },
+  label: { fontFamily: "sans-serif-medium", fontSize: 12 },
+  text: { fontFamily: "sans-serif", fontSize: 13, lineHeight: 20 },
   input: {
-    marginHorizontal: 20,
-    padding: 15,
-    borderRadius: 14,
-    fontFamily: "DMSans_400Regular",
-    marginBottom: 10,
+    marginHorizontal: space.xl,
+    padding: space.lg,
+    borderRadius: radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    fontFamily: "sans-serif",
+    marginBottom: space.sm,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    gap: space.md,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
   },
-  body: { flex: 1, gap: 3 },
-  name: { fontFamily: "DMSans_500Medium", fontSize: 15 },
-  empty: { textAlign: "center", margin: 40 },
+  body: { flex: 1, gap: space.xs },
+  name: { fontFamily: "sans-serif-medium", fontSize: 15 },
+  empty: { textAlign: "center", margin: space.xxxl },
   send: {
-    margin: 20,
-    borderRadius: 20,
-    backgroundColor: coral,
-    padding: 17,
+    margin: space.xl,
+    borderRadius: radius.control,
+    padding: space.lg,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
+    gap: space.sm,
   },
-  sendText: { color: onCoral, fontFamily: "DMSans_700Bold", fontSize: 15 },
+  sendText: { fontFamily: "sans-serif-medium", fontSize: 15 },
 });

@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { CORAL, styles } from "./CallScreen.styles";
+import { CALL_ACCENT, styles } from "./CallScreen.styles";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -34,7 +34,7 @@ export default function CallControl({
         <Ionicons
           name={icon}
           size={24}
-          color={active && !danger ? CORAL : "#FFFFFF"}
+          color={active && !danger ? CALL_ACCENT : "#FFFFFF"}
           style={danger && icon === "call" ? styles.hangupIcon : undefined}
         />
       </Pressable>

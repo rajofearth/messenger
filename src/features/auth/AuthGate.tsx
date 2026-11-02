@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +17,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { describeAuthFailure } from "./authErrors";
 import { messengerRepository } from "../../data/messengerRepository";
 import { useDeviceScheme } from "../../state/useDeviceScheme";
-import { coral, palette, resolveDark } from "../../ui/theme";
+import { palette, radius, resolveDark, space } from "../../ui/theme";
 import type { ThemePreference } from "../../ui/theme";
 
 function usernameFromName(name: string) {
@@ -40,17 +40,47 @@ function AuthForm({ dark }: { dark: boolean }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const colors = palette(dark);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    username?: string;
+    password?: string;
+  }>({});
+  const [authError, setAuthError] = useState<{
+    title: string;
+    message: string;
+    missingAccount: boolean;
+  } | null>(null);
+  const nameInput = useRef<TextInput>(null);
+  const usernameInput = useRef<TextInput>(null);
+  const passwordInput = useRef<TextInput>(null);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    tint: dark ? "#242424" : "#F4F4F4",
+    input: dark ? "#202020" : "#F4F4F4",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+  };
 
   async function submit() {
-    if (!username.trim() || !password) {
-      Alert.alert("Missing details", "Enter your username and password.");
+    const nextErrors: typeof fieldErrors = {};
+    if (mode === "signUp" && !name.trim()) nextErrors.name = "Enter your name.";
+    if (!username.trim()) nextErrors.username = "Enter your username.";
+    if (!password) nextErrors.password = "Enter your password.";
+    setFieldErrors(nextErrors);
+    setAuthError(null);
+    if (Object.keys(nextErrors).length > 0) {
+      if (nextErrors.name) nameInput.current?.focus();
+      else if (nextErrors.username) usernameInput.current?.focus();
+      else passwordInput.current?.focus();
       return;
     }
-    if (mode === "signUp" && !name.trim()) {
-      Alert.alert("Add your name", "Enter the name you want people to see.");
-      return;
-    }
+    Keyboard.dismiss();
     setBusy(true);
     try {
       await signIn("password", {
@@ -61,25 +91,62 @@ function AuthForm({ dark }: { dark: boolean }) {
         flow: mode,
       });
     } catch (error) {
-      const failure = describeAuthFailure(error, mode, username);
-      if (failure.missingAccount) {
-        Alert.alert(failure.title, failure.message, [
-          { text: "Try again", style: "cancel" },
-          {
-            text: "Create account",
-            onPress: () => {
-              setUsernameEdited(true);
-              setMode("signUp");
-            },
-          },
-        ]);
-      } else {
-        Alert.alert(failure.title, failure.message);
-      }
+      setAuthError(describeAuthFailure(error, mode, username));
     } finally {
       setBusy(false);
     }
   }
+
+  function changeMode(nextMode: "signIn" | "signUp") {
+    if (busy || nextMode === mode) return;
+    setMode(nextMode);
+    setFieldErrors({});
+    setAuthError(null);
+  }
+
+  function updateField(
+    field: "name" | "username" | "password",
+    value: string,
+  ) {
+    if (field === "name") {
+      setName(value);
+      if (mode === "signUp" && !usernameEdited) setUsername(usernameFromName(value));
+    } else if (field === "username") {
+      setUsernameEdited(true);
+      setUsername(value);
+    } else {
+      setPassword(value);
+    }
+    setFieldErrors((current) => {
+      const next = { ...current, [field]: undefined };
+      if (field === "name" && mode === "signUp" && !usernameEdited) {
+        next.username = undefined;
+      }
+      return next;
+    });
+    setAuthError(null);
+  }
+
+  const inputStyle = (field: keyof typeof fieldErrors) => [
+    s.input,
+    {
+      color: colors.fg,
+      backgroundColor: colors.input,
+      borderColor: fieldErrors[field] ? colors.danger : "transparent",
+    },
+  ];
+
+  const errorText = (field: keyof typeof fieldErrors) =>
+    fieldErrors[field] ? (
+      <Text accessibilityRole="alert" style={[s.fieldError, { color: colors.danger }]}>
+        {fieldErrors[field]}
+      </Text>
+    ) : null;
+  const submitLabel = authError
+    ? "Try again"
+    : mode === "signIn"
+      ? "Sign in"
+      : "Create account";
 
   return (
     <KeyboardAvoidingView
@@ -91,69 +158,113 @@ function AuthForm({ dark }: { dark: boolean }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={[s.logo, { backgroundColor: colors.tint }]}>
-          <Ionicons name="chatbubble-ellipses" size={34} color={colors.coralInk} />
+        <View style={[s.logo, { backgroundColor: colors.fg }]}>
+          <Ionicons name="chatbubble-ellipses" size={34} color={colors.bg} />
         </View>
         <Text style={[s.title, { color: colors.fg }]}>Welcome to Messenger</Text>
         <Text style={[s.subtitle, { color: colors.muted }]}>
-          Private conversations that stay with you across your signed-in devices.
+          Conversations that stay with you across your signed-in devices
         </Text>
+        <View
+          accessibilityRole="tablist"
+          style={[s.modeSwitcher, { backgroundColor: colors.input }]}
+        >
+          {([
+            ["signIn", "Sign in"],
+            ["signUp", "Create account"],
+          ] as const).map(([value, label]) => (
+            <Pressable
+              key={value}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: mode === value, disabled: busy }}
+              disabled={busy}
+              onPress={() => changeMode(value)}
+              style={[s.modeTab, mode === value && { backgroundColor: colors.fg }]}
+            >
+              <Text style={[s.modeTabText, { color: mode === value ? colors.bg : colors.muted }]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         {mode === "signUp" && (
-          <TextInput
-            accessibilityLabel="Name"
-            autoCapitalize="words"
-            autoComplete="name"
-            textContentType="name"
-            importantForAutofill="yes"
-            placeholder="Your name"
-            placeholderTextColor={colors.muted}
-            value={name}
-            onChangeText={(value) => {
-              setName(value);
-              if (mode === "signUp" && !usernameEdited) {
-                setUsername(usernameFromName(value));
-              }
-            }}
-            style={[s.input, { color: colors.fg, backgroundColor: colors.card }]}
-          />
+          <View>
+            <TextInput
+              ref={nameInput}
+              accessibilityLabel="Name"
+              accessibilityHint={fieldErrors.name ?? "The name people will see"}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+              importantForAutofill="yes"
+              placeholder="Your name"
+              placeholderTextColor={colors.muted}
+              value={name}
+              onChangeText={(value) => updateField("name", value)}
+              onSubmitEditing={() => usernameInput.current?.focus()}
+              returnKeyType="next"
+              style={inputStyle("name")}
+            />
+            {errorText("name")}
+          </View>
         )}
-        <TextInput
-          accessibilityLabel="Username"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="username"
-          textContentType="username"
-          importantForAutofill="yes"
-          placeholder="Username"
-          placeholderTextColor={colors.muted}
-          value={username}
-          onChangeText={(value) => {
-            setUsernameEdited(true);
-            setUsername(value);
-          }}
-          style={[s.input, { color: colors.fg, backgroundColor: colors.card }]}
-        />
-        <View style={[s.passwordRow, { backgroundColor: colors.card }]}>
+        <View>
           <TextInput
-            accessibilityLabel="Password"
+            ref={usernameInput}
+            accessibilityLabel="Username"
+            accessibilityHint={fieldErrors.username ?? "Enter the username for your account"}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete={
-              mode === "signIn" ? "current-password" : "new-password"
+            autoComplete="username"
+            textContentType="username"
+            importantForAutofill="yes"
+            placeholder="Username"
+            placeholderTextColor={colors.muted}
+            value={username}
+            onChangeText={(value) => updateField("username", value)}
+            onSubmitEditing={() => passwordInput.current?.focus()}
+            returnKeyType="next"
+            style={inputStyle("username")}
+          />
+          {errorText("username")}
+        </View>
+        <View
+          style={[
+            s.passwordRow,
+            {
+              backgroundColor: colors.input,
+              borderColor: fieldErrors.password ? colors.danger : "transparent",
+            },
+          ]}
+        >
+          <TextInput
+            ref={passwordInput}
+            accessibilityLabel="Password"
+            accessibilityHint={
+              fieldErrors.password ??
+              (mode === "signIn" ? "Enter your password" : "Choose a password")
             }
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete={mode === "signIn" ? "current-password" : "new-password"}
             textContentType={mode === "signIn" ? "password" : "newPassword"}
             importantForAutofill="yes"
             placeholder="Password"
             placeholderTextColor={colors.muted}
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(value) => updateField("password", value)}
+            onSubmitEditing={() => void submit()}
+            returnKeyType="done"
             style={[s.passwordInput, { color: colors.fg }]}
           />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            accessibilityState={{ checked: showPassword, disabled: busy }}
             hitSlop={10}
+            disabled={busy}
             onPress={() => setShowPassword((value) => !value)}
             style={s.reveal}
           >
@@ -164,48 +275,50 @@ function AuthForm({ dark }: { dark: boolean }) {
             />
           </Pressable>
         </View>
+        {errorText("password")}
+        {authError ? (
+          <View
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={[s.authError, { backgroundColor: colors.dangerSoft }]}
+          >
+            <Text style={[s.authErrorTitle, { color: colors.danger }]}>{authError.title}</Text>
+            <Text style={[s.authErrorMessage, { color: colors.fg }]}>{authError.message}</Text>
+            {authError.missingAccount && mode === "signIn" ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Create an account instead"
+                disabled={busy}
+                onPress={() => {
+                  setUsernameEdited(true);
+                  changeMode("signUp");
+                }}
+                style={s.errorAction}
+              >
+                <Text style={[s.errorActionText, { color: colors.danger }]}>Create an account instead</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={submitLabel}
+          accessibilityState={{ busy, disabled: busy }}
           disabled={busy}
           onPress={() => void submit()}
-          style={[s.primary, { opacity: busy ? 0.65 : 1 }]}
+          style={[s.primary, { backgroundColor: colors.switchTrackOn, opacity: busy ? 0.65 : 1 }]}
         >
           {busy ? (
             <ActivityIndicator color={colors.onCoral} />
           ) : (
             <Text style={[s.primaryText, { color: colors.onCoral }]}>
-              {mode === "signIn" ? "Sign in" : "Create account"}
+              {submitLabel}
             </Text>
           )}
         </Pressable>
-        {mode === "signIn" && (
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() =>
-              Alert.alert(
-                "Password recovery is unavailable",
-                "You can change your password only while you are signed in. If you forget it while signed out, this account and its conversations cannot be recovered.",
-              )
-            }
-          >
-            <Text style={[s.link, { color: colors.coralInk }]}>Forgot password?</Text>
-          </Pressable>
-        )}
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => setMode(mode === "signIn" ? "signUp" : "signIn")}
-        >
-          <Text style={[s.link, { color: colors.muted }]}>
-            {mode === "signIn"
-              ? "New here? Create an account"
-              : "Already have an account? Sign in"}
-          </Text>
-        </Pressable>
         <Text style={[s.note, { color: colors.muted }]}>
-          Your username is how people find you. Keep your password safe; there is
-          deliberately no signed-out password reset.
+          Your username is how people find you. Keep your password safe; there
+          is no signed-out password reset.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -237,7 +350,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const dark = resolveDark(storedTheme, scheme);
 
   if (isLoading) {
-    const colors = palette(dark);
+    const colors = {
+      ...palette(dark),
+      bg: dark ? "#111111" : "#FFFFFF",
+      coralInk: dark ? "#F5F5F5" : "#111111",
+    };
     return (
       <SafeAreaView style={[s.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.coralInk} size="large" />
@@ -253,68 +370,101 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 const s = StyleSheet.create({
   root: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { flexGrow: 1, justifyContent: "center", padding: 28, gap: 14 },
+  content: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: space.xxl,
+    gap: space.md,
+  },
   logo: {
     alignSelf: "center",
     width: 76,
     height: 76,
-    borderRadius: 28,
+    borderRadius: 38,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+    marginBottom: space.sm,
   },
   title: {
     textAlign: "center",
-    fontFamily: "DMSans_700Bold",
-    fontSize: 29,
+    fontSize: 28,
+    fontWeight: "600",
   },
   subtitle: {
     textAlign: "center",
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 12,
+    marginBottom: space.md,
   },
+  modeSwitcher: {
+    flexDirection: "row",
+    borderRadius: radius.control,
+    padding: space.xs,
+    marginBottom: space.xs,
+  },
+  modeTab: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: radius.control - space.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.sm,
+  },
+  modeTabText: { fontSize: 14, fontWeight: "600" },
   input: {
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontFamily: "DMSans_400Regular",
+    borderRadius: radius.control,
+    borderWidth: 1,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.lg,
     fontSize: 16,
   },
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: radius.control,
+    borderWidth: 1,
   },
   passwordInput: {
     flex: 1,
-    paddingLeft: 16,
-    paddingVertical: 15,
-    fontFamily: "DMSans_400Regular",
+    paddingLeft: space.lg,
+    paddingVertical: space.lg,
     fontSize: 16,
   },
-  reveal: { paddingHorizontal: 14, paddingVertical: 14 },
+  reveal: { paddingHorizontal: space.lg, paddingVertical: space.lg },
+  fieldError: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: -space.sm,
+    marginBottom: space.xs,
+    paddingHorizontal: space.xs,
+  },
+  authError: {
+    borderRadius: radius.control,
+    padding: space.md,
+    gap: space.xs,
+  },
+  authErrorTitle: { fontSize: 14, fontWeight: "600" },
+  authErrorMessage: { fontSize: 13, lineHeight: 19 },
+  errorAction: { alignSelf: "flex-start", marginTop: space.xs },
+  errorActionText: { fontSize: 13, fontWeight: "600" },
   primary: {
-    minHeight: 54,
-    borderRadius: 17,
+    minHeight: 52,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: coral,
-    marginTop: 4,
+    marginTop: space.xs,
   },
-  primaryText: { fontFamily: "DMSans_700Bold", fontSize: 16 },
+  primaryText: { fontSize: 16, fontWeight: "600" },
   link: {
     textAlign: "center",
-    fontFamily: "DMSans_500Medium",
     fontSize: 14,
-    paddingVertical: 5,
+    fontWeight: "600",
+    paddingVertical: space.xs,
   },
   note: {
     textAlign: "center",
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: space.sm,
   },
 });

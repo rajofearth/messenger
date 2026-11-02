@@ -9,14 +9,84 @@ import { s } from "./ChatsScreen.styles";
 
 type Props = {
   chat: Chat;
+  members: Chat[];
+  selfAvatar: string;
+  selfName?: string;
   dark: boolean;
   onOpen: (chat: Chat) => void;
   onActions: (chat: Chat, x?: number, y?: number) => void;
 };
 
-/** Memoized row so an open action menu does not re-render the whole list. */
-function ChatRow({ chat, dark, onOpen, onActions }: Props) {
+type ChatPresence = Chat & {
+  /** Optional fields are accepted for backends that expose live presence. */
+  online?: boolean;
+  isOnline?: boolean;
+  presence?: boolean | "online" | "offline";
+};
+
+type GroupAvatarMember = {
+  uri: string | undefined;
+  name: string | undefined;
+};
+
+function GroupAvatar({
+  chat,
+  members,
+  selfAvatar,
+  selfName,
+  dark,
+}: {
+  chat: Chat;
+  members: Chat[];
+  selfAvatar: string;
+  selfName?: string;
+  dark: boolean;
+}) {
   const colors = palette(dark);
+  const byId = new Map(members.map((member) => [member.id, member]));
+  const avatars = (chat.memberIds ?? [])
+    .slice(0, 4)
+    .map<GroupAvatarMember | null>((id) => {
+      if (id === "self") return { uri: selfAvatar, name: selfName || "You" };
+      const member = byId.get(id);
+      return member ? { uri: member.avatar, name: member.name } : null;
+    })
+    .filter((member): member is GroupAvatarMember => member !== null);
+  return (
+    <View
+      accessible={false}
+      style={[s.groupAvatar, { backgroundColor: colors.input }]}
+    >
+      {avatars.length > 0 ? (
+        avatars.map((member, index) => (
+          <View key={`${member.name ?? "member"}-${index}`} style={s.groupAvatarCell}>
+            <Avatar uri={member.uri} name={member.name} size={17} dark={dark} />
+          </View>
+        ))
+      ) : (
+        <Ionicons name="people-outline" size={24} color={colors.muted} />
+      )}
+    </View>
+  );
+}
+
+/** Memoized row so an open action menu does not re-render the whole list. */
+function ChatRow({
+  chat,
+  members,
+  selfAvatar,
+  selfName,
+  dark,
+  onOpen,
+  onActions,
+}: Props) {
+  const colors = palette(dark);
+  const presence = chat as ChatPresence;
+  const online =
+    presence.online === true ||
+    presence.isOnline === true ||
+    presence.presence === true ||
+    presence.presence === "online";
   const longPressed = useRef(false);
   const pending =
     chat.lastMessageStatus === "sending" || chat.lastMessageStatus === "failed";
@@ -64,17 +134,52 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
       }}
       style={({ pressed }) => [
         s.chatRow,
-        pressed && { backgroundColor: colors.card },
+        pressed && { backgroundColor: colors.input },
       ]}
     >
-      <Avatar uri={chat.avatar} name={name} />
+      <View style={s.avatarWrap}>
+        {chat.group ? (
+          <GroupAvatar
+            chat={chat}
+            members={members}
+            selfAvatar={selfAvatar}
+            selfName={selfName}
+            dark={dark}
+          />
+        ) : (
+          <Avatar uri={chat.avatar} name={name} size={56} dark={dark} />
+        )}
+        {online && (
+          <View
+            accessible={false}
+            style={[
+              s.presence,
+              { backgroundColor: colors.online, borderColor: colors.bg },
+            ]}
+          />
+        )}
+      </View>
       <View style={s.chatBody}>
         <View style={s.rowTop}>
-          <Text numberOfLines={1} style={[s.name, { color: colors.fg }]}>
-            {name}
-          </Text>
+          <View style={s.nameLine}>
+            <Text
+              numberOfLines={1}
+              style={[s.name, chat.unread > 0 && s.unreadName, { color: colors.fg }]}
+            >
+              {name}
+            </Text>
+            {chat.unread > 0 && (
+              <View
+                accessible={false}
+                style={[s.unreadDot, { backgroundColor: colors.unread }]}
+              />
+            )}
+          </View>
           <Text
-            style={[s.time, { color: chat.unread > 0 ? colors.coralInk : colors.muted }]}
+            style={[
+              s.time,
+              { color: colors.muted },
+            ]}
           >
             {timestamp}
           </Text>
@@ -86,13 +191,9 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
               s.preview,
               {
                 color: failed
-                  ? dark
-                    ? "#FFB4AB"
-                    : "#B3261E"
+                  ? colors.danger
                   : chat.unread > 0
-                    ? dark
-                      ? "#D7DAD3"
-                      : "#667268"
+                    ? colors.fg
                     : colors.muted,
               },
             ]}
@@ -114,11 +215,6 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
               color={colors.muted}
               accessibilityLabel="Pinned"
             />
-          )}
-          {chat.unread > 0 && (
-            <View style={s.unread}>
-              <Text style={s.unreadText}>{chat.unread}</Text>
-            </View>
           )}
           {chat.unread <= 0 && confirmed && (
             <Ionicons name="checkmark" color={colors.muted} size={15} />

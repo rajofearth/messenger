@@ -1,11 +1,12 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { formatDuration } from "../../domain/model";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 
 export type CallHistoryDetailProps = {
   chat: Chat;
@@ -47,9 +48,7 @@ export function CallHistoryList({
             size={20}
             color={
               record.missed
-                ? dark
-                  ? "#FFB4AB"
-                  : "#B3261E"
+                ? colors.danger
                 : colors.muted
             }
           />
@@ -58,11 +57,7 @@ export function CallHistoryList({
               style={[
                 s.label,
                 {
-                  color: record.missed
-                    ? dark
-                      ? "#FFB4AB"
-                      : "#B3261E"
-                    : colors.fg,
+                    color: record.missed ? colors.danger : colors.fg,
                 },
               ]}
             >
@@ -76,7 +71,7 @@ export function CallHistoryList({
           </View>
           <IconButton
             name={record.video ? "videocam-outline" : "call-outline"}
-            color={colors.coralInk}
+            color={colors.fg}
             label={`Start ${record.video ? "video" : "voice"} call with ${chat.name}`}
             onPress={() => onCall(record.video)}
           />
@@ -104,7 +99,7 @@ export function CallHistoryActions({
           <Ionicons
             name={video ? "videocam-outline" : "call-outline"}
             size={23}
-            color={colors.coralInk}
+            color={colors.fg}
           />
           <Text style={[s.label, { color: colors.fg }]}>
             {video ? "Video call" : "Voice call"}
@@ -125,7 +120,7 @@ export default function CallHistoryDetail({
 }: CallHistoryDetailProps) {
   const colors = palette(dark);
   return (
-    <View style={[s.screen, { backgroundColor: colors.bg }]}>
+    <SafeAreaView style={[s.screen, { backgroundColor: colors.bg }]} edges={["top", "left", "right"]}>
       <View style={s.header}>
         <IconButton
           name="arrow-back"
@@ -133,6 +128,7 @@ export default function CallHistoryDetail({
           color={colors.fg}
           onPress={onBack}
         />
+        <Text style={[s.backLabel, { color: colors.fg }]}>Back</Text>
         <Text style={[s.heading, { color: colors.fg }]}>Call history</Text>
       </View>
       <ScrollView contentContainerStyle={s.content}>
@@ -157,34 +153,35 @@ export default function CallHistoryDetail({
           onCall={onCall}
         />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16 },
-  content: { padding: 24, paddingBottom: 60 },
-  heading: { fontFamily: "DMSans_700Bold", fontSize: 20 },
-  profile: { alignItems: "center", gap: 12, paddingVertical: 20 },
-  name: { fontFamily: "DMSans_700Bold", fontSize: 26, textAlign: "center" },
-  actions: { flexDirection: "row", gap: 12, marginVertical: 24 },
+  header: { flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.lg },
+  backLabel: { fontSize: 14, fontWeight: "500", marginLeft: -space.sm },
+  content: { padding: space.xl, paddingBottom: 60 },
+  heading: { fontSize: 20, fontWeight: "600" },
+  profile: { alignItems: "center", gap: space.md, paddingVertical: space.xl },
+  name: { fontSize: 26, fontWeight: "600", textAlign: "center" },
+  actions: { flexDirection: "row", gap: space.md, marginVertical: space.xl },
   action: {
     flex: 1,
-    padding: 18,
-    borderRadius: 18,
+    padding: space.lg,
+    borderRadius: 10,
     alignItems: "center",
     gap: 10,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
+    gap: space.md,
+    paddingVertical: space.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1 },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: 5 },
-  empty: { fontFamily: "DMSans_400Regular", paddingVertical: 24 },
+  label: { fontSize: 14, fontWeight: "600" },
+  caption: { fontSize: 12, marginTop: space.xs },
+  empty: { paddingVertical: space.xxl },
 });

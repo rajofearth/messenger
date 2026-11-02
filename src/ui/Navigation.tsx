@@ -1,8 +1,8 @@
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Avatar, tap } from "./primitives";
-import { palette } from "./theme";
+import { palette, space } from "./theme";
 export type Tab = "chats" | "calls" | "settings";
 export default function Navigation({
   active,
@@ -55,15 +55,23 @@ export default function Navigation({
         >
           <View style={s.icon}>
             {item.id === "settings" ? (
-              <Avatar uri={avatar} name={name} size={27} />
+              <Avatar uri={avatar} name={name} size={28} dark={dark} />
             ) : (
               <Ionicons
                 name={active === item.id ? item.filled : item.icon}
                 size={23}
-                color={active === item.id ? colors.coralInk : colors.muted}
+                color={active === item.id ? colors.fg : colors.muted}
               />
             )}
           </View>
+          <Text
+            style={[
+              s.label,
+              { color: active === item.id ? colors.fg : colors.muted },
+            ]}
+          >
+            {item.label}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -72,30 +80,26 @@ export default function Navigation({
 const s = StyleSheet.create({
   nav: {
     flexDirection: "row",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 36,
-    marginHorizontal: 36,
-    marginTop: 8,
-    marginBottom: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    elevation: 3,
-    shadowColor: "#30251B",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
   },
   item: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 52,
+    gap: space.xs,
   },
   icon: {
-    width: 55,
-    height: 39,
-    borderRadius: 28,
+    width: 32,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
+  },
+  label: {
+    fontFamily: "sans-serif",
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

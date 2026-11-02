@@ -5,6 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { imageCacheKey } from "../domain/imageVariants";
 import { useAvatarUri } from "./useAvatarUri";
+import { palette, radius } from "./theme";
 export type IconName = React.ComponentProps<typeof Ionicons>["name"];
 let hapticsEnabled = true;
 export function setHapticsEnabled(enabled: boolean) {
@@ -18,9 +19,9 @@ export function IconButton({
   name,
   onPress,
   label,
-  color = "#313730",
+  color = palette(false).fg,
   background,
-  size = 22,
+  size = 20,
   hangup = false,
 }: {
   name: IconName;
@@ -68,11 +69,14 @@ export function Avatar({
   uri,
   name,
   size = 54,
+  dark = false,
 }: {
   uri?: string;
   name?: string;
   size?: number;
+  dark?: boolean;
 }) {
+  const colors = palette(dark);
   const [failed, setFailed] = React.useState(false);
   const imageUri = useAvatarUri(uri);
   React.useEffect(() => setFailed(false), [imageUri]);
@@ -86,15 +90,29 @@ export function Avatar({
           accessible={false}
           style={[
             styles.avatarFallback,
-            { width: size, height: size, borderRadius: size / 2 },
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              backgroundColor: colors.tint,
+            },
           ]}
         >
           {initials ? (
-            <Text style={[styles.initials, { fontSize: Math.max(11, size * 0.34) }]}>
+            <Text
+              style={[
+                styles.initials,
+                { fontSize: Math.max(11, size * 0.34), color: colors.fg },
+              ]}
+            >
               {initials}
             </Text>
           ) : (
-            <Ionicons name="person" size={size * 0.48} color="#6B5A4E" />
+            <Ionicons
+              name="person"
+              size={size * 0.48}
+              color={colors.muted}
+            />
           )}
         </View>
       ) : (
@@ -110,7 +128,7 @@ export function Avatar({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: "#E5DCD3",
+            backgroundColor: colors.input,
           }}
         />
       )}
@@ -121,18 +139,16 @@ const styles = StyleSheet.create({
   button: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarFallback: {
-    backgroundColor: "#E5DCD3",
     alignItems: "center",
     justifyContent: "center",
   },
   initials: {
-    color: "#5B4A3F",
-    fontFamily: "DMSans_700Bold",
-    letterSpacing: 0.3,
+    fontFamily: "DMSans_500Medium",
+    letterSpacing: 0,
   },
 });

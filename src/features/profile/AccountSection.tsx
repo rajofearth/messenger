@@ -22,6 +22,7 @@ import { messengerRepository } from "../../data/messengerRepository";
 import { clearLocalAccountFiles } from "../../services/accountCleanup";
 import { clearOutbox } from "../../services/outbox";
 import { releasePushToken } from "../../services/pushTokens";
+import { space } from "../../ui/theme";
 import { styles, type SettingsColors } from "./SettingsScreen.styles";
 
 type Dialog = "password" | "devices" | null;
@@ -29,16 +30,16 @@ type Dialog = "password" | "devices" | null;
 function reason(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("CURRENT_PASSWORD_INVALID"))
-    return "The current password is not correct.";
+    return "The current password is not correct";
   if (message.includes("PASSWORD_TOO_SHORT"))
-    return "Use at least 8 characters for the new password.";
+    return "Use at least 8 characters for the new password";
   if (message.includes("PASSWORD_UNCHANGED"))
-    return "Choose a password that differs from the current one.";
+    return "Choose a password that differs from the current one";
   if (message.includes("DEVICE_TOO_NEW"))
-    return "A device can manage other devices only after it has been signed in for 24 hours.";
+    return "A device can manage other devices only after it has been signed in for 24 hours";
   if (message.includes("CANNOT_REVOKE_CURRENT_DEVICE"))
-    return "This device cannot remove itself. Use Sign out instead.";
-  return "The server could not complete this request. Check your connection and try again.";
+    return "This device cannot remove itself. Use Sign out instead";
+  return "The server could not complete this request. Check your connection and try again";
 }
 
 /**
@@ -46,11 +47,7 @@ function reason(error: unknown) {
  * Device removal is deliberately gated by the server until the current device
  * has been registered for a day.
  */
-export default function AccountSection({
-  colors,
-}: {
-  colors: SettingsColors;
-}) {
+export default function AccountSection({ colors }: { colors: SettingsColors }) {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuthActions();
   const changePassword = useAction(api.security.changePassword);
@@ -76,11 +73,11 @@ export default function AccountSection({
   async function savePassword() {
     if (busy) return;
     if (!current || !next) {
-      Alert.alert("Missing details", "Enter your current and new password.");
+      Alert.alert("Missing details", "Enter your current and new password");
       return;
     }
     if (next !== confirm) {
-      Alert.alert("Passwords differ", "The new passwords do not match.");
+      Alert.alert("Passwords differ", "The new passwords do not match");
       return;
     }
     setBusy(true);
@@ -90,7 +87,10 @@ export default function AccountSection({
       setCurrent("");
       setNext("");
       setConfirm("");
-      Alert.alert("Password changed", "Use the new password next time you sign in.");
+      Alert.alert(
+        "Password changed",
+        "Use the new password next time you sign in",
+      );
     } catch (error) {
       Alert.alert("Password not changed", reason(error));
     } finally {
@@ -102,7 +102,10 @@ export default function AccountSection({
     setRevoking(id);
     try {
       await revokeDevice({ deviceId: id as Id<"devices"> });
-      Alert.alert("Device signed out", "That device can no longer read this account.");
+      Alert.alert(
+        "Device signed out",
+        "That device can no longer read this account",
+      );
     } catch (error) {
       Alert.alert("Device not removed", reason(error));
     } finally {
@@ -110,10 +113,25 @@ export default function AccountSection({
     }
   }
 
+  function confirmRemoveDevice(device: { id: string; label: string }) {
+    Alert.alert(
+      `Sign out ${device.label}?`,
+      "That device will lose access to this account the next time it connects.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out device",
+          style: "destructive",
+          onPress: () => void removeDevice(device.id),
+        },
+      ],
+    );
+  }
+
   function confirmSignOut() {
     Alert.alert(
       "Sign out?",
-      "Messages stay on the server. This device's local copy is removed so the next account cannot read it.",
+      "Messages stay on the server. This device's local copy is removed so the next account cannot read it",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -136,7 +154,7 @@ export default function AccountSection({
               } catch {
                 Alert.alert(
                   "Sign out failed",
-                  "This device may still be signed in. Local messages were removed anyway; check your connection and try again.",
+                  "This device may still be signed in. Local messages were removed anyway; check your connection and try again",
                 );
               } finally {
                 await messengerRepository.clearAccountData().catch(() => {});
@@ -159,6 +177,8 @@ export default function AccountSection({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Opens this account option"
         onPress={action}
         style={({ pressed }) => [styles.row, { opacity: pressed ? 0.65 : 1 }]}
       >
@@ -166,14 +186,14 @@ export default function AccountSection({
           <Ionicons
             name={icon}
             size={21}
-            color={danger ? "#C76161" : colors.text}
+            color={danger ? colors.danger : colors.text}
           />
         </View>
         <View style={styles.rowCopy}>
           <Text
             style={[
               styles.rowTitle,
-              { color: danger ? "#C76161" : colors.text },
+              { color: danger ? colors.danger : colors.text },
             ]}
           >
             {title}
@@ -192,7 +212,7 @@ export default function AccountSection({
 
   return (
     <>
-      <Text style={[styles.section, { color: colors.muted }]}>ACCOUNT</Text>
+      <Text style={[styles.section, { color: colors.muted }]}>Account</Text>
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         {row(
           "Change password",
@@ -248,7 +268,9 @@ export default function AccountSection({
           >
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {dialog === "password" ? "Change password" : "Signed-in devices"}
+                {dialog === "password"
+                  ? "Change password"
+                  : "Signed-in devices"}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -267,9 +289,17 @@ export default function AccountSection({
                   devices stay signed in until you remove them.
                 </Text>
                 {[
-                  { label: "Current password", value: current, set: setCurrent },
+                  {
+                    label: "Current password",
+                    value: current,
+                    set: setCurrent,
+                  },
                   { label: "New password", value: next, set: setNext },
-                  { label: "Confirm new password", value: confirm, set: setConfirm },
+                  {
+                    label: "Confirm new password",
+                    value: confirm,
+                    set: setConfirm,
+                  },
                 ].map((field) => (
                   <View key={field.label}>
                     <Text style={[styles.label, { color: colors.text }]}>
@@ -294,12 +324,22 @@ export default function AccountSection({
                   accessibilityRole="button"
                   disabled={busy}
                   onPress={() => void savePassword()}
-                  style={[styles.primary, { opacity: busy ? 0.65 : 1 }]}
+                  style={[
+                    styles.primary,
+                    {
+                      backgroundColor: colors.switchTrackOn,
+                      opacity: busy ? 0.65 : 1,
+                    },
+                  ]}
                 >
                   {busy ? (
                     <ActivityIndicator color={colors.onCoral} />
                   ) : (
-                    <Text style={styles.primaryText}>Change password</Text>
+                    <Text
+                      style={[styles.primaryText, { color: colors.onCoral }]}
+                    >
+                      Change password
+                    </Text>
                   )}
                 </Pressable>
               </ScrollView>
@@ -329,7 +369,9 @@ export default function AccountSection({
                         {device.label}
                         {device.current ? " · This device" : ""}
                       </Text>
-                      <Text style={[styles.rowSubtitle, { color: colors.muted }]}>
+                      <Text
+                        style={[styles.rowSubtitle, { color: colors.muted }]}
+                      >
                         {device.platform} · signed in{" "}
                         {new Date(device.registeredAt).toLocaleDateString()}
                       </Text>
@@ -338,18 +380,22 @@ export default function AccountSection({
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`Sign out ${device.label}`}
+                        accessibilityHint="Requires confirmation"
                         disabled={!canManage || revoking === device.id}
-                        onPress={() => void removeDevice(device.id)}
+                        onPress={() => confirmRemoveDevice(device)}
                         style={{
                           opacity: canManage ? 1 : 0.35,
-                          paddingHorizontal: 10,
-                          paddingVertical: 7,
+                          paddingHorizontal: space.sm,
+                          paddingVertical: space.sm,
                         }}
                       >
                         {revoking === device.id ? (
-                          <ActivityIndicator size="small" color="#C76161" />
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.danger}
+                          />
                         ) : (
-                          <Text style={{ color: "#C76161", fontSize: 12 }}>
+                          <Text style={{ color: colors.danger, fontSize: 12 }}>
                             Remove
                           </Text>
                         )}
@@ -375,8 +421,8 @@ const s = StyleSheet.create({
   device: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
+    gap: space.md,
+    paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });

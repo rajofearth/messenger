@@ -29,7 +29,9 @@ export default function UpdateSection({
       : null;
 
   function summary(): string {
-    const version = installed ? `Version ${installed.versionName}` : "This build";
+    const version = installed
+      ? `Version ${installed.versionName}`
+      : "This build";
     switch (status) {
       case "unsupported":
         return "Requires the Android app build";
@@ -49,8 +51,10 @@ export default function UpdateSection({
         ? `Downloading… ${formatBytes(progress?.done ?? 0)}`
         : `Downloading… ${Math.round(percent * 100)}% of ${size}`;
     }
-    if (download.stage === "ready") return `${version} · update downloaded and verified`;
-    if (download.stage === "installing") return "Waiting for Android's installer";
+    if (download.stage === "ready")
+      return `${version} · update downloaded and verified`;
+    if (download.stage === "installing")
+      return "Waiting for Android's installer";
     if (download.stage === "failed") {
       return download.message ?? "The update could not be downloaded";
     }
@@ -66,6 +70,8 @@ export default function UpdateSection({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Performs this update action"
         onPress={() => {
           tap();
           run();
@@ -162,7 +168,11 @@ export default function UpdateSection({
     <View style={[styles.card, { backgroundColor: colors.card }]}>
       <View style={styles.row}>
         <View style={[styles.rowIcon, { backgroundColor: colors.tint }]}>
-          <Ionicons name="cloud-download-outline" size={21} color={colors.text} />
+          <Ionicons
+            name="cloud-download-outline"
+            size={21}
+            color={colors.text}
+          />
         </View>
         <View style={styles.rowCopy}>
           <Text style={[styles.rowTitle, { color: colors.text }]}>Updates</Text>

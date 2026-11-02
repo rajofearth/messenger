@@ -6,12 +6,13 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { KeyboardMediaInput } from "../../ui/KeyboardMediaInput";
 import type { Message } from "../../domain/data";
 import { formatDuration } from "../../domain/model";
 import { IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import AttachmentMenu from "./AttachmentMenu";
 import RecordingWaveform from "./RecordingWaveform";
 import type { useMessageMedia } from "./useMessageMedia";
@@ -40,11 +41,14 @@ export default function Composer({
   setAttachmentOpen: (open: boolean) => void;
   disabled: boolean;
 }) {
-  const { card, coralInk, fg, muted, onCoral } = palette(dark);
+  const { fg, muted, input: inputSurface, line, danger } = palette(dark);
+  const actionBackground = dark ? "#F4F4F4" : fg;
+  const actionForeground = dark ? "#111111" : "#FFFFFF";
   const input = useRef<TextInput>(null);
   const [top, setTop] = useState(260);
   const host = useRef<View>(null);
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   return (
     <View
       ref={host}
@@ -62,22 +66,13 @@ export default function Composer({
       )}
       {reply && !disabled && (
         <View
-          style={{
-            marginHorizontal: 20,
-            borderLeftWidth: 3,
-            borderLeftColor: coralInk,
-            backgroundColor: card,
-            paddingLeft: 12,
-            flexDirection: "row",
-            alignItems: "center",
-            borderRadius: 8,
-          }}
+          style={[s.replyPreview, { borderLeftColor: line, backgroundColor: inputSurface }]}
         >
-          <View style={{ flex: 1, paddingVertical: 8 }}>
-            <Text style={{ color: coralInk, fontSize: 12 }}>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
+            <Text style={[s.replyLabel, { color: muted }]}>
               Replying to {reply.mine ? "yourself" : "message"}
             </Text>
-            <Text numberOfLines={2} style={{ color: fg }}>
+            <Text numberOfLines={2} style={[s.replyText, { color: fg }]}>
               {reply.text}
             </Text>
           </View>
@@ -89,39 +84,49 @@ export default function Composer({
           />
         </View>
       )}
-      <View style={[s.composer, { backgroundColor: card }]}>
+      <View
+        accessibilityLabel={media.recording ? "Voice note recording" : "Message composer"}
+        style={[
+          s.composer,
+          {
+            backgroundColor: inputSurface,
+            borderColor: line,
+            marginBottom: space.md + insets.bottom,
+          },
+        ]}
+      >
         {disabled ? (
-          <>
+          <View style={s.recordingState}>
             <Ionicons name="lock-closed-outline" size={17} color={muted} />
             <Text style={[s.blockedText, { color: muted }]}>
               This contact is blocked. Unblock them in chat details to send
               messages.
             </Text>
-          </>
+          </View>
         ) : media.recording ? (
-          <>
+          <View style={s.recordingState}>
             <IconButton
               name="trash-outline"
               label="Cancel recording"
-              color={dark ? "#FFB4AB" : "#B3261E"}
+              color={danger}
               onPress={() => void media.cancelRecord()}
             />
-            <View style={s.liveDot} />
-            <RecordingWaveform
-              metering={media.metering}
-              color={coralInk}
-            />
-            <Text style={{ color: fg }}>
+            <View style={[s.liveDot, { backgroundColor: danger }]} />
+            <RecordingWaveform metering={media.metering} color={fg} />
+            <Text
+              accessibilityLiveRegion="polite"
+              style={[s.composerMeta, { color: fg }]}
+            >
               {formatDuration(Math.floor(media.durationMillis / 1000))}
             </Text>
             <IconButton
               name="send"
               label="Send voice note"
-              background={coral}
-              color={onCoral}
+              background={actionBackground}
+              color={actionForeground}
               onPress={() => void media.record()}
             />
-          </>
+          </View>
         ) : (
           <>
             <IconButton
@@ -140,7 +145,7 @@ export default function Composer({
               onMediaError={({ message }) =>
                 Alert.alert("Keyboard attachment unavailable", message)
               }
-              accessibilityLabel="Message"
+               accessibilityLabel="Message text"
               editable={!disabled}
               value={draft}
               onChangeText={setDraft}
@@ -150,8 +155,9 @@ export default function Composer({
               }
               placeholderTextColor={muted}
               style={[s.messageInput, { color: fg }]}
-              multiline
-              maxLength={4000}
+               multiline
+               maxLength={4000}
+               textAlignVertical="top"
             />
             <IconButton
               name="keypad-outline"
@@ -168,8 +174,8 @@ export default function Composer({
             <IconButton
               name={draft.trim() ? "arrow-up" : "mic-outline"}
               label={draft.trim() ? "Send message" : "Record voice note"}
-              background={coral}
-              color={onCoral}
+              background={actionBackground}
+              color={actionForeground}
               onPress={() => {
                 if (!disabled) {
                   setAttachmentOpen(false);

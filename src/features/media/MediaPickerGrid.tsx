@@ -11,7 +11,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { MediaType } from "expo-media-library";
 import type { AssetMetadata } from "expo-media-library";
 import type { Colors } from "../../ui/theme";
-import { coral } from "../../ui/theme";
 import {
   formatMediaDuration,
   mediaSelectionOrder,
@@ -50,9 +49,9 @@ export function MediaPickerGrid(props: Props) {
   if (props.access === "checking" || (props.loading && !props.assets.length)) {
     return (
       <View style={s.pickerCenter}>
-        <ActivityIndicator size="large" color={coral} />
+        <ActivityIndicator size="large" color={props.colors.fg} />
         <Text style={[s.pickerEmptyText, { color: props.colors.muted }]}>
-          Loading your photos…
+          Loading media…
         </Text>
       </View>
     );
@@ -66,7 +65,7 @@ export function MediaPickerGrid(props: Props) {
           <Ionicons
             name="images-outline"
             size={34}
-            color={props.colors.coralInk}
+            color={props.colors.fg}
           />
         </View>
         <Text style={[s.pickerEmptyTitle, { color: props.colors.fg }]}>
@@ -77,6 +76,8 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Allow photo library access"
+          accessibilityHint="Grant access so Messenger can show media to choose"
           onPress={props.onAllowAccess}
           style={s.pickerPrimary}
         >
@@ -96,6 +97,7 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Try loading media again"
           onPress={props.onRetry}
           style={s.pickerPrimary}
         >
@@ -115,6 +117,7 @@ export function MediaPickerGrid(props: Props) {
         </Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open camera to create media"
           onPress={props.onOpenCamera}
           style={s.pickerPrimary}
         >
@@ -191,7 +194,11 @@ export function MediaPickerGrid(props: Props) {
             </Pressable>
             <Pressable
               accessibilityRole="checkbox"
-              accessibilityLabel={selected ? "Deselect media" : "Select media"}
+              accessibilityLabel={
+                selected
+                  ? `Deselect ${asset.mediaType === MediaType.VIDEO ? "video" : "photo"}`
+                  : `Select ${asset.mediaType === MediaType.VIDEO ? "video" : "photo"}`
+              }
               accessibilityState={{ checked: selected }}
               onPress={() => props.onToggle(asset.id)}
               hitSlop={8}
@@ -216,8 +223,8 @@ export function MediaPickerGrid(props: Props) {
         <RefreshControl
           refreshing={props.refreshing}
           onRefresh={props.onRefresh}
-          colors={[coral]}
-          tintColor={coral}
+          colors={[props.colors.fg]}
+          tintColor={props.colors.fg}
         />
       }
       initialNumToRender={18}
@@ -227,7 +234,7 @@ export function MediaPickerGrid(props: Props) {
       showsVerticalScrollIndicator={false}
       ListFooterComponent={
         props.loadingMore ? (
-          <ActivityIndicator color={coral} style={s.pickerFooterSpinner} />
+          <ActivityIndicator color={props.colors.fg} style={s.pickerFooterSpinner} />
         ) : null
       }
     />

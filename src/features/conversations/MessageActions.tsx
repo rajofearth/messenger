@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Message } from "../../domain/data";
 import { messageActionsLayout } from "./messageActionsLayout";
-import { palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import { deleteOptions, messageSummary } from "./conversationModel";
 
@@ -23,7 +23,7 @@ export type MessageRect = {
   height: number;
 };
 export type ActionTarget = { message: Message; rect: MessageRect };
-export const reactionEmojis = ["🤍", "😂", "😍", "👍", "🔥", "✨"];
+export const reactionEmojis = ["🤍", "😂", "😍", "👍", "🔥"];
 
 export function confirmDelete(
   message: Message,
@@ -32,8 +32,8 @@ export function confirmDelete(
   Alert.alert(
     "Delete message?",
     message.mine
-      ? "Delete for everyone removes this message for all participants."
-      : "You can only delete this message for yourself. Only its sender can delete it for everyone.",
+      ? "Delete this message for everyone."
+      : "You can delete it for yourself; only the sender can delete it for everyone.",
     deleteOptions(message, onDelete),
   );
 }
@@ -62,7 +62,7 @@ export default function MessageActions({
   const { width, height } = useWindowDimensions();
   const [menuHeight, setMenuHeight] = useState(200);
   const insets = useSafeAreaInsets();
-  const { card, fg } = palette(dark);
+  const { card, fg, muted, danger, scrim, line } = palette(dark);
   if (!target) return null;
   const { message, rect } = target;
   const summary = messageSummary(message);
@@ -88,7 +88,7 @@ export default function MessageActions({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { backgroundColor: scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
@@ -103,6 +103,7 @@ export default function MessageActions({
             styles.menu,
             {
               backgroundColor: card,
+              borderColor: line,
               width: menuWidth,
               left: Math.max(
                 insets.left + 8,
@@ -113,6 +114,15 @@ export default function MessageActions({
           ]}
         >
           <ScrollView keyboardShouldPersistTaps="always">
+            <View
+              accessibilityRole="header"
+              style={[styles.heading, { borderBottomColor: line }]}
+            >
+              <Text style={[styles.headingLabel, { color: fg }]}>Message actions</Text>
+              <Text numberOfLines={2} style={[styles.headingSummary, { color: muted }]}>
+                {summary}
+              </Text>
+            </View>
             {serverMessage ? (
               <View style={styles.emojis}>
                 {reactionEmojis.map((emoji) => (
@@ -161,16 +171,11 @@ export default function MessageActions({
                 accessibilityRole="button"
                 accessibilityLabel={`${label}: ${summary}`}
                 onPress={() => run(action)}
-                style={styles.action}
+                style={({ pressed }) => [styles.action, { opacity: pressed ? 0.55 : 1 }]}
               >
                 <Text
                   style={{
-                    color:
-                      label === "Delete"
-                        ? dark
-                          ? "#FFB4AB"
-                          : "#B3261E"
-                        : fg,
+                    color: label === "Delete" ? danger : fg,
                     fontSize: 16,
                   }}
                 >
@@ -185,15 +190,31 @@ export default function MessageActions({
   );
 }
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "#0004" },
+  overlay: { flex: 1 },
   menu: {
     position: "absolute",
-    borderRadius: 18,
-    padding: 6,
-    elevation: 8,
+    borderRadius: radius.control,
+    padding: space.xs,
     overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
   },
   emojis: { flexDirection: "row", justifyContent: "space-between" },
-  emoji: { paddingVertical: 8, paddingHorizontal: 4 },
-  action: { paddingHorizontal: 16, paddingVertical: 11 },
+  emoji: {
+    minWidth: 44,
+    minHeight: 44,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heading: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: space.xs,
+  },
+  headingLabel: { fontFamily: "sans-serif-medium", fontSize: 13, lineHeight: 18 },
+  headingSummary: { fontFamily: "sans-serif", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  action: { minHeight: 48, justifyContent: "center", paddingHorizontal: space.lg, paddingVertical: space.sm },
 });

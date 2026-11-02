@@ -23,7 +23,7 @@ import {
   isSystemNotificationsAvailable,
   requestPermission,
 } from "../../services/systemNotifications";
-import { coral, type ThemePreference } from "../../ui/theme";
+import { type ThemePreference } from "../../ui/theme";
 import type { AppUpdater } from "../../state/useAppUpdater";
 import UpdateSection from "./UpdateSection";
 import AccountSection from "./AccountSection";
@@ -72,6 +72,8 @@ export default function SettingsScreen({
   const {
     preferences,
     ready,
+    loadError,
+    retryLoad,
     setSheet,
     picking,
     avatarFailed,
@@ -89,13 +91,9 @@ export default function SettingsScreen({
         ? "Always dark"
         : "Always light";
 
-  const icon = (
-    name: React.ComponentProps<typeof Ionicons>["name"],
-    size = 21,
-  ) => <Ionicons name={name} size={size} color={colors.text} />;
-  const section = (title: string) => (
-    <Text style={[styles.section, { color: colors.muted }]}>{title}</Text>
-  );
+  const icon = (name: React.ComponentProps<typeof Ionicons>["name"], size = 21) =>
+    <Ionicons accessible={false} name={name} size={size} color={colors.text} />;
+  const section = (title: string) => <Text accessibilityRole="header" style={[styles.section, { color: colors.muted }]}>{title}</Text>;
   function row(
     title: string,
     subtitle: string,
@@ -105,6 +103,8 @@ export default function SettingsScreen({
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${title}. ${subtitle}`}
+        accessibilityHint="Opens this section"
         onPress={() => {
           tap();
           action();
@@ -145,12 +145,16 @@ export default function SettingsScreen({
         </View>
         <Switch
           accessibilityLabel={title}
+          accessibilityState={{ checked: value, disabled }}
           value={value}
           onValueChange={change}
           disabled={disabled}
-          trackColor={{ false: dark ? "#50574E" : "#DEDfD5", true: coral }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={dark ? "#50574E" : "#DEDFD5"}
+          trackColor={{
+            false: colors.switchTrackOff,
+            true: colors.switchTrackOn,
+          }}
+          thumbColor={colors.switchThumb}
+          ios_backgroundColor={colors.switchTrackOff}
         />
       </View>
     );
@@ -169,9 +173,7 @@ export default function SettingsScreen({
             color={colors.text}
             onPress={() => setPage("profile")}
           />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Settings
-          </Text>
+          <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
         </View>
       )}
       <ScrollView
@@ -211,7 +213,15 @@ export default function SettingsScreen({
                     onError={() => setAvatarFailed(true)}
                   />
                 )}
-                <View style={[styles.camera, { borderColor: colors.card }]}>
+                <View
+                  style={[
+                    styles.camera,
+                    {
+                      backgroundColor: colors.switchTrackOn,
+                      borderColor: colors.card,
+                    },
+                  ]}
+                >
                   {picking ? (
                     <ActivityIndicator size="small" color={colors.onCoral} />
                   ) : (
@@ -219,9 +229,7 @@ export default function SettingsScreen({
                   )}
                 </View>
               </Pressable>
-              <Text style={[styles.profileName, { color: colors.text }]}>
-                {preferences.name}
-              </Text>
+              <Text accessibilityRole="header" style={[styles.profileName, { color: colors.text }]}>{preferences.name}</Text>
               <Text style={[styles.bio, { color: colors.muted }]}>
                 {preferences.username
                   ? `@${preferences.username}`
@@ -244,14 +252,9 @@ export default function SettingsScreen({
                 <Ionicons
                   name="create-outline"
                   size={15}
-                  color={dark ? "#F4AD97" : "#A6533C"}
+                  color={colors.coralInk}
                 />
-                <Text
-                  style={[
-                    styles.editText,
-                    { color: dark ? "#F4AD97" : "#A6533C" },
-                  ]}
-                >
+                <Text style={[styles.editText, { color: colors.coralInk }]}>
                   Edit profile
                 </Text>
               </Pressable>
@@ -262,9 +265,22 @@ export default function SettingsScreen({
                   accessibilityLabel="Loading settings"
                 />
               )}
+              {loadError && (
+                <>
+                  <Text accessibilityLiveRegion="polite" style={[styles.error, { color: colors.danger }]}>Saved settings could not be loaded.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Try loading settings again"
+                    onPress={retryLoad}
+                    style={[styles.retry, { borderColor: colors.line }]}
+                  >
+                    <Text style={[styles.retryText, { color: colors.text }]}>Try again</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
 
-            {section("PREFERENCES")}
+            {section("Preferences")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {row(
                 "Settings",
@@ -276,10 +292,12 @@ export default function SettingsScreen({
           </>
         ) : (
           <>
-            {section("APPEARANCE")}
+            {section("Appearance")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.row}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.tint }]}>
+                <View
+                  style={[styles.rowIcon, { backgroundColor: colors.tint }]}
+                >
                   {icon("contrast-outline")}
                 </View>
                 <View style={styles.rowCopy}>
@@ -298,6 +316,7 @@ export default function SettingsScreen({
                     <Pressable
                       key={option.value}
                       accessibilityRole="button"
+                      accessibilityLabel={`${option.label} theme`}
                       accessibilityState={{ selected: active }}
                       onPress={() => {
                         tap();
@@ -305,7 +324,10 @@ export default function SettingsScreen({
                       }}
                       style={[
                         styles.segmentOption,
-                        active && styles.segmentActive,
+                        active && [
+                          styles.segmentActive,
+                          { backgroundColor: colors.switchTrackOn },
+                        ],
                       ]}
                     >
                       <Text
@@ -321,7 +343,7 @@ export default function SettingsScreen({
                 })}
               </View>
             </View>
-            {section("NOTIFICATIONS")}
+            {section("Notifications")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {switchRow(
                 "System notifications",
@@ -358,14 +380,14 @@ export default function SettingsScreen({
                 !ready,
               )}
             </View>
-            {section("UPDATES")}
+            {section("Updates")}
             <UpdateSection updates={updates} colors={colors} />
             <Text style={[styles.note, { color: colors.muted }]}>
               Updates download from this app's release feed and are checked
               against their published checksum. Android confirms the install,
               which replaces the app in place and keeps your chats and settings.
             </Text>
-            {section("FEEDBACK")}
+            {section("Feedback")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {switchRow(
                 "Haptics",
@@ -385,7 +407,7 @@ export default function SettingsScreen({
               Typing indicators, online status and read receipts are not part of
               this build.
             </Text>
-            {section("INFORMATION")}
+            {section("Information")}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               {row(
                 "Privacy",
@@ -409,8 +431,17 @@ export default function SettingsScreen({
                 { backgroundColor: colors.tint, opacity: pressed ? 0.7 : 1 },
               ]}
             >
-              <View style={styles.callIcon}>
-                <Ionicons name="call-outline" size={24} color={colors.onCoral} />
+              <View
+                style={[
+                  styles.callIcon,
+                  { backgroundColor: colors.switchTrackOn },
+                ]}
+              >
+                <Ionicons
+                  name="call-outline"
+                  size={24}
+                  color={colors.onCoral}
+                />
               </View>
               <View style={styles.rowCopy}>
                 <Text style={[styles.rowTitle, { color: colors.text }]}>
@@ -425,32 +456,32 @@ export default function SettingsScreen({
           </>
         )}
       </ScrollView>
-        <SettingsDialogs
-          settings={settings}
-          colors={colors}
-          onOpenAvatarPicker={() => setAvatarPickerOpen(true)}
+      <SettingsDialogs
+        settings={settings}
+        colors={colors}
+        onOpenAvatarPicker={() => setAvatarPickerOpen(true)}
+      />
+      <Modal
+        visible={avatarPickerOpen}
+        animationType="slide"
+        onRequestClose={() => setAvatarPickerOpen(false)}
+      >
+        <MediaPicker
+          dark={dark}
+          title="Profile photo"
+          mediaMode="photos"
+          selectionLimit={1}
+          permissionTitle="Choose a profile photo"
+          permissionText="Allow Messenger to see your photos so you can choose a profile photo"
+          emptyTitle="No photos yet"
+          emptyText="Take a photo to use it as your profile picture"
+          onPicked={(media) => {
+            setAvatarPickerOpen(false);
+            void settings.savePickedAvatar(media);
+          }}
+          onClose={() => setAvatarPickerOpen(false)}
         />
-        <Modal
-          visible={avatarPickerOpen}
-          animationType="slide"
-          onRequestClose={() => setAvatarPickerOpen(false)}
-        >
-          <MediaPicker
-            dark={dark}
-            title="Profile photo"
-            mediaMode="photos"
-            selectionLimit={1}
-            permissionTitle="Choose a profile photo"
-            permissionText="Allow Messenger to see your photos so you can choose a profile photo."
-            emptyTitle="No photos yet"
-            emptyText="Take a photo to use it as your profile picture."
-            onPicked={(media) => {
-              setAvatarPickerOpen(false);
-              void settings.savePickedAvatar(media);
-            }}
-            onClose={() => setAvatarPickerOpen(false)}
-          />
-        </Modal>
+      </Modal>
     </View>
   );
 }

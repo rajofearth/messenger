@@ -5,17 +5,12 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import type { Message } from "../../domain/data";
 import type { ActionTarget } from "./MessageActions";
 import { formatDuration } from "../../domain/model";
-import { onCoral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import { openAttachment } from "../../ui/openAttachment";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { messageAccessibilityLabel } from "./conversationModel";
 import { styles as s } from "./MessageBubble.styles";
-
-/** Error ink on the app background, not on the coral bubble. */
-function failedColor(dark: boolean) {
-  return dark ? "#FFB4AB" : "#B3261E";
-}
 
 type VoiceNoteHandle = { toggle: () => void };
 
@@ -31,8 +26,8 @@ const VoiceNote = React.forwardRef<
   const player = useAudioPlayer(message.uri ?? null);
   const status = useAudioPlayerStatus(player);
   const colors = palette(dark);
-  const color = message.mine ? colors.outgoingFg : colors.fg;
-  const activeWave = message.mine ? color : colors.coralInk;
+  const color = colors.fg;
+  const activeWave = colors.fg;
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
   useEffect(() => {
@@ -72,11 +67,11 @@ const VoiceNote = React.forwardRef<
 
   return (
     <View style={s.voice}>
-      <View style={s.voicePlay}>
+      <View style={[s.voicePlay, { backgroundColor: colors.selected }]}>
         <Ionicons
           name={status.playing ? "pause" : "play"}
           size={18}
-          color={onCoral}
+          color={colors.fg}
         />
       </View>
       <View style={s.wave}>
@@ -84,13 +79,13 @@ const VoiceNote = React.forwardRef<
           <View
             key={i}
             style={{
-              width: 3,
-              borderRadius: 3,
+              width: 4,
+              borderRadius: 2,
               height: 7 + ((i * 17 + 7) % 23),
               backgroundColor:
                 i / 28 < status.currentTime / (status.duration || 1)
                   ? activeWave
-                  : "#C7BAB1",
+                  : colors.line,
             }}
           />
         ))}
@@ -117,8 +112,7 @@ function DeliveryMeta({
   dark: boolean;
   showTimestamp: boolean;
 }) {
-  const { muted } = palette(dark);
-  const failure = failedColor(dark);
+  const { muted, danger } = palette(dark);
   const pending = message.status === "sending" || message.status === "failed";
   const uploading =
     message.status === "sending" && message.kind && message.uploadProgress !== undefined
@@ -126,14 +120,28 @@ function DeliveryMeta({
       : null;
   if (!showTimestamp && !pending) return null;
   return (
-    <View style={s.messageMeta}>
+    <View
+      accessible
+      accessibilityLabel={
+        message.status === "failed"
+          ? "Not sent. Tap to retry."
+          : message.status === "sending"
+            ? uploading === null
+              ? "Sending"
+              : `Uploading ${uploading}%`
+            : message.mine
+              ? "Sent"
+              : message.time
+      }
+      style={s.messageMeta}
+    >
       <Text style={[s.tiny, { color: muted }]}>{message.time}</Text>
       {message.mine && message.status === "failed" ? (
         <>
-          <Ionicons name="alert-circle" size={14} color={failure} />
+          <Ionicons name="alert-circle" size={14} color={danger} />
           <Text
             accessibilityLiveRegion="polite"
-            style={[s.tiny, { color: failure }]}
+            style={[s.tiny, { color: danger }]}
           >
             Not sent. Tap to retry.
           </Text>
@@ -181,8 +189,17 @@ export default function MessageBubble({
   onViewMedia,
   onRetry,
 }: MessageBubbleProps) {
-  const { fg, muted, card, outgoingFg, outgoingMuted, coralInk } =
+  const {
+    fg,
+    muted,
+    card,
+    media,
+    line,
+    onImage,
+  } =
     palette(dark);
+  const neutralSurface = dark ? "#2A2A2A" : "#F4F4F4";
+  const neutralWell = dark ? "#242424" : "#F4F4F4";
   const bubble = useRef<View>(null);
   const voice = useRef<VoiceNoteHandle>(null);
   const pendingTap = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -307,36 +324,42 @@ export default function MessageBubble({
         onPress={handleTap}
         style={[
           s.bubble,
-          { backgroundColor: m.mine ? (dark ? "#B86B57" : "#F4A18B") : card },
+          {
+            backgroundColor: m.mine ? neutralSurface : card,
+            borderColor: line,
+            borderWidth: m.mine ? 0 : 1,
+          },
           m.mine ? s.bubbleMine : s.bubbleTheirs,
-          m.kind === "image" && { padding: 5 },
+          m.kind === "image" && { padding: space.xs },
         ]}
       >
         {m.forwarded && !m.deleted && (
-          <Text
-            style={[
-              s.tiny,
-              { color: m.mine ? outgoingMuted : muted, marginBottom: 6 },
-            ]}
-          >
-            ↪ Forwarded
-          </Text>
+          <View style={s.forwarded}>
+            <Ionicons
+              name="arrow-redo"
+              size={14}
+              color={muted}
+            />
+            <Text style={[s.tiny, { color: muted }]}>
+              Forwarded
+            </Text>
+          </View>
         )}
         {m.replyTo && !m.deleted && (
           <View
             style={{
-              borderLeftWidth: 3,
-              borderLeftColor: m.mine ? outgoingMuted : coralInk,
-              backgroundColor: "#00000010",
-              borderRadius: 6,
-              padding: 8,
-              marginBottom: 8,
+              borderLeftWidth: 4,
+              borderLeftColor: line,
+              backgroundColor: neutralWell,
+              borderRadius: radius.badge,
+              padding: space.sm,
+              marginBottom: space.sm,
             }}
           >
-            <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
+            <Text style={[s.tiny, { color: muted }]}>
               {m.replyTo.mine ? "You" : "Reply"}
             </Text>
-            <Text numberOfLines={2} style={{ color: m.mine ? outgoingFg : fg }}>
+            <Text numberOfLines={2} style={{ color: fg }}>
               {m.replyTo.text}
             </Text>
           </View>
@@ -347,17 +370,23 @@ export default function MessageBubble({
           </Text>
         ) : m.kind === "video" ? (
           <View
-            style={[
-              s.chatImage,
-              {
-                backgroundColor: "#292C29",
-                justifyContent: "center",
-                alignItems: "center",
-              },
-            ]}
+            style={[s.videoPreview, { backgroundColor: media }]}
           >
-            <Ionicons name="play-circle" size={56} color="white" />
-            <Text style={{ color: "white" }}>Video · Tap to play</Text>
+            {m.previewUri ? (
+              <ResponsiveImage
+                uri={m.previewUri}
+                previewUri={m.previewUri}
+                previewWidth={m.previewWidth}
+                displayWidth={220}
+                style={s.videoPreview}
+                contentFit="cover"
+                recyclingKey={`${m.id}-preview`}
+              />
+            ) : null}
+            <View style={[s.videoShade, { backgroundColor: m.previewUri ? "rgba(0,0,0,0.24)" : media }]}>
+              <Ionicons name="play-circle" size={56} color={onImage} />
+              <Text style={{ color: onImage }}>Video · Tap to play</Text>
+            </View>
           </View>
         ) : m.kind === "image" ? (
           <ResponsiveImage
@@ -385,27 +414,30 @@ export default function MessageBubble({
             <Ionicons
               name="document-text-outline"
               size={28}
-              color={m.mine ? outgoingFg : coralInk}
+              color={fg}
             />
             <Text
               numberOfLines={2}
-              style={[s.body, { color: m.mine ? outgoingFg : fg, flex: 1 }]}
+              style={[s.body, { color: fg, flex: 1 }]}
             >
               {m.filename}
             </Text>
             <Ionicons
               name="open-outline"
               size={17}
-              color={m.mine ? outgoingMuted : muted}
+              color={muted}
             />
           </View>
         ) : (
-          <Text style={[s.messageText, { color: m.mine ? outgoingFg : fg }]}>
+          <Text style={[s.messageText, { color: fg }]}>
             {m.text}
           </Text>
         )}
+        {(m.kind === "image" || m.kind === "video") && !!m.text && !m.deleted && (
+          <Text style={[s.mediaCaption, { color: fg }]}>{m.text}</Text>
+        )}
         {m.reaction && !m.deleted && (
-          <View style={s.reaction}>
+          <View style={[s.reaction, { backgroundColor: card }]}>
             <Text>{m.reaction}</Text>
           </View>
         )}

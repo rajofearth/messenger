@@ -10,7 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import { Avatar } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export type NewConversationScreenProps = {
   contacts: Chat[];
@@ -39,7 +39,16 @@ export default function NewConversationScreen({
 }: NewConversationScreenProps) {
   const [search, setSearch] = useState("");
   const base = palette(dark);
-  const colors = { ...base, text: base.fg, input: base.card };
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    text: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    input: dark ? "#202020" : "#F4F4F4",
+    tint: dark ? "#242424" : "#F4F4F4",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+  };
   const query = search.trim().toLowerCase();
   const people = contacts.filter((chat) => !chat.group);
   const filtered = people.filter((chat) =>
@@ -86,7 +95,7 @@ export default function NewConversationScreen({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          selectionColor={coral}
+          selectionColor={colors.coralInk}
           style={[s.searchInput, { color: colors.text }]}
         />
         {search.length > 0 && (
@@ -170,12 +179,21 @@ export default function NewConversationScreen({
         renderItem={({ item: chat }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={chat.name}
+            accessibilityLabel={`${chat.name}${
+              chat.username ? `, @${chat.username.replace(/^@/, "")}` : ""
+            }`}
             onPress={() => onSelect(chat)}
             style={({ pressed }) => [s.row, pressed && s.pressed]}
           >
             <Avatar uri={chat.avatar} name={chat.name} size={52} />
-            <Text style={[s.name, { color: colors.text }]}>{chat.name}</Text>
+            <View style={s.rowCopy}>
+              <Text style={[s.name, { color: colors.text }]}>{chat.name}</Text>
+              {!!chat.username && (
+                <Text style={[s.handle, { color: colors.muted }]}>
+                  @{chat.username.replace(/^@/, "")}
+                </Text>
+              )}
+            </View>
           </Pressable>
         )}
         ListEmptyComponent={
@@ -196,10 +214,10 @@ const s = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-    gap: 8,
+    paddingHorizontal: space.xxl,
+    paddingTop: space.md,
+    paddingBottom: space.xl,
+    gap: space.sm,
   },
   iconButton: {
     width: 48,
@@ -207,23 +225,22 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { flex: 1, fontFamily: "DMSans_700Bold", fontSize: 26 },
+  title: { flex: 1, fontSize: 24, fontWeight: "600" },
   search: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 24,
-    marginBottom: 16,
-    paddingLeft: 16,
-    paddingRight: 4,
-    borderRadius: 18,
+    marginHorizontal: space.xxl,
+    marginBottom: space.lg,
+    paddingLeft: space.lg,
+    paddingRight: space.xs,
+    borderRadius: 16,
     minHeight: 52,
-    gap: 10,
+    gap: space.sm,
   },
   searchInput: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: 14,
-    fontFamily: "DMSans_400Regular",
+    paddingVertical: space.md,
     fontSize: 15,
   },
   clearButton: {
@@ -232,33 +249,34 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { paddingHorizontal: 24, paddingBottom: 24 },
+  list: { paddingHorizontal: space.xxl, paddingBottom: space.xxl },
   row: {
     flexDirection: "row",
     alignItems: "center",
     minHeight: 76,
-    paddingVertical: 10,
-    gap: 16,
+    paddingVertical: space.sm,
+    gap: space.lg,
   },
   actionIcon: {
     width: 52,
     height: 52,
-    borderRadius: 18,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { flex: 1, fontFamily: "DMSans_500Medium", fontSize: 17 },
+  rowCopy: { flex: 1, minWidth: 0 },
+  name: { flex: 1, fontSize: 17, fontWeight: "600" },
+  handle: { fontSize: 12, marginTop: space.xs },
   section: {
     borderTopWidth: 1,
-    marginTop: 16,
-    paddingTop: 24,
-    paddingBottom: 8,
+    marginTop: space.lg,
+    paddingTop: space.xxl,
+    paddingBottom: space.sm,
   },
-  sectionLabel: { fontFamily: "DMSans_700Bold", fontSize: 14 },
+  sectionLabel: { fontSize: 14, fontWeight: "600" },
   empty: {
     textAlign: "center",
-    paddingVertical: 40,
-    fontFamily: "DMSans_400Regular",
+    paddingVertical: space.xxxl + space.sm,
     fontSize: 15,
   },
   pressed: { opacity: 0.55 },

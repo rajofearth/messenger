@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AppState, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { styles } from "./CallScreen.styles";
+import { CALL_ACCENT, styles } from "./CallScreen.styles";
 
 export default function CallScreenCamera({ front }: { front: boolean }) {
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -59,9 +59,19 @@ export default function CallScreenCamera({ front }: { front: boolean }) {
         ? "Open settings"
         : "Enable camera";
   return (
-    <View style={{ padding: 8, paddingBottom: 28 }}>
-      <Text style={[styles.youText, { textAlign: "center", marginBottom: 8 }]}>
-        {failed ? "Camera unavailable" : permissionError ? "Permission unavailable" : "Local preview"}
+    <View style={{ padding: 12, paddingBottom: 28, alignItems: "center", maxWidth: 260 }}>
+      <Text style={[styles.youText, { textAlign: "center", marginBottom: 6 }]}
+      >
+        {failed ? "Camera unavailable" : permissionError ? "Camera permission unavailable" : "Camera preview"}
+      </Text>
+      <Text style={{ color: "#D9DBDF", fontSize: 12, lineHeight: 17, textAlign: "center", marginBottom: 10 }}>
+        {failed
+          ? "The preview could not start. Try opening it again."
+          : permissionError
+            ? "Camera access could not be checked. Try again, or use Settings if access was blocked."
+            : permission?.granted
+              ? "The preview pauses while Messenger is in the background."
+              : "Allow camera access to show your video to you during this call."}
       </Text>
       <Pressable
         accessibilityRole="button"
@@ -71,8 +81,13 @@ export default function CallScreenCamera({ front }: { front: boolean }) {
           if (failed) setFailed(false);
           else void enableCamera();
         }}
+        style={({ pressed }) => [
+          styles.cameraAction,
+          pressed && styles.pressed,
+          (busy || !active) && styles.disabledAction,
+        ]}
       >
-        <Text style={[styles.youText, { textAlign: "center", color: "#F28B70" }]}>
+        <Text style={[styles.youText, { textAlign: "center", color: CALL_ACCENT }]}>
           {busy ? "Please wait" : label}
         </Text>
       </Pressable>

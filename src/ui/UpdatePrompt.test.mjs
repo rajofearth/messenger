@@ -37,7 +37,11 @@ function harness(overrides = {}) {
     "react-native-safe-area-context": { SafeAreaView: "SafeAreaView" },
     "@expo/vector-icons/Ionicons": "Icon",
     "../domain/updates": { formatBytes: () => "13.7 MiB" },
-    "./theme": { palette: () => ({}), coral: "coral", onCoral: "white" },
+    "./theme": {
+      palette: () => ({}),
+      radius: { control: 10, sheet: 20, pill: 999 },
+      space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 },
+    },
     "./primitives": { tap() {} },
   };
   const compiled = ts.transpileModule(readFileSync(new URL("./UpdatePrompt.tsx", import.meta.url), "utf8"), {

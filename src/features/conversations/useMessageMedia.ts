@@ -141,7 +141,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
         if (!permission.granted) {
           Alert.alert(
             "Microphone permission needed",
-            "Allow microphone access to record a voice note.",
+            "Allow microphone access to record.",
           );
           return;
         }
@@ -170,7 +170,7 @@ export function useMessageMedia(onSend: (message: Partial<Message>) => void) {
       await resetAudioMode();
       Alert.alert(
         "Recording unavailable",
-        "Please check your microphone permission and try again.",
+         "Check microphone permission and try again.",
       );
     } finally {
       busy.current = false;

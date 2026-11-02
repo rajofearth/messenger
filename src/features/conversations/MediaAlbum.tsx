@@ -3,12 +3,13 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Message } from "../../domain/data";
 import { albumOverflowCount } from "../../domain/mediaAlbums";
-import { palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import type { MessageBubbleProps } from "./MessageBubble";
 
 type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "visible"> & {
+  dark: boolean;
   onOpen: () => void;
   label: string;
   style?: StyleProp<ViewStyle>;
@@ -16,7 +17,8 @@ type ItemProps = Pick<MessageBubbleProps, "message" | "onActions" | "visible"> &
 };
 
 /** Shared gestures keep each album item independently actionable, including in the viewer. */
-export function AlbumItem({ message, onActions, visible = true, onOpen, label, style, children }: ItemProps) {
+export function AlbumItem({ dark, message, onActions, visible = true, onOpen, label, style, children }: ItemProps) {
+  const colors = palette(dark);
   const target = useRef<View>(null);
   const longPressed = useRef(false);
   const active = useRef(visible);
@@ -55,9 +57,9 @@ export function AlbumItem({ message, onActions, visible = true, onOpen, label, s
         accessibilityLabel={`Message actions for ${message.kind === "video" ? "video" : "photo"}`}
         onPress={actions}
         hitSlop={6}
-        style={s.menu}
+        style={[s.menu, { backgroundColor: colors.scrim }]}
       >
-        <Ionicons name="ellipsis-horizontal" size={20} color="white" />
+        <Ionicons name="ellipsis-horizontal" size={20} color={colors.onImage} />
       </Pressable>
     </Pressable>
   );
@@ -67,16 +69,25 @@ type Props = Omit<MessageBubbleProps, "message"> & { messages: Message[] };
 export default function MediaAlbum({ messages, dark, showTimestamp, visible = true, onActions, onViewMedia }: Props) {
   const first = messages[0];
   const last = messages[messages.length - 1];
-  const { card, coralInk, fg, muted, outgoingFg, outgoingMuted } =
+  const {
+    card,
+    fg,
+    muted,
+    line,
+    media,
+    onImage,
+    scrim,
+  } =
     palette(dark);
+  const albumSurface = dark ? "#2A2A2A" : "#F4F4F4";
   const overflow = albumOverflowCount(messages.length);
   return (
     <View style={[s.row, first.mine && { alignItems: "flex-end" }]}>
-      <View style={[s.album, { backgroundColor: first.mine ? (dark ? "#B86B57" : "#F4A18B") : card }]}>
+      <View style={[s.album, { backgroundColor: first.mine ? albumSurface : card }]}>
         {first.replyTo && (
-          <View style={[s.reply, { borderLeftColor: first.mine ? outgoingMuted : coralInk }]}>
-            <Text style={{ color: first.mine ? outgoingMuted : muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
-            <Text numberOfLines={2} style={{ color: first.mine ? outgoingFg : fg }}>{first.replyTo.text}</Text>
+          <View style={[s.reply, { borderLeftColor: line }]}>
+            <Text style={{ color: muted }}>{first.replyTo.mine ? "You" : "Reply"}</Text>
+            <Text numberOfLines={2} style={{ color: fg }}>{first.replyTo.text}</Text>
           </View>
         )}
         <View style={s.grid}>
@@ -90,7 +101,12 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
               label={index === 3 && overflow
                 ? `${overflow} more ${messages.some((item) => item.kind === "video") ? "media items" : "photos"}`
                 : `${message.kind === "video" ? "Video" : "Photo"} ${index + 1} of ${messages.length}`}
-              style={[s.tile, messages.length === 3 && index === 2 && { width: "100%", aspectRatio: 2 }]}
+              dark={dark}
+              style={[
+                s.tile,
+                { backgroundColor: media },
+                messages.length === 3 && index === 2 && { width: "100%", aspectRatio: 2 },
+              ]}
             >
               {message.kind === "image" ? (
                 <ResponsiveImage
@@ -105,11 +121,27 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />
-              ) : <Ionicons name="play-circle" size={44} color="white" />}
-              {!!message.text && <Text numberOfLines={2} style={s.caption}>{message.text}</Text>}
-              {!!message.reaction && <Text style={s.reaction}>{message.reaction}</Text>}
+              ) : <Ionicons name="play-circle" size={44} color={onImage} />}
+              {!!message.text && (
+                <Text
+                  numberOfLines={2}
+                  style={[s.caption, { color: onImage, backgroundColor: scrim }]}
+                >
+                  {message.text}
+                </Text>
+              )}
+              {!!message.reaction && (
+                <Text style={[s.reaction, { backgroundColor: card }]}>
+                  {message.reaction}
+                </Text>
+              )}
               {index === 3 && overflow > 0 && (
-                <View pointerEvents="none" style={s.overflow}><Text style={s.count}>+{overflow}</Text></View>
+                <View
+                  pointerEvents="none"
+                  style={[s.overflow, { backgroundColor: scrim }]}
+                >
+                  <Text style={[s.count, { color: onImage }]}>+{overflow}</Text>
+                </View>
               )}
             </AlbumItem>
           ))}
@@ -118,7 +150,7 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
       {showTimestamp && (
         <View style={s.meta}>
           <Text style={{ color: muted, fontSize: 11 }}>{last.time}</Text>
-          {last.mine && <Ionicons name="checkmark" size={15} color={coralInk} />}
+          {last.mine && <Ionicons name="checkmark" size={15} color={muted} />}
         </View>
       )}
     </View>
@@ -126,15 +158,15 @@ export default function MediaAlbum({ messages, dark, showTimestamp, visible = tr
 }
 
 const s = StyleSheet.create({
-  row: { alignItems: "flex-start", marginBottom: 10 },
-  album: { width: "82%", maxWidth: 340, borderRadius: 18, padding: 4, overflow: "hidden" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  tile: { width: "49%", flexGrow: 1, aspectRatio: 1, backgroundColor: "#292C29", borderRadius: 6, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  menu: { position: "absolute", top: 6, right: 6, backgroundColor: "#00000088", borderRadius: 12, paddingHorizontal: 5, paddingVertical: 2, zIndex: 2 },
-  overflow: { ...StyleSheet.absoluteFill, backgroundColor: "#00000088", justifyContent: "center", alignItems: "center" },
-  count: { color: "white", fontSize: 32, fontWeight: "600" },
-  caption: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 5, color: "white", backgroundColor: "#00000088", fontSize: 12 },
-  reaction: { position: "absolute", bottom: 4, right: 4, backgroundColor: "white", borderRadius: 12, padding: 2 },
-  reply: { borderLeftWidth: 3, padding: 8, marginBottom: 4 },
-  meta: { flexDirection: "row", gap: 4, marginTop: 5 },
+  row: { alignItems: "flex-start", marginBottom: space.sm },
+  album: { width: "82%", maxWidth: 340, borderRadius: radius.control, padding: space.xs, overflow: "hidden" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
+  tile: { width: "49%", flexGrow: 1, aspectRatio: 1, borderRadius: radius.badge, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  menu: { position: "absolute", top: space.sm, right: space.sm, borderRadius: radius.control, paddingHorizontal: space.xs, paddingVertical: space.xs, zIndex: 2 },
+  overflow: { ...StyleSheet.absoluteFill, justifyContent: "center", alignItems: "center" },
+  count: { fontSize: 32, fontWeight: "600" },
+  caption: { position: "absolute", bottom: 0, left: 0, right: 0, padding: space.xs, fontSize: 12 },
+  reaction: { position: "absolute", bottom: space.xs, right: space.xs, borderRadius: radius.control, padding: space.xs },
+  reply: { borderLeftWidth: 2, borderRadius: radius.badge, padding: space.sm, marginBottom: space.xs },
+  meta: { flexDirection: "row", gap: space.xs, marginTop: space.xs },
 });

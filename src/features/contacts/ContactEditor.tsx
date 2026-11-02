@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,7 +12,7 @@ import {
 } from "react-native";
 import { IconButton } from "../../ui/primitives";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { palette, coral, onCoral } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 export default function ContactEditor({
   kind,
   dark,
@@ -28,21 +27,32 @@ export default function ContactEditor({
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
-  const colors = palette(dark);
+  const [error, setError] = useState("");
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    onCoral: dark ? "#111111" : "#FFFFFF",
+  };
   useEffect(() => {
     setName("");
     setHandle("");
+    setError("");
   }, [kind]);
   function save() {
     if (!name.trim() || !handle.trim()) {
-      Alert.alert(
-        "Missing details",
+      setError(
         kind === "group"
-          ? "Enter a group name and at least one member username."
-          : "Enter a name and username.",
+          ? "Enter a group name and at least one member username"
+          : "Enter a name and username",
       );
       return;
     }
+    setError("");
     onSave(name.trim(), handle.trim(), kind === "group");
   }
   return (
@@ -69,7 +79,10 @@ export default function ContactEditor({
           contentContainerStyle={[s.sheet, { backgroundColor: colors.bg }]}
         >
           <View style={s.header}>
-            <Text style={[s.title, { color: colors.fg }]}>
+            <Text
+              accessibilityRole="header"
+              style={[s.title, { color: colors.fg }]}
+            >
               {kind === "group" ? "Create group" : "New contact"}
             </Text>
             <IconButton
@@ -87,7 +100,10 @@ export default function ContactEditor({
             placeholder={kind === "group" ? "Group name" : "Full name"}
             placeholderTextColor={colors.muted}
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              setError("");
+              setName(value);
+            }}
             maxLength={70}
             style={[
               s.input,
@@ -100,7 +116,10 @@ export default function ContactEditor({
               placeholder="@username"
               placeholderTextColor={colors.muted}
               value={handle}
-              onChangeText={setHandle}
+              onChangeText={(value) => {
+                setError("");
+                setHandle(value);
+              }}
               autoCapitalize="none"
               maxLength={100}
               style={[
@@ -114,7 +133,10 @@ export default function ContactEditor({
               placeholder="Member @usernames, separated by commas"
               placeholderTextColor={colors.muted}
               value={handle}
-              onChangeText={setHandle}
+              onChangeText={(value) => {
+                setError("");
+                setHandle(value);
+              }}
               autoCapitalize="none"
               multiline
               maxLength={400}
@@ -125,12 +147,20 @@ export default function ContactEditor({
               ]}
             />
           )}
+          <Text style={[s.helper, { color: error ? colors.danger : colors.muted }]}
+          >
+            {error ||
+              (kind === "group"
+                ? "Separate member usernames with commas"
+                : "Use the username they use on Messenger")}
+          </Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={kind === "group" ? "Create group" : "Add contact"}
             onPress={save}
-            style={s.primary}
+            style={[s.primary, { backgroundColor: colors.switchTrackOn }]}
           >
-            <Text style={s.primaryText}>
+            <Text style={[s.primaryText, { color: colors.onCoral }]}>
               {kind === "group" ? "Create group" : "Add contact"}
             </Text>
           </Pressable>
@@ -142,33 +172,32 @@ export default function ContactEditor({
 const s = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "#FBFAF7",
+    backgroundColor: "transparent",
   },
   sheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-    gap: 15,
+    borderTopLeftRadius: radius.control,
+    borderTopRightRadius: radius.control,
+    padding: space.xxl,
+    paddingBottom: space.xxxl,
+    gap: space.lg,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 23 },
+  title: { fontSize: 22, fontWeight: "600" },
   input: {
-    borderRadius: 14,
-    padding: 16,
-    fontFamily: "DMSans_400Regular",
+    borderRadius: radius.control,
+    padding: space.lg,
     fontSize: 15,
   },
   members: { minHeight: 92, textAlignVertical: "top" },
+  helper: { fontSize: 12, lineHeight: 18, marginTop: -space.sm },
   primary: {
-    backgroundColor: coral,
-    padding: 16,
-    borderRadius: 17,
+    padding: space.lg,
+    borderRadius: radius.control,
     alignItems: "center",
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
+  primaryText: { fontSize: 14, fontWeight: "600" },
 });

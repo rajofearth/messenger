@@ -10,7 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Chat } from "../../domain/data";
-import { palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export type ChatActionTarget = { chat: Chat; x?: number; y?: number };
 
@@ -41,7 +41,7 @@ export default function ChatListActions({
   if (!target) return null;
   const { chat, x, y } = target;
   const menuWidth = Math.min(280, width - 24);
-  const menuHeight = confirming ? 250 : 272;
+  const menuHeight = confirming ? 248 : 272;
   const left =
     x === undefined
       ? Math.max(12, (width - menuWidth) / 2)
@@ -65,7 +65,7 @@ export default function ChatListActions({
     action: () => void,
     destructive = false,
   ) {
-    const ink = destructive ? (dark ? "#FFB4AB" : "#B3261E") : colors.fg;
+    const ink = destructive ? colors.danger : colors.fg;
     return (
       <Pressable
         accessibilityRole="button"
@@ -76,11 +76,7 @@ export default function ChatListActions({
           pressed && { backgroundColor: colors.line },
         ]}
       >
-        <Ionicons
-          name={icon}
-          size={19}
-          color={ink}
-        />
+        <Ionicons name={icon} size={19} color={ink} />
         <Text style={[s.label, { color: ink }]}>
           {label}
         </Text>
@@ -96,7 +92,7 @@ export default function ChatListActions({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={s.overlay}>
+      <View style={[s.overlay, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
@@ -114,6 +110,7 @@ export default function ChatListActions({
               width: menuWidth,
               backgroundColor: colors.card,
               borderColor: colors.line,
+              shadowColor: colors.shadow,
             },
           ]}
         >
@@ -169,33 +166,41 @@ export default function ChatListActions({
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.2)" },
+  overlay: { flex: 1 },
   menu: {
     position: "absolute",
-    borderRadius: 18,
+    borderRadius: radius.card,
     borderWidth: 1,
-    padding: 8,
-    elevation: 8,
-    shadowColor: "#000",
+    padding: space.sm,
+    elevation: 4,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
   },
-  title: { fontFamily: "DMSans_600SemiBold", fontSize: 15, padding: 12 },
+  title: {
+    fontFamily: "sans-serif-medium",
+    fontSize: 15,
+    lineHeight: 20,
+    padding: space.md,
+  },
   option: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: space.sm,
     minHeight: 48,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingHorizontal: space.md,
+    borderRadius: radius.control,
   },
-  label: { flexShrink: 1, fontFamily: "DMSans_500Medium", fontSize: 14 },
+  label: {
+    flexShrink: 1,
+    fontFamily: "sans-serif-medium",
+    fontSize: 14,
+  },
   message: {
-    fontFamily: "DMSans_400Regular",
+    fontFamily: "sans-serif",
     fontSize: 14,
     lineHeight: 21,
-    paddingHorizontal: 12,
-    paddingBottom: 12,
+    paddingHorizontal: space.md,
+    paddingBottom: space.md,
   },
 });

@@ -11,10 +11,11 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
-import { palette } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
@@ -68,7 +69,8 @@ export default function ConversationScreen({
   loadOlderFailed = false,
   onLoadOlder,
 }: ConversationScreenProps) {
-  const { bg, fg, muted, line } = palette(dark);
+  const { bg, fg, muted, line, media: mediaBg, onImage } = palette(dark);
+  const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
@@ -177,7 +179,15 @@ export default function ConversationScreen({
       style={[s.root, { backgroundColor: bg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={[s.chatHeader, { borderBottomColor: line }]}>
+      <View
+        style={[
+          s.chatHeader,
+          {
+            borderBottomColor: line,
+            paddingTop: space.sm + Math.min(insets.top, space.xl),
+          },
+        ]}
+      >
         <IconButton
           name="chevron-back"
           label="Back to chats"
@@ -197,15 +207,22 @@ export default function ConversationScreen({
           accessibilityLabel={`View ${chat.name}'s profile`}
           onPress={() => guardRecording(onProfile)}
         >
-          <Text numberOfLines={1} style={[s.name, { color: fg }]}>
+          <Text
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={[s.name, { color: fg }]}
+          >
             {chat.name}
-            {chat.muted ? " · Muted" : ""}
           </Text>
-          {(chat.blocked || chat.group) && (
-            <Text style={[s.tiny, { color: muted, marginTop: 3 }]}>
-              {chat.blocked ? "Blocked" : "Your little circle"}
-            </Text>
-          )}
+          <Text style={[s.headerStatus, { color: muted }]}>
+            {chat.blocked
+              ? "Blocked"
+              : chat.group
+                ? "Group chat"
+                : chat.muted
+                  ? "Muted"
+                  : "Conversation"}
+          </Text>
         </Pressable>
         {!chat.group && (
           <>
@@ -270,7 +287,7 @@ export default function ConversationScreen({
           dark={dark}
           title="Share media"
           permissionTitle="Choose media to share"
-          permissionText="Allow Messenger to see your photos and videos so you can share them in this conversation."
+          permissionText="Allow photo and video access to share media here."
           emptyTitle="No photos or videos yet"
           emptyText="Take a photo or video to share it here."
           onPicked={media.pickMedia}
@@ -310,6 +327,7 @@ export default function ConversationScreen({
           key={album.initialId}
           messages={albumMessages}
           initialId={album.initialId}
+          dark={dark}
           visible={visible}
           onClose={() => setAlbum(null)}
           onActions={(nextTarget) => {
@@ -324,12 +342,15 @@ export default function ConversationScreen({
         animationType="fade"
         onRequestClose={() => setViewer(null)}
       >
-        <View style={s.imageViewer}>
-          <View style={s.imageClose}>
+         <View
+           accessibilityViewIsModal
+           style={[s.imageViewer, { backgroundColor: mediaBg }]}
+         >
+           <View style={[s.imageClose, { top: insets.top + space.sm }]}>
             <IconButton
               name="close"
               label="Close media"
-              color="white"
+              color={onImage}
               onPress={() => setViewer(null)}
             />
           </View>

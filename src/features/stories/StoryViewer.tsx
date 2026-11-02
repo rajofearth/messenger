@@ -9,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { StoryGroup } from "../../domain/stories";
 import type { Story } from "../../domain/data";
@@ -71,10 +70,13 @@ export function StoryViewer(props: Props) {
   const [viewersOpen, setViewersOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [held, setHeld] = useState(false);
+  const [manualPaused, setManualPaused] = useState(false);
+  const [mediaRetry, setMediaRetry] = useState(0);
+  const [mediaError, setMediaError] = useState(false);
   const [background, setBackground] = useState(
     AppState.currentState !== "active",
   );
-  const paused = held || background || viewersOpen || saving;
+  const paused = held || background || viewersOpen || saving || manualPaused;
   const [progress, setProgress] = useState({ id: active?.id, value: 0 });
   const elapsed = useRef(0);
   const latest = useRef({ props, ownerIndex, itemIndex, active, paused });
@@ -95,6 +97,9 @@ export function StoryViewer(props: Props) {
     });
     setViewersOpen(false);
     setSaving(false);
+    setManualPaused(false);
+    setMediaRetry(0);
+    setMediaError(false);
   }
   function move(direction: number, ownerOnly = false) {
     const current = latest.current;
@@ -198,18 +203,20 @@ export function StoryViewer(props: Props) {
           video={active.video}
           crop={active.crop}
           paused={paused || !ready}
+          retryKey={mediaRetry}
+          onError={() => setMediaError(true)}
           onProgress={(value) => setProgress({ id: active.id, value })}
           onEnd={() => {
             if (ready) moveRef.current(1);
           }}
         />
-        <LinearGradient
-          colors={["#00000099", "transparent", "#000000AA"]}
-          style={s.image}
-          pointerEvents="none"
-        />
+        <View style={s.imageScrim} pointerEvents="none" />
         <View style={s.top}>
-          <View style={s.tracks}>
+          <View
+            style={s.tracks}
+            accessible
+            accessibilityLabel={`Story ${itemIndex + 1} of ${group.items.length}`}
+          >
             {group.items.map((item, i) => (
               <View key={item.id} style={s.track}>
                 {item.uploadStatus === "failed" && (
@@ -264,19 +271,25 @@ export function StoryViewer(props: Props) {
               )}
             </View>
             {ownStory && (
-              <IconButton
-                name="trash-outline"
-                label="Delete your story"
-                color="white"
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Delete your story"
                 onPress={() => props.onDelete(active.id)}
-              />
+                style={s.deleteStory}
+              >
+                <Ionicons name="trash-outline" size={19} color="white" />
+                <Text style={s.deleteStoryText}>Delete</Text>
+              </Pressable>
             )}
-            <IconButton
-              name="close"
-              label="Close story"
-              color="white"
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close story"
               onPress={props.onClose}
-            />
+              style={s.closeStory}
+            >
+              <Ionicons name="close" size={21} color="white" />
+              <Text style={s.closeStoryText}>Close</Text>
+            </Pressable>
           </View>
         </View>
         <View
@@ -297,6 +310,38 @@ export function StoryViewer(props: Props) {
           }
         />
         <View style={s.bottom} pointerEvents="box-none">
+          {active.video && ready && !mediaError && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={manualPaused ? "Play story video" : "Pause story video"}
+              onPress={() => setManualPaused((value) => !value)}
+              style={s.playbackControl}
+            >
+              <Ionicons
+                name={manualPaused ? "play" : "pause"}
+                size={16}
+                color="white"
+              />
+              <Text style={s.playbackControlText}>{manualPaused ? "Play" : "Pause"}</Text>
+            </Pressable>
+          )}
+          {mediaError && (
+            <View style={s.mediaErrorAction}>
+              <Text style={s.mediaErrorActionText}>Video unavailable.</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry video"
+                onPress={() => {
+                  setMediaError(false);
+                  setMediaRetry((value) => value + 1);
+                }}
+                style={s.retry}
+              >
+                <Ionicons name="refresh" size={16} color="white" />
+                <Text style={s.uploadText}>Retry video</Text>
+              </Pressable>
+            </View>
+          )}
           {!!active.caption && (
             <Text style={s.caption} pointerEvents="none">
               {active.caption}
@@ -321,7 +366,7 @@ export function StoryViewer(props: Props) {
             <View style={s.uploadState}>
               <ActivityIndicator size="small" color="white" />
               <Text style={s.uploadText}>
-                Uploading {uploadPercent ?? 0}% · this story will appear when it finishes
+                Uploading {uploadPercent ?? 0}%
               </Text>
             </View>
           )}
@@ -334,7 +379,7 @@ export function StoryViewer(props: Props) {
             >
               <Ionicons name="refresh" size={16} color="white" />
               <Text style={s.uploadText}>
-                Upload failed · Tap to retry
+                Upload failed · Retry
               </Text>
             </Pressable>
           )}
@@ -354,7 +399,7 @@ export function StoryViewer(props: Props) {
                 <IconButton
                   name="close"
                   label="Close viewers"
-                  color="white"
+                  color="#111111"
                   onPress={() => setViewersOpen(false)}
                 />
               </View>
@@ -364,12 +409,15 @@ export function StoryViewer(props: Props) {
                 showsVerticalScrollIndicator={false}
               >
                 {viewers === undefined ? (
-                  <ActivityIndicator color="white" style={s.viewersLoading} />
+                  <View style={s.viewersLoading}>
+                    <ActivityIndicator color="#111111" />
+                    <Text style={s.viewersLoadingText}>Loading viewers…</Text>
+                  </View>
                 ) : viewers.length === 0 ? (
                   <View style={s.viewersEmptyState}>
-                    <Ionicons name="eye-outline" size={34} color="#FFFFFF88" />
+                    <Ionicons name="eye-outline" size={34} color="#6B6B6B" />
                     <Text style={s.viewersEmptyTitle}>0 views yet</Text>
-                    <Text style={s.viewersEmpty}>Viewers will appear here after they watch this story.</Text>
+                    <Text style={s.viewersEmpty}>Viewers appear here when they watch.</Text>
                   </View>
                 ) : (
                   viewers.map((view) => (

@@ -12,11 +12,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton, type IconName } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
-import {
-  CallHistoryActions,
-  CallHistoryList,
-} from "../calls/CallHistoryDetail";
+import { palette, space } from "../../ui/theme";
+import { CallHistoryList } from "../calls/CallHistoryDetail";
+import ChatProfileActions from "./ChatProfileActions";
 import ChatProfileShared from "./ChatProfileShared";
 import { profileDate, profileMembership } from "./ChatProfileMetadata";
 
@@ -51,7 +49,20 @@ export default function ChatProfile({
   onClearHistory,
   onOpenChat,
 }: ChatProfileProps) {
-  const colors = palette(dark);
+  const base = palette(dark);
+  const colors = {
+    ...base,
+    bg: dark ? "#111111" : "#FFFFFF",
+    fg: dark ? "#F5F5F5" : "#111111",
+    muted: dark ? "#A6A6A6" : "#6B6B6B",
+    card: dark ? "#171717" : "#FFFFFF",
+    line: dark ? "#2A2A2A" : "#E8E8E8",
+    tint: dark ? "#242424" : "#F4F4F4",
+    coralInk: dark ? "#F5F5F5" : "#111111",
+    switchTrackOff: dark ? "#4A4A4A" : "#D6D6D6",
+    switchTrackOn: dark ? "#F5F5F5" : "#111111",
+    switchThumb: dark ? "#111111" : "#FFFFFF",
+  };
   const date = profileDate(chat, chat.group ? [] : messages);
   const membership = profileMembership(chat);
   const mutualGroups = chats.filter(
@@ -93,25 +104,13 @@ export default function ChatProfile({
         <Ionicons
           name={icon}
           size={23}
-          color={
-            destructive
-              ? dark
-                ? "#FFB4AB"
-                : "#B3261E"
-              : colors.coralInk
-          }
+          color={destructive ? colors.danger : colors.coralInk}
         />
         <View style={s.body}>
           <Text
             style={[
               s.label,
-              {
-                color: destructive
-                  ? dark
-                    ? "#FFB4AB"
-                    : "#B3261E"
-                  : colors.fg,
-              },
+              { color: destructive ? colors.danger : colors.fg },
             ]}
           >
             {title}
@@ -140,12 +139,16 @@ export default function ChatProfile({
         </View>
         <Switch
           accessibilityLabel={title}
+          accessibilityState={{ checked: value, disabled }}
           value={value}
           onValueChange={change}
           disabled={disabled}
-          trackColor={{ false: dark ? "#50574E" : "#DEDFD5", true: coral }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={dark ? "#50574E" : "#DEDFD5"}
+          trackColor={{
+            false: colors.switchTrackOff,
+            true: colors.switchTrackOn,
+          }}
+          thumbColor={colors.switchThumb}
+          ios_backgroundColor={colors.switchTrackOff}
         />
       </View>
     );
@@ -159,35 +162,47 @@ export default function ChatProfile({
           onPress={onBack}
           color={colors.fg}
         />
-        <Text style={[s.heading, { color: colors.fg }]}>
+        <Text
+          accessibilityRole="header"
+          style={[s.heading, { color: colors.fg }]}
+        >
           {chat.group ? "Group details" : "Contact details"}
         </Text>
       </View>
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.hero}>
           <Avatar uri={chat.avatar} name={chat.name} size={112} />
-          <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
+          <Text
+            accessibilityRole="header"
+            style={[s.name, { color: colors.fg }]}
+          >
+            {chat.name}
+          </Text>
           {!!chat.username && (
             <Text style={[s.label, { color: colors.coralInk }]}>
               @{chat.username.replace(/^@/, "")}
             </Text>
           )}
+          <Text style={[s.caption, { color: colors.muted }]}>
+            {chat.group ? "Group" : "Contact"}
+          </Text>
           {!!chat.pinned && (
             <Text style={[s.caption, { color: colors.muted }]}>
               Pinned conversation
             </Text>
           )}
         </View>
-        {chat.group ? (
-          <Text style={[s.note, { color: colors.muted }]}>
-            Group voice and video calls are unavailable. Start a one-to-one call
-            from a member's profile instead.
-          </Text>
-        ) : (
-          <CallHistoryActions dark={dark} onCall={onCall} />
-        )}
+        <ChatProfileActions
+          group={chat.group}
+          dark={dark}
+          onMessage={() => onOpenChat(chat)}
+          onCall={onCall}
+        />
         <View style={[s.card, { backgroundColor: colors.card }]}>
-          <Text style={[s.heading, { color: colors.fg }]}>
+          <Text
+            accessibilityRole="header"
+            style={[s.heading, { color: colors.fg }]}
+          >
             {chat.group ? "Description" : "About"}
           </Text>
           <Text
@@ -197,7 +212,7 @@ export default function ChatProfile({
             ]}
           >
             {chat.bio ||
-              (chat.group ? "No group description added." : "No bio added.")}
+              (chat.group ? "No group description added" : "No bio added")}
           </Text>
           <Text style={[s.caption, { color: colors.muted }]}>
             {chat.group ? "Created" : "Talking since"} {date.label}
@@ -206,9 +221,23 @@ export default function ChatProfile({
         </View>
         {chat.group ? (
           <View style={s.section}>
-            <Text style={[s.heading, { color: colors.fg }]}>
+            <Text
+              accessibilityRole="header"
+              style={[s.heading, { color: colors.fg }]}
+            >
               Members · {membership.ids.length}
             </Text>
+            {actionRow(
+              "person-add-outline",
+              "Add members",
+              "Choose people for a new group conversation",
+              () =>
+                Alert.alert(
+                  "Add members",
+                  "Adding members to an existing group is not available yet. Create a new group from New conversation to choose members.",
+                  [{ text: "OK" }],
+                ),
+            )}
             {membership.mock && (
               <Text style={[s.caption, { color: colors.muted }]}>
                 Demo membership and admin labels
@@ -217,8 +246,8 @@ export default function ChatProfile({
             {!membership.ids.length && (
               <Text style={[s.empty, { color: colors.muted }]}>
                 {chat.memberIds
-                  ? "No members listed."
-                  : "Member information is unavailable."}
+                  ? "No members listed"
+                  : "Member information is unavailable"}
               </Text>
             )}
             {membership.ids.map((id) => {
@@ -233,16 +262,18 @@ export default function ChatProfile({
                   style={[s.row, { borderBottomColor: colors.line }]}
                 >
                   <Avatar uri={member.avatar} name={member.name} size={42} />
-                  <Text style={[s.label, s.body, { color: colors.fg }]}>
-                    {member.name}
-                  </Text>
+                  <View style={s.body}>
+                    <Text style={[s.label, { color: colors.fg }]}>
+                      {member.name}
+                    </Text>
+                    {!!member.username && (
+                      <Text style={[s.caption, { color: colors.muted }]}>
+                        @{member.username.replace(/^@/, "")}
+                      </Text>
+                    )}
+                  </View>
                   {admin && (
-                    <Text
-                      style={[
-                        s.badge,
-                        { color: colors.coralInk, backgroundColor: colors.tint },
-                      ]}
-                    >
+                    <Text style={[s.caption, { color: colors.coralInk }]}>
                       Admin
                     </Text>
                   )}
@@ -266,12 +297,7 @@ export default function ChatProfile({
                     {id === "self" ? "You" : `Member ${id}`}
                   </Text>
                   {admin && (
-                    <Text
-                      style={[
-                        s.badge,
-                        { color: colors.coralInk, backgroundColor: colors.tint },
-                      ]}
-                    >
+                    <Text style={[s.caption, { color: colors.coralInk }]}>
                       Admin
                     </Text>
                   )}
@@ -281,12 +307,15 @@ export default function ChatProfile({
           </View>
         ) : (
           <View style={s.section}>
-            <Text style={[s.heading, { color: colors.fg }]}>
+            <Text
+              accessibilityRole="header"
+              style={[s.heading, { color: colors.fg }]}
+            >
               Groups in common · {mutualGroups.length}
             </Text>
             {!mutualGroups.length && (
               <Text style={[s.empty, { color: colors.muted }]}>
-                No shared groups in the available membership data.
+                No shared groups in the available membership data
               </Text>
             )}
             {mutualGroups.map((group) => (
@@ -320,7 +349,12 @@ export default function ChatProfile({
         <ChatProfileShared key={chat.id} messages={messages} dark={dark} />
         {!chat.group && (
           <View style={s.section}>
-            <Text style={[s.heading, { color: colors.fg }]}>Call history</Text>
+            <Text
+              accessibilityRole="header"
+              style={[s.heading, { color: colors.fg }]}
+            >
+              Call history
+            </Text>
             <CallHistoryList
               chat={chat}
               history={history}
@@ -330,15 +364,16 @@ export default function ChatProfile({
           </View>
         )}
         <View style={s.section}>
-          <Text style={[s.heading, { color: colors.fg }]}>
+          <Text
+            accessibilityRole="header"
+            style={[s.heading, { color: colors.fg }]}
+          >
             Conversation settings
           </Text>
           {toggleRow(
             "notifications-off-outline",
             "Mute notifications",
-            chat.muted
-              ? "Muted · no system notifications"
-              : "Notifications on",
+            chat.muted ? "Muted · no system notifications" : "Notifications on",
             !!chat.muted,
             onMuteChange,
           )}
@@ -357,7 +392,18 @@ export default function ChatProfile({
             "Block contact",
             chat.blocked ? "Blocked" : "Not blocked",
             !!chat.blocked,
-            onBlockChange,
+            (value) => {
+              if (!value) {
+                onBlockChange(false);
+                return;
+              }
+              confirm(
+                `Block ${chat.name}?`,
+                "You will not receive messages from this contact until you unblock them.",
+                "Block contact",
+                () => onBlockChange(true),
+              );
+            },
           )}
           {actionRow(
             "trash-outline",
@@ -393,51 +439,49 @@ export default function ChatProfile({
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16 },
-  heading: { fontFamily: "DMSans_700Bold", fontSize: 20 },
-  content: { paddingHorizontal: 24, paddingBottom: 70 },
-  hero: { alignItems: "center", gap: 10, paddingTop: 16 },
-  name: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 28,
-    textAlign: "center",
-    marginTop: 8,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    padding: space.lg,
   },
-  label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: 5 },
+  heading: { fontSize: 20, fontWeight: "600" },
+  content: { paddingHorizontal: space.xxl, paddingBottom: space.xxxl * 2 },
+  hero: { alignItems: "center", gap: space.sm, paddingTop: space.lg },
+  name: {
+    fontSize: 26,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: space.sm,
+  },
+  label: { fontSize: 14, fontWeight: "600" },
+  caption: {
+    fontSize: 12,
+    marginTop: space.xs,
+  },
   note: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 19,
-    marginTop: 14,
-    marginHorizontal: 4,
+    marginTop: space.md,
+    marginHorizontal: space.xs,
   },
   description: {
-    fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 23,
-    marginVertical: 12,
+    marginVertical: space.md,
   },
-  card: { padding: 20, borderRadius: 20 },
-  section: { marginTop: 28 },
+  card: { padding: space.xl, borderRadius: 0 },
+  section: { marginTop: space.xxxl },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
+    gap: space.md,
+    paddingVertical: space.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1 },
-  badge: {
-    fontFamily: "DMSans_500Medium",
-    fontSize: 11,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
   empty: {
-    fontFamily: "DMSans_400Regular",
-    paddingVertical: 20,
+    paddingVertical: space.xl,
     lineHeight: 21,
   },
 });

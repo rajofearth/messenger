@@ -12,8 +12,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Camera } from "expo-camera";
 import type { AssetMetadata } from "expo-media-library";
-import { IconButton, tap } from "../../ui/primitives";
-import { coral, onCoral, palette } from "../../ui/theme";
+import { tap } from "../../ui/primitives";
+import { palette } from "../../ui/theme";
 import {
   toggleStorySelection,
   MEDIA_PICKER_LIMIT,
@@ -131,8 +131,8 @@ export function MediaPicker(props: Props) {
       const permission = await Camera.requestCameraPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
-          "Camera permission needed",
-          "Allow camera access in device settings to take a photo or video story.",
+          "Camera access needed",
+          "Allow camera access to capture media.",
           [
             { text: "Not now", style: "cancel" },
             {
@@ -146,7 +146,7 @@ export function MediaPicker(props: Props) {
       if (!photosOnly) {
         const microphone = await Camera.requestMicrophonePermissionsAsync();
         if (!microphone.granted) {
-          Alert.alert("Microphone permission needed", "Allow microphone access to record videos.");
+          Alert.alert("Microphone access needed", "Allow microphone access to record video.");
           return;
         }
       }
@@ -156,8 +156,8 @@ export function MediaPicker(props: Props) {
       }
     } catch (cause) {
       Alert.alert(
-        "Couldn't open the camera",
-        cause instanceof Error ? cause.message : "Please try again.",
+        "Camera unavailable",
+        cause instanceof Error ? cause.message : "Try again.",
       );
     } finally {
       camera.current = false;
@@ -196,16 +196,16 @@ export function MediaPicker(props: Props) {
         const keep = new Set(available.map((item) => item.id));
         setSelection((current) => current.filter((id) => keep.has(id)));
         Alert.alert(
-          "Some items are unavailable",
-          `${missing} selected item${missing === 1 ? " is" : "s are"} no longer in your library, so ${missing === 1 ? "it was" : "they were"} removed. Check the selection and try again.`,
+          "Some items unavailable",
+          `${missing} item${missing === 1 ? " was" : "s were"} removed. Check your selection.`,
         );
         return;
       }
       props.onPicked(available.map((item) => item.media));
     } catch (cause) {
       Alert.alert(
-        "Couldn't open media",
-        cause instanceof Error ? cause.message : "Please pick the items again.",
+        "Media unavailable",
+        cause instanceof Error ? cause.message : "Pick the items again.",
       );
     } finally {
       if (alive.current) setPreparing(false);
@@ -219,12 +219,15 @@ export function MediaPicker(props: Props) {
         style={s.flex}
       >
         <View style={s.pickerHeader}>
-          <IconButton
-            name="close"
-            label="Cancel story"
-            color={colors.fg}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel media selection"
             onPress={props.onClose}
-          />
+            style={s.pickerHeaderAction}
+          >
+            <Ionicons name="close" size={21} color={colors.fg} />
+            <Text style={[s.pickerHeaderActionText, { color: colors.fg }]}>Cancel</Text>
+          </Pressable>
           <Text
             style={[s.pickerTitle, { color: colors.fg }]}
           >
@@ -235,12 +238,15 @@ export function MediaPicker(props: Props) {
               <ActivityIndicator color={colors.fg} />
             </View>
           ) : (
-            <IconButton
-              name="camera-outline"
-              label="Take a photo or video"
-              color={colors.fg}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Take a photo or video"
               onPress={() => void openCamera()}
-            />
+              style={s.pickerHeaderAction}
+            >
+              <Ionicons name="camera-outline" size={20} color={colors.fg} />
+              <Text style={[s.pickerHeaderActionText, { color: colors.fg }]}>Camera</Text>
+            </Pressable>
           )}
         </View>
         {access === "ready" && limited && (
@@ -253,12 +259,12 @@ export function MediaPicker(props: Props) {
             <Ionicons
               name="images-outline"
               size={16}
-              color={colors.coralInk}
+              color={colors.fg}
             />
             <Text style={[s.pickerLimitedText, { color: colors.fg }]}>
               Showing selected media
             </Text>
-            <Text style={[s.pickerLimitedAction, { color: colors.coralInk }]}>
+            <Text style={[s.pickerLimitedAction, { color: colors.fg }]}>
               Manage
             </Text>
           </Pressable>
@@ -269,7 +275,7 @@ export function MediaPicker(props: Props) {
           onPress={openAlbums}
           style={[s.pickerAlbumButton, { borderColor: colors.line }]}
         >
-          <Ionicons name="folder-open-outline" size={18} color={colors.coralInk} />
+          <Ionicons name="folder-open-outline" size={18} color={colors.fg} />
           <Text style={[s.pickerAlbumTitle, { color: colors.fg }]} numberOfLines={1}>
             {currentAlbumTitle}
           </Text>
@@ -286,14 +292,14 @@ export function MediaPicker(props: Props) {
                 onPress={() => chooseFilter(item.id)}
                 style={[
                   s.pickerChip,
-                  { borderColor: active ? coral : colors.line },
-                  active && { backgroundColor: coral },
+                  { borderColor: active ? colors.fg : colors.line },
+                  active && { backgroundColor: colors.fg },
                 ]}
               >
                 <Text
                   style={[
                     s.pickerChipText,
-                    { color: active ? onCoral : colors.muted },
+                    { color: active ? colors.bg : colors.muted },
                   ]}
                 >
                   {item.label}
@@ -320,13 +326,13 @@ export function MediaPicker(props: Props) {
           onPreview={setPreview}
           onLoadMore={loadMore}
           copy={{
-            permissionTitle: props.permissionTitle ?? "Choose from your photos",
+            permissionTitle: props.permissionTitle ?? "Choose media",
             permissionText:
               props.permissionText ??
-              "Allow Messenger to see your photos and videos so you can add them to a story.",
-            emptyTitle: props.emptyTitle ?? "No photos or videos yet",
+              "Allow access to add photos and videos to your story.",
+            emptyTitle: props.emptyTitle ?? "No media yet",
             emptyText:
-              props.emptyText ?? "Take a photo or video to start your story.",
+              props.emptyText ?? "Capture media to start your story.",
           }}
         />
       </SafeAreaView>
@@ -342,19 +348,21 @@ export function MediaPicker(props: Props) {
           ]}
         >
           <Text style={[s.pickerSelectedText, { color: colors.muted }]}>
-            {selection.length} selected
+            {selection.length} of {limit} selected
           </Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Review selected media"
+            accessibilityHint="Open a preview of the selected media"
             accessibilityState={{ disabled: preparing }}
             disabled={preparing}
             onPress={() => void next()}
             style={[s.pickerNext, { opacity: preparing ? 0.6 : 1 }]}
           >
             {preparing ? (
-              <ActivityIndicator color={onCoral} />
+              <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={s.pickerNextText}>Next</Text>
+              <Text style={s.pickerNextText}>Review</Text>
             )}
           </Pressable>
         </SafeAreaView>

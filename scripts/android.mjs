@@ -181,6 +181,11 @@ if (dev) {
   env.EXPO_PUBLIC_CONVEX_URL = convexUrl;
   env.EXPO_PUBLIC_CONVEX_SITE_URL = convexSiteUrl;
 } else {
+  const convexUrl = httpsUrl(
+    setting(localEnv, "EXPO_PUBLIC_CONVEX_URL"),
+    "EXPO_PUBLIC_CONVEX_URL",
+  );
+  env.EXPO_PUBLIC_CONVEX_URL = convexUrl;
   delete env.EXPO_PUBLIC_APP_VARIANT;
   delete env.EXPO_PUBLIC_DEV_UPDATE_FEED_URL;
   delete env.APP_VERSION_CODE;
