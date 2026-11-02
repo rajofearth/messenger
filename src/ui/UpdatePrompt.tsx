@@ -22,7 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { formatBytes } from "../domain/updates";
 import type { AppUpdater } from "../state/useAppUpdater";
-import { palette, coral, onCoral } from "./theme";
+import { palette, radius, space } from "./theme";
 import { tap } from "./primitives";
 
 export default function UpdatePrompt({
@@ -65,11 +65,7 @@ export default function UpdatePrompt({
   const installed = updates.installed?.versionName;
   const title = updates.forced ? "Update required" : "Update available";
 
-  const primary = (
-    label: string,
-    action: () => void,
-    disabled = false,
-  ) => (
+  const primary = (label: string, action: () => void, disabled = false) => (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
@@ -79,10 +75,13 @@ export default function UpdatePrompt({
       }}
       style={({ pressed }) => [
         s.primary,
-        { opacity: disabled ? 0.5 : pressed ? 0.75 : 1 },
+        {
+          backgroundColor: colors.switchTrackOn,
+          opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
+        },
       ]}
     >
-      <Text style={s.primaryText}>{label}</Text>
+      <Text style={[s.primaryText, { color: colors.onCoral }]}>{label}</Text>
     </Pressable>
   );
 
@@ -169,7 +168,7 @@ export default function UpdatePrompt({
       return (
         <>
           <Text style={[s.error, { color: colors.muted }]}>
-            {download.message ?? "The update could not be downloaded."}
+            {download.message ?? "The update could not be downloaded"}
           </Text>
           {!updates.canInstall
             ? primary("Allow installs", updates.openInstallSettings)
@@ -206,15 +205,22 @@ export default function UpdatePrompt({
         if (dismissible) updates.dismiss();
       }}
     >
-      <SafeAreaView style={s.overlay}>
+      <SafeAreaView style={[s.overlay, { backgroundColor: colors.scrim }]}>
         <View
           accessibilityViewIsModal
           style={[s.card, { backgroundColor: colors.card }]}
         >
-          <ScrollView style={s.content} contentContainerStyle={s.contentContainer}>
+          <ScrollView
+            style={s.content}
+            contentContainerStyle={s.contentContainer}
+          >
             <View style={s.header}>
               <View style={[s.symbol, { backgroundColor: colors.tint }]}>
-                <Ionicons name="cloud-download-outline" size={22} color={colors.fg} />
+                <Ionicons
+                  name="cloud-download-outline"
+                  size={22}
+                  color={colors.fg}
+                />
               </View>
               <Text style={[s.title, { color: colors.fg }]}>{title}</Text>
             </View>
@@ -223,7 +229,8 @@ export default function UpdatePrompt({
             </Text>
             {updates.forced ? (
               <Text style={[s.hint, { color: colors.muted }]}>
-                Install this update to keep using Messenger. Your chats and settings stay in place.
+                Install this update to keep using Messenger. Your chats and
+                settings stay in place.
               </Text>
             ) : null}
             {manifest.notes ? (
@@ -235,13 +242,25 @@ export default function UpdatePrompt({
                   onPress={() => setNotesExpanded((expanded) => !expanded)}
                   style={s.notesToggle}
                 >
-                  <Text style={[s.notesLabel, { color: colors.fg }]}>What's new</Text>
-                  <Ionicons name={notesExpanded ? "chevron-up" : "chevron-down"} size={16} color={colors.muted} />
+                  <Text style={[s.notesLabel, { color: colors.fg }]}>
+                    What's new
+                  </Text>
+                  <Ionicons
+                    name={notesExpanded ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={colors.muted}
+                  />
                 </Pressable>
                 {notesExpanded ? (
                   <ScrollView nestedScrollEnabled style={s.notes}>
-                    {installed ? <Text style={[s.hint, { color: colors.muted }]}>Installed: {installed}</Text> : null}
-                    <Text style={[s.body, { color: colors.muted }]}>{manifest.notes}</Text>
+                    {installed ? (
+                      <Text style={[s.hint, { color: colors.muted }]}>
+                        Installed: {installed}
+                      </Text>
+                    ) : null}
+                    <Text style={[s.body, { color: colors.muted }]}>
+                      {manifest.notes}
+                    </Text>
                   </ScrollView>
                 ) : null}
               </>
@@ -257,13 +276,13 @@ export default function UpdatePrompt({
 const s = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(16,25,20,0.55)",
+    backgroundColor: "transparent",
     justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.xxl,
   },
   card: {
-    borderRadius: 22,
+    borderRadius: radius.sheet,
     width: "100%",
     maxWidth: 400,
     maxHeight: "100%",
@@ -271,71 +290,80 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   content: { flexGrow: 0, flexShrink: 1 },
-  contentContainer: { padding: 20 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  contentContainer: { padding: space.xl },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    marginBottom: space.md,
+  },
   symbol: {
     width: 40,
     height: 40,
-    borderRadius: 14,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_500Medium",
     fontSize: 20,
-    letterSpacing: -0.4,
   },
   body: {
     fontFamily: "DMSans_400Regular",
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 10,
+    marginBottom: space.sm,
   },
-  notesToggle: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  notesToggle: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
   notesLabel: { fontFamily: "DMSans_500Medium", fontSize: 13 },
-  notes: { maxHeight: 180, marginBottom: 8 },
+  notes: { maxHeight: 180, marginBottom: space.sm },
   hint: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 19,
-    marginBottom: 14,
+    marginBottom: space.md,
   },
   error: {
     fontFamily: "DMSans_500Medium",
     fontSize: 13,
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: space.lg,
   },
   track: {
-    height: 6,
-    borderRadius: 3,
+    height: space.xs,
+    borderRadius: radius.pill,
     overflow: "hidden",
-    marginTop: 6,
+    marginTop: space.sm,
   },
-  fill: { height: "100%", borderRadius: 3 },
+  fill: { height: "100%", borderRadius: radius.pill },
   progress: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
-    marginTop: 9,
-    marginBottom: 18,
+    marginTop: space.sm,
+    marginBottom: space.lg,
   },
-  spinner: { marginBottom: 14 },
+  spinner: { marginBottom: space.md },
   primary: {
-    backgroundColor: coral,
-    borderRadius: 16,
+    borderRadius: radius.control,
     minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 6,
+    marginTop: space.sm,
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 14 },
   secondary: {
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderRadius: radius.control,
     minHeight: 40,
-    marginTop: 4,
+    marginTop: space.xs,
   },
   secondaryText: { fontFamily: "DMSans_500Medium", fontSize: 13 },
 });

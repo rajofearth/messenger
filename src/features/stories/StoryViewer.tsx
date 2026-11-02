@@ -9,7 +9,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { StoryGroup } from "../../domain/stories";
 import type { Story } from "../../domain/data";
@@ -203,11 +202,7 @@ export function StoryViewer(props: Props) {
             if (ready) moveRef.current(1);
           }}
         />
-        <LinearGradient
-          colors={["#00000099", "transparent", "#000000AA"]}
-          style={s.image}
-          pointerEvents="none"
-        />
+        <View style={s.imageScrim} pointerEvents="none" />
         <View style={s.top}>
           <View style={s.tracks}>
             {group.items.map((item, i) => (
@@ -321,7 +316,7 @@ export function StoryViewer(props: Props) {
             <View style={s.uploadState}>
               <ActivityIndicator size="small" color="white" />
               <Text style={s.uploadText}>
-                Uploading {uploadPercent ?? 0}% · this story will appear when it finishes
+                Uploading {uploadPercent ?? 0}%
               </Text>
             </View>
           )}
@@ -334,7 +329,7 @@ export function StoryViewer(props: Props) {
             >
               <Ionicons name="refresh" size={16} color="white" />
               <Text style={s.uploadText}>
-                Upload failed · Tap to retry
+                Upload failed · Retry
               </Text>
             </Pressable>
           )}
@@ -369,7 +364,7 @@ export function StoryViewer(props: Props) {
                   <View style={s.viewersEmptyState}>
                     <Ionicons name="eye-outline" size={34} color="#FFFFFF88" />
                     <Text style={s.viewersEmptyTitle}>0 views yet</Text>
-                    <Text style={s.viewersEmpty}>Viewers will appear here after they watch this story.</Text>
+                    <Text style={s.viewersEmpty}>Viewers appear here when they watch.</Text>
                   </View>
                 ) : (
                   viewers.map((view) => (

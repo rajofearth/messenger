@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { tap, type IconName } from "../../ui/primitives";
-import { palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export default function AttachmentMenu({
   dark,
@@ -61,14 +61,9 @@ const styles = StyleSheet.create({
     bottom: "100%",
     left: 16,
     width: 240,
-    borderRadius: 18,
-    padding: 8,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 3 },
+    borderRadius: radius.card,
+    padding: space.xs,
     zIndex: 10,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 14, padding: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md },
 });

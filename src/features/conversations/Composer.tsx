@@ -11,7 +11,7 @@ import { KeyboardMediaInput } from "../../ui/KeyboardMediaInput";
 import type { Message } from "../../domain/data";
 import { formatDuration } from "../../domain/model";
 import { IconButton } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import AttachmentMenu from "./AttachmentMenu";
 import RecordingWaveform from "./RecordingWaveform";
 import type { useMessageMedia } from "./useMessageMedia";
@@ -40,7 +40,8 @@ export default function Composer({
   setAttachmentOpen: (open: boolean) => void;
   disabled: boolean;
 }) {
-  const { card, coralInk, fg, muted, onCoral } = palette(dark);
+  const { card, coralInk, fg, muted, onCoral, switchTrackOn, danger } =
+    palette(dark);
   const input = useRef<TextInput>(null);
   const [top, setTop] = useState(260);
   const host = useRef<View>(null);
@@ -63,17 +64,17 @@ export default function Composer({
       {reply && !disabled && (
         <View
           style={{
-            marginHorizontal: 20,
-            borderLeftWidth: 3,
+            marginHorizontal: space.xl,
+            borderLeftWidth: 4,
             borderLeftColor: coralInk,
             backgroundColor: card,
-            paddingLeft: 12,
+            paddingLeft: space.md,
             flexDirection: "row",
             alignItems: "center",
-            borderRadius: 8,
+            borderRadius: radius.badge,
           }}
         >
-          <View style={{ flex: 1, paddingVertical: 8 }}>
+          <View style={{ flex: 1, paddingVertical: space.sm }}>
             <Text style={{ color: coralInk, fontSize: 12 }}>
               Replying to {reply.mine ? "yourself" : "message"}
             </Text>
@@ -103,10 +104,10 @@ export default function Composer({
             <IconButton
               name="trash-outline"
               label="Cancel recording"
-              color={dark ? "#FFB4AB" : "#B3261E"}
+              color={danger}
               onPress={() => void media.cancelRecord()}
             />
-            <View style={s.liveDot} />
+            <View style={[s.liveDot, { backgroundColor: danger }]} />
             <RecordingWaveform
               metering={media.metering}
               color={coralInk}
@@ -117,7 +118,7 @@ export default function Composer({
             <IconButton
               name="send"
               label="Send voice note"
-              background={coral}
+              background={switchTrackOn}
               color={onCoral}
               onPress={() => void media.record()}
             />
@@ -168,7 +169,7 @@ export default function Composer({
             <IconButton
               name={draft.trim() ? "arrow-up" : "mic-outline"}
               label={draft.trim() ? "Send message" : "Record voice note"}
-              background={coral}
+              background={switchTrackOn}
               color={onCoral}
               onPress={() => {
                 if (!disabled) {

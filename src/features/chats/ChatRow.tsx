@@ -67,14 +67,28 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
         pressed && { backgroundColor: colors.card },
       ]}
     >
-      <Avatar uri={chat.avatar} name={name} />
+      <Avatar uri={chat.avatar} name={name} size={56} dark={dark} />
       <View style={s.chatBody}>
         <View style={s.rowTop}>
-          <Text numberOfLines={1} style={[s.name, { color: colors.fg }]}>
-            {name}
-          </Text>
+          <View style={s.nameLine}>
+            <Text
+              numberOfLines={1}
+              style={[s.name, chat.unread > 0 && s.unreadName, { color: colors.fg }]}
+            >
+              {name}
+            </Text>
+            {chat.unread > 0 && (
+              <View
+                accessible={false}
+                style={[s.unreadDot, { backgroundColor: colors.unread }]}
+              />
+            )}
+          </View>
           <Text
-            style={[s.time, { color: chat.unread > 0 ? colors.coralInk : colors.muted }]}
+            style={[
+              s.time,
+              { color: colors.muted },
+            ]}
           >
             {timestamp}
           </Text>
@@ -86,13 +100,9 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
               s.preview,
               {
                 color: failed
-                  ? dark
-                    ? "#FFB4AB"
-                    : "#B3261E"
+                  ? colors.danger
                   : chat.unread > 0
-                    ? dark
-                      ? "#D7DAD3"
-                      : "#667268"
+                    ? colors.fg
                     : colors.muted,
               },
             ]}
@@ -114,11 +124,6 @@ function ChatRow({ chat, dark, onOpen, onActions }: Props) {
               color={colors.muted}
               accessibilityLabel="Pinned"
             />
-          )}
-          {chat.unread > 0 && (
-            <View style={s.unread}>
-              <Text style={s.unreadText}>{chat.unread}</Text>
-            </View>
           )}
           {chat.unread <= 0 && confirmed && (
             <Ionicons name="checkmark" color={colors.muted} size={15} />

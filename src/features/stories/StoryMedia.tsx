@@ -31,7 +31,7 @@ function StoryVideo(props: Props) {
         <Image source={{ uri: props.poster }} style={s.image} contentFit={props.crop === "fill" ? "cover" : "contain"} />
       ) : props.posterPlaceholder ? (
         <View style={s.previewVideoPlaceholder}>
-          <Text style={s.previewVideoPlaceholderText}>Loading video preview…</Text>
+          <Text style={s.previewVideoPlaceholderText}>Loading preview…</Text>
         </View>
       ) : null}
       {props.videoSurface !== false && <StoryVideoSurface key={props.uri} {...props} />}
@@ -98,7 +98,7 @@ function StoryVideoSurface(props: Props) {
       </Animated.View>
       {error && (
         <Text style={s.mediaError}>
-          Couldn't play this video. Tap to continue.
+          Video unavailable. Tap to continue.
         </Text>
       )}
     </>

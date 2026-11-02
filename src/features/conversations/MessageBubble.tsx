@@ -5,17 +5,12 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import type { Message } from "../../domain/data";
 import type { ActionTarget } from "./MessageActions";
 import { formatDuration } from "../../domain/model";
-import { onCoral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import { tap } from "../../ui/primitives";
 import { openAttachment } from "../../ui/openAttachment";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
 import { messageAccessibilityLabel } from "./conversationModel";
 import { styles as s } from "./MessageBubble.styles";
-
-/** Error ink on the app background, not on the coral bubble. */
-function failedColor(dark: boolean) {
-  return dark ? "#FFB4AB" : "#B3261E";
-}
 
 type VoiceNoteHandle = { toggle: () => void };
 
@@ -72,11 +67,11 @@ const VoiceNote = React.forwardRef<
 
   return (
     <View style={s.voice}>
-      <View style={s.voicePlay}>
+      <View style={[s.voicePlay, { backgroundColor: colors.tint }]}>
         <Ionicons
           name={status.playing ? "pause" : "play"}
           size={18}
-          color={onCoral}
+          color={colors.coralInk}
         />
       </View>
       <View style={s.wave}>
@@ -84,13 +79,13 @@ const VoiceNote = React.forwardRef<
           <View
             key={i}
             style={{
-              width: 3,
-              borderRadius: 3,
+              width: 4,
+              borderRadius: 2,
               height: 7 + ((i * 17 + 7) % 23),
               backgroundColor:
                 i / 28 < status.currentTime / (status.duration || 1)
                   ? activeWave
-                  : "#C7BAB1",
+                  : colors.line,
             }}
           />
         ))}
@@ -117,8 +112,7 @@ function DeliveryMeta({
   dark: boolean;
   showTimestamp: boolean;
 }) {
-  const { muted } = palette(dark);
-  const failure = failedColor(dark);
+  const { muted, danger } = palette(dark);
   const pending = message.status === "sending" || message.status === "failed";
   const uploading =
     message.status === "sending" && message.kind && message.uploadProgress !== undefined
@@ -130,10 +124,10 @@ function DeliveryMeta({
       <Text style={[s.tiny, { color: muted }]}>{message.time}</Text>
       {message.mine && message.status === "failed" ? (
         <>
-          <Ionicons name="alert-circle" size={14} color={failure} />
+          <Ionicons name="alert-circle" size={14} color={danger} />
           <Text
             accessibilityLiveRegion="polite"
-            style={[s.tiny, { color: failure }]}
+            style={[s.tiny, { color: danger }]}
           >
             Not sent. Tap to retry.
           </Text>
@@ -181,7 +175,18 @@ export default function MessageBubble({
   onViewMedia,
   onRetry,
 }: MessageBubbleProps) {
-  const { fg, muted, card, outgoingFg, outgoingMuted, coralInk } =
+  const {
+    fg,
+    muted,
+    card,
+    tint,
+    media,
+    outgoingBg,
+    outgoingFg,
+    outgoingMuted,
+    coralInk,
+    onImage,
+  } =
     palette(dark);
   const bubble = useRef<View>(null);
   const voice = useRef<VoiceNoteHandle>(null);
@@ -307,30 +312,32 @@ export default function MessageBubble({
         onPress={handleTap}
         style={[
           s.bubble,
-          { backgroundColor: m.mine ? (dark ? "#B86B57" : "#F4A18B") : card },
+          { backgroundColor: m.mine ? outgoingBg : card },
           m.mine ? s.bubbleMine : s.bubbleTheirs,
-          m.kind === "image" && { padding: 5 },
+          m.kind === "image" && { padding: space.xs },
         ]}
       >
         {m.forwarded && !m.deleted && (
-          <Text
-            style={[
-              s.tiny,
-              { color: m.mine ? outgoingMuted : muted, marginBottom: 6 },
-            ]}
-          >
-            ↪ Forwarded
-          </Text>
+          <View style={s.forwarded}>
+            <Ionicons
+              name="arrow-redo"
+              size={14}
+              color={m.mine ? outgoingMuted : muted}
+            />
+            <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
+              Forwarded
+            </Text>
+          </View>
         )}
         {m.replyTo && !m.deleted && (
           <View
             style={{
-              borderLeftWidth: 3,
+              borderLeftWidth: 4,
               borderLeftColor: m.mine ? outgoingMuted : coralInk,
-              backgroundColor: "#00000010",
-              borderRadius: 6,
-              padding: 8,
-              marginBottom: 8,
+              backgroundColor: tint,
+              borderRadius: radius.badge,
+              padding: space.sm,
+              marginBottom: space.sm,
             }}
           >
             <Text style={[s.tiny, { color: m.mine ? outgoingMuted : muted }]}>
@@ -350,14 +357,14 @@ export default function MessageBubble({
             style={[
               s.chatImage,
               {
-                backgroundColor: "#292C29",
+                backgroundColor: media,
                 justifyContent: "center",
                 alignItems: "center",
               },
             ]}
           >
-            <Ionicons name="play-circle" size={56} color="white" />
-            <Text style={{ color: "white" }}>Video · Tap to play</Text>
+            <Ionicons name="play-circle" size={56} color={onImage} />
+            <Text style={{ color: onImage }}>Video · Tap to play</Text>
           </View>
         ) : m.kind === "image" ? (
           <ResponsiveImage
@@ -405,7 +412,7 @@ export default function MessageBubble({
           </Text>
         )}
         {m.reaction && !m.deleted && (
-          <View style={s.reaction}>
+          <View style={[s.reaction, { backgroundColor: card }]}>
             <Text>{m.reaction}</Text>
           </View>
         )}

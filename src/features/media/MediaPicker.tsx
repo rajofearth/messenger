@@ -131,8 +131,8 @@ export function MediaPicker(props: Props) {
       const permission = await Camera.requestCameraPermissionsAsync();
       if (!permission.granted) {
         Alert.alert(
-          "Camera permission needed",
-          "Allow camera access in device settings to take a photo or video story.",
+          "Camera access needed",
+          "Allow camera access to capture media.",
           [
             { text: "Not now", style: "cancel" },
             {
@@ -146,7 +146,7 @@ export function MediaPicker(props: Props) {
       if (!photosOnly) {
         const microphone = await Camera.requestMicrophonePermissionsAsync();
         if (!microphone.granted) {
-          Alert.alert("Microphone permission needed", "Allow microphone access to record videos.");
+          Alert.alert("Microphone access needed", "Allow microphone access to record video.");
           return;
         }
       }
@@ -156,8 +156,8 @@ export function MediaPicker(props: Props) {
       }
     } catch (cause) {
       Alert.alert(
-        "Couldn't open the camera",
-        cause instanceof Error ? cause.message : "Please try again.",
+        "Camera unavailable",
+        cause instanceof Error ? cause.message : "Try again.",
       );
     } finally {
       camera.current = false;
@@ -196,16 +196,16 @@ export function MediaPicker(props: Props) {
         const keep = new Set(available.map((item) => item.id));
         setSelection((current) => current.filter((id) => keep.has(id)));
         Alert.alert(
-          "Some items are unavailable",
-          `${missing} selected item${missing === 1 ? " is" : "s are"} no longer in your library, so ${missing === 1 ? "it was" : "they were"} removed. Check the selection and try again.`,
+          "Some items unavailable",
+          `${missing} item${missing === 1 ? " was" : "s were"} removed. Check your selection.`,
         );
         return;
       }
       props.onPicked(available.map((item) => item.media));
     } catch (cause) {
       Alert.alert(
-        "Couldn't open media",
-        cause instanceof Error ? cause.message : "Please pick the items again.",
+        "Media unavailable",
+        cause instanceof Error ? cause.message : "Pick the items again.",
       );
     } finally {
       if (alive.current) setPreparing(false);
@@ -320,13 +320,13 @@ export function MediaPicker(props: Props) {
           onPreview={setPreview}
           onLoadMore={loadMore}
           copy={{
-            permissionTitle: props.permissionTitle ?? "Choose from your photos",
+            permissionTitle: props.permissionTitle ?? "Choose media",
             permissionText:
               props.permissionText ??
-              "Allow Messenger to see your photos and videos so you can add them to a story.",
-            emptyTitle: props.emptyTitle ?? "No photos or videos yet",
+              "Allow access to add photos and videos to your story.",
+            emptyTitle: props.emptyTitle ?? "No media yet",
             emptyText:
-              props.emptyText ?? "Take a photo or video to start your story.",
+              props.emptyText ?? "Capture media to start your story.",
           }}
         />
       </SafeAreaView>

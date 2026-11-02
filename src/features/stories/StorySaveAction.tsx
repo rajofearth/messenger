@@ -47,7 +47,7 @@ export function StorySaveAction({ onSave, onBusyChange }: {
       </Pressable>
       {status === "saved" || status === "failed" ? (
         <Text accessibilityLiveRegion="polite" style={s.saveFeedback}>
-          {status === "saved" ? "Gallery · Messenger album" : "Couldn't save. Tap to retry."}
+          {status === "saved" ? "Saved to Gallery" : "Save failed · Retry"}
         </Text>
       ) : null}
     </View>

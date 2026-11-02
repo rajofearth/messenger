@@ -17,7 +17,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { describeAuthFailure } from "./authErrors";
 import { messengerRepository } from "../../data/messengerRepository";
 import { useDeviceScheme } from "../../state/useDeviceScheme";
-import { coral, palette, resolveDark } from "../../ui/theme";
+import { palette, radius, resolveDark, space } from "../../ui/theme";
 import type { ThemePreference } from "../../ui/theme";
 
 function usernameFromName(name: string) {
@@ -44,11 +44,11 @@ function AuthForm({ dark }: { dark: boolean }) {
 
   async function submit() {
     if (!username.trim() || !password) {
-      Alert.alert("Missing details", "Enter your username and password.");
+      Alert.alert("Missing details", "Enter your username and password");
       return;
     }
     if (mode === "signUp" && !name.trim()) {
-      Alert.alert("Add your name", "Enter the name you want people to see.");
+      Alert.alert("Add your name", "Enter the name you want people to see");
       return;
     }
     setBusy(true);
@@ -92,11 +92,17 @@ function AuthForm({ dark }: { dark: boolean }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={[s.logo, { backgroundColor: colors.tint }]}>
-          <Ionicons name="chatbubble-ellipses" size={34} color={colors.coralInk} />
+          <Ionicons
+            name="chatbubble-ellipses"
+            size={34}
+            color={colors.coralInk}
+          />
         </View>
-        <Text style={[s.title, { color: colors.fg }]}>Welcome to Messenger</Text>
+        <Text style={[s.title, { color: colors.fg }]}>
+          Welcome to Messenger
+        </Text>
         <Text style={[s.subtitle, { color: colors.muted }]}>
-          Private conversations that stay with you across your signed-in devices.
+          Conversations that stay with you across your signed-in devices
         </Text>
         {mode === "signUp" && (
           <TextInput
@@ -114,7 +120,10 @@ function AuthForm({ dark }: { dark: boolean }) {
                 setUsername(usernameFromName(value));
               }
             }}
-            style={[s.input, { color: colors.fg, backgroundColor: colors.card }]}
+            style={[
+              s.input,
+              { color: colors.fg, backgroundColor: colors.card },
+            ]}
           />
         )}
         <TextInput
@@ -152,7 +161,9 @@ function AuthForm({ dark }: { dark: boolean }) {
           />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            accessibilityLabel={
+              showPassword ? "Hide password" : "Show password"
+            }
             hitSlop={10}
             onPress={() => setShowPassword((value) => !value)}
             style={s.reveal}
@@ -168,7 +179,10 @@ function AuthForm({ dark }: { dark: boolean }) {
           accessibilityRole="button"
           disabled={busy}
           onPress={() => void submit()}
-          style={[s.primary, { opacity: busy ? 0.65 : 1 }]}
+          style={[
+            s.primary,
+            { backgroundColor: colors.switchTrackOn, opacity: busy ? 0.65 : 1 },
+          ]}
         >
           {busy ? (
             <ActivityIndicator color={colors.onCoral} />
@@ -182,14 +196,12 @@ function AuthForm({ dark }: { dark: boolean }) {
           <Pressable
             accessibilityRole="button"
             hitSlop={8}
-            onPress={() =>
-              Alert.alert(
-                "Password recovery is unavailable",
-                "You can change your password only while you are signed in. If you forget it while signed out, this account and its conversations cannot be recovered.",
-              )
-            }
+            onPress={() => undefined}
+            disabled
           >
-            <Text style={[s.link, { color: colors.coralInk }]}>Forgot password?</Text>
+            <Text style={[s.link, { color: colors.muted }]}>
+              Password changes require a signed-in session
+            </Text>
           </Pressable>
         )}
         <Pressable
@@ -204,8 +216,8 @@ function AuthForm({ dark }: { dark: boolean }) {
           </Text>
         </Pressable>
         <Text style={[s.note, { color: colors.muted }]}>
-          Your username is how people find you. Keep your password safe; there is
-          deliberately no signed-out password reset.
+          Your username is how people find you. Keep your password safe; there
+          is no signed-out password reset
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -253,68 +265,72 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 const s = StyleSheet.create({
   root: { flex: 1 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { flexGrow: 1, justifyContent: "center", padding: 28, gap: 14 },
+  content: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: space.xxl,
+    gap: space.md,
+  },
   logo: {
     alignSelf: "center",
     width: 76,
     height: 76,
-    borderRadius: 28,
+    borderRadius: radius.sheet,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+    marginBottom: space.sm,
   },
   title: {
     textAlign: "center",
-    fontFamily: "DMSans_700Bold",
-    fontSize: 29,
+    fontFamily: "DMSans_500Medium",
+    fontSize: 28,
   },
   subtitle: {
     textAlign: "center",
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 12,
+    marginBottom: space.md,
   },
   input: {
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
+    borderRadius: radius.control,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.lg,
     fontFamily: "DMSans_400Regular",
     fontSize: 16,
   },
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: radius.control,
   },
   passwordInput: {
     flex: 1,
-    paddingLeft: 16,
-    paddingVertical: 15,
+    paddingLeft: space.lg,
+    paddingVertical: space.lg,
     fontFamily: "DMSans_400Regular",
     fontSize: 16,
   },
-  reveal: { paddingHorizontal: 14, paddingVertical: 14 },
+  reveal: { paddingHorizontal: space.lg, paddingVertical: space.lg },
   primary: {
-    minHeight: 54,
-    borderRadius: 17,
+    minHeight: 52,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: coral,
-    marginTop: 4,
+    marginTop: space.xs,
   },
-  primaryText: { fontFamily: "DMSans_700Bold", fontSize: 16 },
+  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 16 },
   link: {
     textAlign: "center",
     fontFamily: "DMSans_500Medium",
     fontSize: 14,
-    paddingVertical: 5,
+    paddingVertical: space.xs,
   },
   note: {
     textAlign: "center",
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: space.sm,
   },
 });

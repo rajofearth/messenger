@@ -14,7 +14,7 @@ import {
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
-import { palette } from "../../ui/theme";
+import { palette, space } from "../../ui/theme";
 import Composer from "./Composer";
 import { replySnapshot, withReply } from "./conversationModel";
 import MessageActions, { type ActionTarget } from "./MessageActions";
@@ -68,7 +68,7 @@ export default function ConversationScreen({
   loadOlderFailed = false,
   onLoadOlder,
 }: ConversationScreenProps) {
-  const { bg, fg, muted, line } = palette(dark);
+  const { bg, fg, muted, line, media: mediaBg, onImage } = palette(dark);
   const { width: windowWidth } = useWindowDimensions();
   const [draft, setDraft] = useState("");
   const [attachmentOpen, setAttachmentOpen] = useState(false);
@@ -202,8 +202,8 @@ export default function ConversationScreen({
             {chat.muted ? " · Muted" : ""}
           </Text>
           {(chat.blocked || chat.group) && (
-            <Text style={[s.tiny, { color: muted, marginTop: 3 }]}>
-              {chat.blocked ? "Blocked" : "Your little circle"}
+            <Text style={[s.tiny, { color: muted, marginTop: space.xs }]}>
+              {chat.blocked ? "Blocked" : "Group"}
             </Text>
           )}
         </Pressable>
@@ -270,7 +270,7 @@ export default function ConversationScreen({
           dark={dark}
           title="Share media"
           permissionTitle="Choose media to share"
-          permissionText="Allow Messenger to see your photos and videos so you can share them in this conversation."
+          permissionText="Allow photo and video access to share media here."
           emptyTitle="No photos or videos yet"
           emptyText="Take a photo or video to share it here."
           onPicked={media.pickMedia}
@@ -310,6 +310,7 @@ export default function ConversationScreen({
           key={album.initialId}
           messages={albumMessages}
           initialId={album.initialId}
+          dark={dark}
           visible={visible}
           onClose={() => setAlbum(null)}
           onActions={(nextTarget) => {
@@ -324,12 +325,12 @@ export default function ConversationScreen({
         animationType="fade"
         onRequestClose={() => setViewer(null)}
       >
-        <View style={s.imageViewer}>
+        <View style={[s.imageViewer, { backgroundColor: mediaBg }]}>
           <View style={s.imageClose}>
             <IconButton
               name="close"
               label="Close media"
-              color="white"
+              color={onImage}
               onPress={() => setViewer(null)}
             />
           </View>

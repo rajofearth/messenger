@@ -286,7 +286,7 @@ function StoryThumbnail({ item, index, active, dragging, dropTarget, onPress, on
     onPanResponderTerminate: () => endRef.current(),
   })).current;
   return (
-    <Animated.View {...responder.panHandlers} style={[dragging && c.composerThumbDragging, dragging && { zIndex: 20, transform: [{ translateX: dragX }, { translateY: -8 }, { scale: 1.08 }] }]}>
+    <Animated.View {...responder.panHandlers} style={[dragging && c.composerThumbDragging, dragging && { zIndex: 20, transform: [{ translateX: dragX }, { translateY: -8 }] }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Review media ${index + 1}. Long press to reorder.`}

@@ -1,15 +1,17 @@
 import { StyleSheet } from "react-native";
-import { coral, onCoral } from "../../ui/theme";
+import { coral, onCoral, palette, radius, space } from "../../ui/theme";
 
-const GRID_PADDING = 12;
-const GRID_GAP = 4;
+const colors = palette(true);
+const GRID_PADDING = space.md;
+const GRID_GAP = space.xs;
 
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
-  viewer: { flex: 1, backgroundColor: "#101512" },
+  viewer: { flex: 1, backgroundColor: colors.media },
   image: { ...StyleSheet.absoluteFill },
-  previewPage: { flex: 1, minHeight: 0, justifyContent: "center", backgroundColor: "#101512" },
-  previewVideoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#151A17" },
+  imageScrim: { ...StyleSheet.absoluteFill, backgroundColor: colors.scrim },
+  previewPage: { flex: 1, minHeight: 0, justifyContent: "center", backgroundColor: colors.media },
+  previewVideoPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.sm, backgroundColor: colors.card },
   previewVideoPlaceholderText: { color: "#FFFFFF99", fontFamily: "DMSans_500Medium", fontSize: 13 },
   mediaError: {
     color: "white",
@@ -21,7 +23,7 @@ export const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   name: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: "white",
     fontSize: 15,
   },
@@ -34,12 +36,12 @@ export const styles = StyleSheet.create({
     color: "#FFFFFFCC",
     fontSize: 12,
   },
-  tracks: { flexDirection: "row", gap: 4, marginBottom: 14 },
+  tracks: { flexDirection: "row", gap: space.xs, marginBottom: space.md },
   track: {
     height: 3,
     flex: 1,
     backgroundColor: "#FFFFFF44",
-    borderRadius: 3,
+    borderRadius: radius.badge,
     overflow: "hidden",
   },
   fill: {
@@ -54,7 +56,7 @@ export const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: "#EF8E76CC",
+    backgroundColor: coral,
   },
   uploadFailed: {
     position: "absolute",
@@ -66,7 +68,7 @@ export const styles = StyleSheet.create({
   },
   navigation: { flex: 1, flexDirection: "row" },
   next: { flex: 2 },
-  bottom: { padding: 24, gap: 14 },
+  bottom: { padding: space.xxl, gap: space.md },
   storyActions: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -124,20 +126,20 @@ export const styles = StyleSheet.create({
   },
   viewersSheet: {
     maxHeight: "60%",
-    backgroundColor: "#1A201C",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 16,
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    paddingTop: space.lg,
   },
   viewersHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    gap: space.sm,
+    paddingHorizontal: space.xl,
+    paddingBottom: space.md,
   },
   viewersTitle: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: "white",
     fontSize: 20,
   },
@@ -169,13 +171,13 @@ export const styles = StyleSheet.create({
   },
   viewersEmptyTitle: {
     color: "white",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
   },
-  viewerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  viewerRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   viewerCopy: { flex: 1 },
   viewerName: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: "white",
     fontSize: 14,
   },
@@ -190,8 +192,6 @@ export const styles = StyleSheet.create({
     color: "white",
     fontSize: 22,
     lineHeight: 30,
-    textShadowColor: "#00000088",
-    textShadowRadius: 12,
   },
   captionInput: {
     fontFamily: "DMSans_400Regular",
@@ -199,7 +199,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     padding: 16,
     maxHeight: 140,
-    borderRadius: 20,
+    borderRadius: radius.card,
     backgroundColor: "#FFFFFF22",
     borderWidth: 1,
     borderColor: "#FFFFFF44",
@@ -208,11 +208,11 @@ export const styles = StyleSheet.create({
     backgroundColor: coral,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderRadius: 18,
+    borderRadius: radius.card,
     alignItems: "center",
   },
   shareText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: onCoral,
     fontSize: 15,
   },
@@ -228,7 +228,7 @@ export const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 20,
   },
-  sheetTitle: { flex: 1, fontFamily: "DMSans_700Bold", fontSize: 22 },
+  sheetTitle: { flex: 1, fontFamily: "DMSans_600SemiBold", fontSize: 22 },
   choice: {
     flexDirection: "row",
     alignItems: "center",
@@ -246,7 +246,7 @@ export const styles = StyleSheet.create({
   pickerTitle: {
     flex: 1,
     textAlign: "center",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 18,
   },
   pickerHeaderBusy: {
@@ -271,7 +271,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
   },
   pickerLimitedAction: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
   },
   pickerFilters: {
@@ -329,7 +329,7 @@ export const styles = StyleSheet.create({
     backgroundColor: coral,
   },
   pickerBadgeText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
     color: onCoral,
   },
@@ -373,7 +373,7 @@ export const styles = StyleSheet.create({
     alignItems: "center",
   },
   pickerNextText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: onCoral,
     fontSize: 14,
   },
@@ -392,7 +392,7 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pickerEmptyTitle: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
     textAlign: "center",
   },
@@ -410,12 +410,12 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   pickerPrimaryText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: onCoral,
     fontSize: 14,
   },
   pickerLink: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 13,
   },
   pickerFooterSpinner: { paddingVertical: 18 },
@@ -432,7 +432,7 @@ export const styles = StyleSheet.create({
   },
   pickerAlbumTitle: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
   },
   albumOverlay: {
@@ -458,7 +458,7 @@ export const styles = StyleSheet.create({
   },
   albumTitle: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
   },
   albumList: { paddingHorizontal: 16, paddingBottom: 28, gap: 8 },

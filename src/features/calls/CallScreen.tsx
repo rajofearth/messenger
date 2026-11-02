@@ -12,8 +12,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
 import CallScreenCamera from "./CallScreenCamera";
@@ -84,21 +82,9 @@ export default function CallScreen({
           onError={() => setRemoteFailed(true)}
         />
       )}
-      <LinearGradient
-        colors={
-          showingVideo && !remoteFailed
-            ? [
-                "rgba(12,17,21,0.72)",
-                "rgba(12,17,21,0.03)",
-                "rgba(12,17,21,0.25)",
-                "#10171EF2",
-              ]
-            : ["#303333", "#25272B", "#131A21", "#10171E"]
-        }
-        locations={[0, 0.35, 0.58, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+      {showingVideo && !remoteFailed && (
+        <View style={styles.backdropScrim} pointerEvents="none" />
+      )}
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable
@@ -142,11 +128,7 @@ export default function CallScreen({
           {showingVideo && (
             <View style={styles.preview}>
               <CallScreenCamera front={frontCamera} />
-              <LinearGradient
-                pointerEvents="none"
-                colors={["transparent", "#00000099"]}
-                style={StyleSheet.absoluteFill}
-              />
+              <View style={styles.previewScrim} pointerEvents="none" />
               <View style={styles.previewLabel}>
                 <Text style={styles.youText}>You</Text>
                 <Ionicons
@@ -163,16 +145,10 @@ export default function CallScreen({
           <View style={styles.callNote}>
             <View style={styles.smallDot} />
             <Text style={styles.callNoteText}>
-              Demo call · Local preview only · No audio or video sent
+              Demo · Preview only · No media sent
             </Text>
           </View>
           <View style={styles.dock}>
-            <BlurView
-              intensity={45}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.dockTint} />
             <View style={styles.controls}>
               <Control
                 icon={cameraOn ? "videocam-outline" : "videocam-off-outline"}
@@ -248,7 +224,7 @@ export default function CallScreen({
                 <View style={styles.optionCopy}>
                   <Text style={styles.optionTitle}>Speaker</Text>
                   <Text style={styles.optionSubtitle}>
-                    {speaker ? "Speaker selected" : "Earpiece selected"}
+                    {speaker ? "Speaker" : "Earpiece"}
                   </Text>
                 </View>
                 <Switch
@@ -279,8 +255,8 @@ export default function CallScreen({
                   <Text style={styles.optionTitle}>Switch camera</Text>
                   <Text style={styles.optionSubtitle}>
                     {frontCamera
-                      ? "Front camera selected"
-                      : "Rear camera selected"}
+                      ? "Front camera"
+                      : "Rear camera"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={19} color="#A7ABB0" />
@@ -292,9 +268,8 @@ export default function CallScreen({
                   color={CORAL}
                 />
                 <Text style={styles.simulationText}>
-                  The camera shows a live local preview when enabled. No video
-                  is recorded or sent. Microphone and speaker controls are
-                  simulated; no call audio is captured.
+                  Live preview only. No video is recorded or sent. Audio
+                  controls are simulated.
                 </Text>
               </View>
             </ScrollView>

@@ -5,7 +5,7 @@ import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { formatDuration } from "../../domain/model";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export type CallHistoryDetailProps = {
   chat: Chat;
@@ -47,9 +47,7 @@ export function CallHistoryList({
             size={20}
             color={
               record.missed
-                ? dark
-                  ? "#FFB4AB"
-                  : "#B3261E"
+                ? colors.danger
                 : colors.muted
             }
           />
@@ -58,11 +56,7 @@ export function CallHistoryList({
               style={[
                 s.label,
                 {
-                  color: record.missed
-                    ? dark
-                      ? "#FFB4AB"
-                      : "#B3261E"
-                    : colors.fg,
+                    color: record.missed ? colors.danger : colors.fg,
                 },
               ]}
             >
@@ -163,28 +157,28 @@ export default function CallHistoryDetail({
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16 },
-  content: { padding: 24, paddingBottom: 60 },
-  heading: { fontFamily: "DMSans_700Bold", fontSize: 20 },
-  profile: { alignItems: "center", gap: 12, paddingVertical: 20 },
-  name: { fontFamily: "DMSans_700Bold", fontSize: 26, textAlign: "center" },
-  actions: { flexDirection: "row", gap: 12, marginVertical: 24 },
+  header: { flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.lg },
+  content: { padding: space.xl, paddingBottom: 60 },
+  heading: { fontFamily: "DMSans_600SemiBold", fontSize: 20 },
+  profile: { alignItems: "center", gap: space.md, paddingVertical: space.xl },
+  name: { fontFamily: "DMSans_600SemiBold", fontSize: 26, textAlign: "center" },
+  actions: { flexDirection: "row", gap: space.md, marginVertical: space.xl },
   action: {
     flex: 1,
-    padding: 18,
-    borderRadius: 18,
+    padding: space.lg,
+    borderRadius: radius.card,
     alignItems: "center",
     gap: 10,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
+    gap: space.md,
+    paddingVertical: space.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1 },
   label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: 5 },
-  empty: { fontFamily: "DMSans_400Regular", paddingVertical: 24 },
+  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: space.xs },
+  empty: { fontFamily: "DMSans_400Regular", paddingVertical: space.xxl },
 });

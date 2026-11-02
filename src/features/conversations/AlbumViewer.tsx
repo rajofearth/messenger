@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, useWindowDimensions, View } from "react-native
 import type { Message } from "../../domain/data";
 import { IconButton } from "../../ui/primitives";
 import { ResponsiveImage } from "../../ui/ResponsiveImage";
+import { palette, space } from "../../ui/theme";
 import { AlbumItem } from "./MediaAlbum";
 import type { MessageBubbleProps } from "./MessageBubble";
 import VideoAttachment from "./VideoAttachment";
@@ -10,13 +11,15 @@ import VideoAttachment from "./VideoAttachment";
 type Props = Pick<MessageBubbleProps, "onActions"> & {
   messages: Message[];
   initialId: string;
+  dark: boolean;
   visible: boolean;
   onClose: () => void;
 };
 
-export default function AlbumViewer({ messages, initialId, visible, onClose, onActions }: Props) {
+export default function AlbumViewer({ messages, initialId, dark, visible, onClose, onActions }: Props) {
   const [selectedId, setSelectedId] = useState(initialId);
   const { width } = useWindowDimensions();
+  const colors = palette(dark);
   const found = messages.findIndex((message) => message.id === selectedId);
   const index = Math.max(0, found);
   const message = messages[index];
@@ -27,14 +30,15 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
       supportedOrientations={["portrait", "landscape", "landscape-left", "landscape-right"]}
       onRequestClose={onClose}
     >
-      <View style={s.root}>
+      <View style={[s.root, { backgroundColor: colors.media }]}>
         <View style={s.toolbar}>
-          <Text accessibilityLiveRegion="polite" style={s.text}>{index + 1} of {messages.length}</Text>
-          <IconButton name="close" label="Close album" color="white" onPress={onClose} />
+          <Text accessibilityLiveRegion="polite" style={[s.text, { color: colors.onImage }]}>{index + 1} of {messages.length}</Text>
+          <IconButton name="close" label="Close album" color={colors.onImage} onPress={onClose} />
         </View>
         {visible && message && (
           <AlbumItem
             key={message.id}
+            dark={dark}
             message={message}
             visible={visible}
             onActions={(target) => { onClose(); onActions(target); }}
@@ -56,19 +60,19 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
                 style={s.image}
                 contentFit="contain"
               />
-            ) : <Text style={s.text}>Media unavailable</Text>}
+            ) : <Text style={[s.text, { color: colors.onImage }]}>Media unavailable</Text>}
           </AlbumItem>
         )}
-        {!!message?.text && <Text style={[s.text, s.caption]}>{message.text}</Text>}
-        {!!message?.reaction && <Text style={s.text}>{message.reaction}</Text>}
+        {!!message?.text && <Text style={[s.text, s.caption, { color: colors.onImage }]}>{message.text}</Text>}
+        {!!message?.reaction && <Text style={[s.text, { color: colors.onImage }]}>{message.reaction}</Text>}
         <View style={s.paging}>
           <IconButton
-            name="chevron-back" label="Previous media" color={index > 0 ? "white" : "#666"}
+            name="chevron-back" label="Previous media" color={index > 0 ? colors.onImage : colors.muted}
             onPress={() => { if (index > 0) setSelectedId(messages[index - 1].id); }}
           />
-          <Text style={s.text}>{message?.kind === "video" ? "Video" : "Photo"}</Text>
+          <Text style={[s.text, { color: colors.onImage }]}>{message?.kind === "video" ? "Video" : "Photo"}</Text>
           <IconButton
-            name="chevron-forward" label="Next media" color={index < messages.length - 1 ? "white" : "#666"}
+            name="chevron-forward" label="Next media" color={index < messages.length - 1 ? colors.onImage : colors.muted}
             onPress={() => { if (index < messages.length - 1) setSelectedId(messages[index + 1].id); }}
           />
         </View>
@@ -78,11 +82,11 @@ export default function AlbumViewer({ messages, initialId, visible, onClose, onA
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#101310", paddingTop: 44, paddingBottom: 24, alignItems: "center" },
-  toolbar: { width: "100%", paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  text: { color: "white", fontSize: 16 },
+  root: { flex: 1, paddingTop: 48, paddingBottom: space.xxl, alignItems: "center" },
+  toolbar: { width: "100%", paddingHorizontal: space.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  text: { fontSize: 16 },
   media: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
   image: { width: "100%", height: "100%" },
-  caption: { padding: 12 },
-  paging: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: 16 },
+  caption: { padding: space.md },
+  paging: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", paddingHorizontal: space.lg },
 });

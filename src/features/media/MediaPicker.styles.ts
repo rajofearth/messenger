@@ -1,22 +1,22 @@
 import { StyleSheet } from "react-native";
-import { coral, onCoral } from "../../ui/theme";
+import { coral, onCoral, radius, space } from "../../ui/theme";
 
-const GRID_PADDING = 12;
-const GRID_GAP = 4;
+const GRID_PADDING = space.md;
+const GRID_GAP = space.xs;
 
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
   pickerHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    gap: space.xs,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
   pickerTitle: {
     flex: 1,
     textAlign: "center",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 18,
   },
   pickerHeaderBusy: {
@@ -51,7 +51,7 @@ export const styles = StyleSheet.create({
   },
   cameraModeTitle: {
     color: "white",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
   },
   cameraBottomBar: {
@@ -70,7 +70,7 @@ export const styles = StyleSheet.create({
     backgroundColor: "#B3261EAA",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: space.sm,
     fontFamily: "DMSans_500Medium",
     fontSize: 12,
     textAlign: "center",
@@ -109,7 +109,7 @@ export const styles = StyleSheet.create({
   },
   cameraRecordingText: {
     color: "white",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 14,
     fontVariant: ["tabular-nums"],
   },
@@ -129,7 +129,7 @@ export const styles = StyleSheet.create({
   },
   cameraModeSwitchText: {
     color: "white",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
   },
   pickerLimited: {
@@ -137,7 +137,7 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: radius.control,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -148,7 +148,7 @@ export const styles = StyleSheet.create({
     fontSize: 12,
   },
   pickerLimitedAction: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
   },
   pickerFilters: {
@@ -180,7 +180,7 @@ export const styles = StyleSheet.create({
   },
   pickerAlbumTitle: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 15,
   },
   pickerGrid: {
@@ -190,11 +190,11 @@ export const styles = StyleSheet.create({
   pickerRow: { gap: GRID_GAP },
   pickerGridGap: { height: GRID_GAP },
   pickerTile: {
-    borderRadius: 8,
+    borderRadius: radius.badge,
     overflow: "hidden",
   },
   pickerCameraCard: {
-    borderRadius: 8,
+    borderRadius: radius.badge,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
@@ -221,7 +221,7 @@ export const styles = StyleSheet.create({
     backgroundColor: coral,
   },
   pickerBadgeText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 12,
     color: onCoral,
   },
@@ -261,11 +261,11 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: coral,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: space.md,
     alignItems: "center",
   },
   pickerNextText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: onCoral,
     fontSize: 14,
   },
@@ -284,7 +284,7 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pickerEmptyTitle: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
     textAlign: "center",
   },
@@ -298,11 +298,11 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: coral,
     paddingHorizontal: 24,
-    paddingVertical: 13,
+    paddingVertical: space.md,
     marginTop: 4,
   },
   pickerPrimaryText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     color: onCoral,
     fontSize: 14,
   },
@@ -318,9 +318,9 @@ export const styles = StyleSheet.create({
   },
   albumSheet: {
     maxHeight: "82%",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 12,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    paddingTop: space.md,
   },
   albumHeader: {
     flexDirection: "row",
@@ -330,7 +330,7 @@ export const styles = StyleSheet.create({
   },
   albumTitle: {
     flex: 1,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 20,
   },
   albumList: { paddingHorizontal: 16, paddingBottom: 28, gap: 8 },
@@ -341,12 +341,12 @@ export const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 14,
+    borderRadius: radius.card,
   },
   albumIcon: {
     width: 52,
     height: 52,
-    borderRadius: 12,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -373,7 +373,7 @@ export const styles = StyleSheet.create({
   previewTitle: {
     flex: 1,
     color: "white",
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 16,
     textAlign: "center",
   },
@@ -402,9 +402,9 @@ export const styles = StyleSheet.create({
     position: "absolute",
     top: 18,
     right: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: "white",
     backgroundColor: "#00000077",
@@ -417,7 +417,7 @@ export const styles = StyleSheet.create({
   },
   previewSelectBadgeText: {
     color: onCoral,
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 18,
   },
   previewVideoSurface: { flex: 1 },
@@ -454,7 +454,7 @@ export const styles = StyleSheet.create({
   },
   previewActionPrimary: { backgroundColor: coral },
   previewActionText: {
-    fontFamily: "DMSans_700Bold",
+    fontFamily: "DMSans_600SemiBold",
     fontSize: 14,
     color: "white",
   },

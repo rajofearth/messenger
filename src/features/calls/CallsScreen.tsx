@@ -11,7 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { palette, coral, onCoral } from "../../ui/theme";
+import { palette, coral, onCoral, radius, space } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
 import QuickActions from "../../ui/QuickActions";
 export default function CallsScreen({
@@ -94,13 +94,7 @@ export default function CallsScreen({
                   name={record.missed ? "arrow-down" : "arrow-up"}
                   size={13}
                   color={
-                    record.missed
-                      ? dark
-                        ? "#FFB4AB"
-                        : "#B3261E"
-                      : dark
-                        ? "#9FD0B2"
-                        : "#2F6A4B"
+                    record.missed ? colors.danger : colors.success
                   }
                 />
                 <Text style={[s.caption, { color: colors.muted }]}>
@@ -153,19 +147,19 @@ export default function CallsScreen({
 }
 const s = StyleSheet.create({
   header: {
-    padding: 25,
+    padding: space.xl,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 36, letterSpacing: -1.6 },
+  title: { fontFamily: "DMSans_600SemiBold", fontSize: 32 },
   search: {
-    marginHorizontal: 25,
-    marginBottom: 18,
-    borderRadius: 14,
+    marginHorizontal: space.xl,
+    marginBottom: space.lg,
+    borderRadius: radius.card,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 13,
+    paddingLeft: space.md,
   },
   input: {
     flex: 1,
@@ -175,11 +169,11 @@ const s = StyleSheet.create({
   },
   row: {
     paddingHorizontal: 25,
-    paddingVertical: 15,
+    paddingVertical: space.md,
     flexDirection: "row",
     alignItems: "center",
   },
-  body: { flex: 1, marginLeft: 15 },
+  body: { flex: 1, marginLeft: space.md },
   callButton: {
     width: 44,
     height: 44,
@@ -187,10 +181,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   name: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  meta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
+  meta: { flexDirection: "row", alignItems: "center", gap: space.xs, marginTop: space.sm },
   caption: { fontFamily: "DMSans_400Regular", fontSize: 12 },
-  empty: { padding: 60, alignItems: "center", gap: 20 },
+  empty: { padding: space.xxxl, alignItems: "center", gap: space.xl },
   emptyTitle: { fontFamily: "DMSans_500Medium", fontSize: 18 },
-  primary: { backgroundColor: coral, padding: 16, borderRadius: 17 },
-  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
+  primary: { backgroundColor: coral, padding: space.lg, borderRadius: radius.control },
+  primaryText: { fontFamily: "DMSans_600SemiBold", color: onCoral, fontSize: 14 },
 });

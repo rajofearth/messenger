@@ -12,7 +12,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import type { RemoteCallRecord } from "../../state/remoteMessengerTypes";
 import { Avatar, IconButton, type IconName } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 import {
   CallHistoryActions,
   CallHistoryList,
@@ -93,24 +93,14 @@ export default function ChatProfile({
         <Ionicons
           name={icon}
           size={23}
-          color={
-            destructive
-              ? dark
-                ? "#FFB4AB"
-                : "#B3261E"
-              : colors.coralInk
-          }
+          color={destructive ? colors.danger : colors.coralInk}
         />
         <View style={s.body}>
           <Text
             style={[
               s.label,
               {
-                color: destructive
-                  ? dark
-                    ? "#FFB4AB"
-                    : "#B3261E"
-                  : colors.fg,
+                color: destructive ? colors.danger : colors.fg,
               },
             ]}
           >
@@ -143,9 +133,12 @@ export default function ChatProfile({
           value={value}
           onValueChange={change}
           disabled={disabled}
-          trackColor={{ false: dark ? "#50574E" : "#DEDFD5", true: coral }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={dark ? "#50574E" : "#DEDFD5"}
+          trackColor={{
+            false: colors.switchTrackOff,
+            true: colors.switchTrackOn,
+          }}
+          thumbColor={colors.switchThumb}
+          ios_backgroundColor={colors.switchTrackOff}
         />
       </View>
     );
@@ -197,7 +190,7 @@ export default function ChatProfile({
             ]}
           >
             {chat.bio ||
-              (chat.group ? "No group description added." : "No bio added.")}
+              (chat.group ? "No group description added" : "No bio added")}
           </Text>
           <Text style={[s.caption, { color: colors.muted }]}>
             {chat.group ? "Created" : "Talking since"} {date.label}
@@ -217,8 +210,8 @@ export default function ChatProfile({
             {!membership.ids.length && (
               <Text style={[s.empty, { color: colors.muted }]}>
                 {chat.memberIds
-                  ? "No members listed."
-                  : "Member information is unavailable."}
+                  ? "No members listed"
+                  : "Member information is unavailable"}
               </Text>
             )}
             {membership.ids.map((id) => {
@@ -240,7 +233,10 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: colors.coralInk, backgroundColor: colors.tint },
+                        {
+                          color: colors.coralInk,
+                          backgroundColor: colors.tint,
+                        },
                       ]}
                     >
                       Admin
@@ -269,7 +265,10 @@ export default function ChatProfile({
                     <Text
                       style={[
                         s.badge,
-                        { color: colors.coralInk, backgroundColor: colors.tint },
+                        {
+                          color: colors.coralInk,
+                          backgroundColor: colors.tint,
+                        },
                       ]}
                     >
                       Admin
@@ -286,7 +285,7 @@ export default function ChatProfile({
             </Text>
             {!mutualGroups.length && (
               <Text style={[s.empty, { color: colors.muted }]}>
-                No shared groups in the available membership data.
+                No shared groups in the available membership data
               </Text>
             )}
             {mutualGroups.map((group) => (
@@ -336,9 +335,7 @@ export default function ChatProfile({
           {toggleRow(
             "notifications-off-outline",
             "Mute notifications",
-            chat.muted
-              ? "Muted · no system notifications"
-              : "Notifications on",
+            chat.muted ? "Muted · no system notifications" : "Notifications on",
             !!chat.muted,
             onMuteChange,
           )}
@@ -393,51 +390,60 @@ export default function ChatProfile({
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, padding: 16 },
-  heading: { fontFamily: "DMSans_700Bold", fontSize: 20 },
-  content: { paddingHorizontal: 24, paddingBottom: 70 },
-  hero: { alignItems: "center", gap: 10, paddingTop: 16 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    padding: space.lg,
+  },
+  heading: { fontFamily: "DMSans_500Medium", fontSize: 20 },
+  content: { paddingHorizontal: space.xxl, paddingBottom: space.xxxl * 2 },
+  hero: { alignItems: "center", gap: space.sm, paddingTop: space.lg },
   name: {
-    fontFamily: "DMSans_700Bold",
-    fontSize: 28,
+    fontFamily: "DMSans_500Medium",
+    fontSize: 26,
     textAlign: "center",
-    marginTop: 8,
+    marginTop: space.sm,
   },
   label: { fontFamily: "DMSans_500Medium", fontSize: 14 },
-  caption: { fontFamily: "DMSans_400Regular", fontSize: 12, marginTop: 5 },
+  caption: {
+    fontFamily: "DMSans_400Regular",
+    fontSize: 12,
+    marginTop: space.xs,
+  },
   note: {
     fontFamily: "DMSans_400Regular",
     fontSize: 12,
     lineHeight: 19,
-    marginTop: 14,
-    marginHorizontal: 4,
+    marginTop: space.md,
+    marginHorizontal: space.xs,
   },
   description: {
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
     lineHeight: 23,
-    marginVertical: 12,
+    marginVertical: space.md,
   },
-  card: { padding: 20, borderRadius: 20 },
-  section: { marginTop: 28 },
+  card: { padding: space.xl, borderRadius: radius.card },
+  section: { marginTop: space.xxxl },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
+    gap: space.md,
+    paddingVertical: space.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1 },
   badge: {
     fontFamily: "DMSans_500Medium",
     fontSize: 11,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.badge,
   },
   empty: {
     fontFamily: "DMSans_400Regular",
-    paddingVertical: 20,
+    paddingVertical: space.xl,
     lineHeight: 21,
   },
 });

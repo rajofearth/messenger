@@ -85,7 +85,7 @@ export function MediaCamera(props: Props) {
     } catch (cause) {
       setRecording(false);
       setBusy(false);
-      setError(cause instanceof Error ? cause.message : "The camera could not capture media.");
+      setError(cause instanceof Error ? cause.message : "Capture failed. Try again.");
     } finally {
       setBusy(false);
     }

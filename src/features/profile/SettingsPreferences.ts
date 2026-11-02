@@ -38,24 +38,26 @@ export const DEFAULT_PREFERENCES: Preferences = {
 function avatarSaveReason(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   if (message.includes("FILE_TOO_LARGE"))
-    return "That photo is larger than 25 MiB. Choose a smaller one.";
+    return "That photo is larger than 25 MiB. Choose a smaller one";
   if (message.includes("INVALID_MIME"))
-    return "That image format is not supported. Choose a JPEG, PNG or WebP photo.";
+    return "That image format is not supported. Choose a JPEG, PNG or WebP photo";
   if (message.includes("AUTH_REQUIRED"))
-    return "Your session expired. Sign in again and choose the photo.";
+    return "Your session expired. Sign in again and choose the photo";
   if (message.includes("USERNAME_TAKEN"))
-    return "Your username is already in use. Update it in Edit profile, then try the photo again.";
-  if (message.includes("INVALID_USERNAME") || message.includes("PROFILE_NOT_READY"))
-    return "Finish setting up your profile name and username, then try the photo again.";
+    return "Your username is already in use. Update it in Edit profile, then try the photo again";
+  if (
+    message.includes("INVALID_USERNAME") ||
+    message.includes("PROFILE_NOT_READY")
+  )
+    return "Finish setting up your profile name and username, then try the photo again";
   if (message.includes("UnableToUpload") || message.includes("Upload failed"))
-    return "The photo could not reach the server. Check your connection and try again.";
-  return "We could not save your choice. Check your connection and try again.";
+    return "The photo could not reach the server. Check your connection and try again";
+  return "We could not save your choice. Check your connection and try again";
 }
 
-export function useSettingsPreferences(
-  onProfileChange?: ProfileChangeHandler,
-) {
-  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
+export function useSettingsPreferences(onProfileChange?: ProfileChangeHandler) {
+  const [preferences, setPreferences] =
+    useState<Preferences>(DEFAULT_PREFERENCES);
   const current = useRef(DEFAULT_PREFERENCES);
   const writes = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
@@ -102,7 +104,7 @@ export function useSettingsPreferences(
         if (active)
           Alert.alert(
             "Could not load settings",
-            "Your saved settings could not be read. You can still make and save changes.",
+            "Your saved settings could not be read. You can still make and save changes",
           );
       } finally {
         if (active) setReady(true);
@@ -138,7 +140,7 @@ export function useSettingsPreferences(
     void persist({ [key]: value }).catch(() => {
       Alert.alert(
         "Settings not saved",
-        "This change is active for now, but could not be saved. Please try again.",
+        "This change is active for now, but could not be saved. Please try again",
       );
     });
     // Keep the shared profile in step with the switch immediately. These
@@ -166,13 +168,17 @@ export function useSettingsPreferences(
       opened = true;
       const asset = result.assets[0];
       setAvatarFailed(false);
-      await saveAvatarAsset(asset.uri, asset.mimeType, asset.fileName ?? undefined);
+      await saveAvatarAsset(
+        asset.uri,
+        asset.mimeType,
+        asset.fileName ?? undefined,
+      );
     } catch (error) {
       Alert.alert(
         opened ? "Photo could not be saved" : "Could not open photos",
         opened
           ? avatarSaveReason(error)
-          : "The photo library could not be opened. Please try again.",
+          : "The photo library could not be opened. Please try again",
       );
     } finally {
       setPicking(false);
@@ -211,7 +217,11 @@ export function useSettingsPreferences(
     setPicking(true);
     try {
       setAvatarFailed(false);
-      await saveAvatarAsset(asset.uri, asset.mimeType ?? "image/jpeg", asset.filename);
+      await saveAvatarAsset(
+        asset.uri,
+        asset.mimeType ?? "image/jpeg",
+        asset.filename,
+      );
     } catch (error) {
       Alert.alert("Photo could not be saved", avatarSaveReason(error));
     } finally {
@@ -230,7 +240,7 @@ export function useSettingsPreferences(
   async function saveProfile() {
     if (!ready || saving || picking) return;
     if (!name.trim()) {
-      Alert.alert("Add your name", "Enter a name before saving your profile.");
+      Alert.alert("Add your name", "Enter a name before saving your profile");
       return;
     }
     const handle = username.trim().replace(/^@/, "");
@@ -252,12 +262,16 @@ export function useSettingsPreferences(
       // Wait for the server before committing the local copy and closing the
       // sheet, so a failed username change cannot look saved.
       await onProfileChange?.(next);
-      await persist({ name: next.name, bio: next.bio, username: next.username });
+      await persist({
+        name: next.name,
+        bio: next.bio,
+        username: next.username,
+      });
       setSheet(null);
     } catch {
       Alert.alert(
         "Profile not saved",
-        "Your profile could not be saved. Please try again.",
+        "Your profile could not be saved. Please try again",
       );
     } finally {
       setSaving(false);

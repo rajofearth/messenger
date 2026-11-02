@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AppState, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { styles } from "./CallScreen.styles";
+import { CORAL, styles } from "./CallScreen.styles";
 
 export default function CallScreenCamera({ front }: { front: boolean }) {
   const [permission, requestPermission, getPermission] = useCameraPermissions();
@@ -72,7 +72,7 @@ export default function CallScreenCamera({ front }: { front: boolean }) {
           else void enableCamera();
         }}
       >
-        <Text style={[styles.youText, { textAlign: "center", color: "#F28B70" }]}>
+        <Text style={[styles.youText, { textAlign: "center", color: CORAL }]}>
           {busy ? "Please wait" : label}
         </Text>
       </Pressable>

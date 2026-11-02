@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { type IconName, tap } from "./primitives";
-import { coral, palette } from "./theme";
+import { palette, radius, space } from "./theme";
 
 type Props = {
   dark: boolean;
@@ -101,7 +101,7 @@ export default function QuickActions({
           accessibilityLabel="Open quick actions"
           accessibilityState={{ expanded: visible }}
           onPress={open}
-          style={s.fab}
+          style={[s.fab, { backgroundColor: colors.switchTrackOn }]}
         >
           {plus}
         </Pressable>
@@ -128,11 +128,12 @@ export default function QuickActions({
             style={[
               s.popup,
               {
-                right: Math.max(16, width - position.x - 58),
-                bottom: Math.max(86, height - position.y + 12),
-                maxWidth: width - 32,
+                right: Math.max(space.lg, width - position.x - 56),
+                bottom: Math.max(88, height - position.y + space.md),
+                maxWidth: width - space.xxxl,
                 backgroundColor: colors.card,
                 borderColor: colors.line,
+                shadowColor: colors.shadow,
                 opacity: progress,
                 transform: [
                   {
@@ -170,6 +171,7 @@ export default function QuickActions({
             onPress={() => dismiss()}
             style={[
               s.fab,
+              { backgroundColor: colors.switchTrackOn },
               { position: "absolute", left: position.x, top: position.y },
             ]}
           >
@@ -182,46 +184,43 @@ export default function QuickActions({
 }
 
 const s = StyleSheet.create({
-  anchor: { position: "absolute", right: 25, bottom: 24 },
+  anchor: { position: "absolute", right: space.xxl, bottom: space.xxl },
   overlay: { flex: 1, backgroundColor: "transparent" },
   fab: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: coral,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#B76F5B",
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   popup: {
     position: "absolute",
-    width: 254,
-    padding: 8,
-    borderRadius: 22,
+    width: 256,
+    padding: space.sm,
+    borderRadius: radius.sheet,
     borderWidth: 1,
-    elevation: 8,
-    shadowColor: "#28231D",
+    elevation: 4,
     shadowOpacity: 0.13,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     transformOrigin: "bottom right",
   },
   action: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 10,
-    borderRadius: 15,
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.control,
     minHeight: 56,
   },
   icon: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },

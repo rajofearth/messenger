@@ -1,10 +1,12 @@
 import React from "react";
 import { StyleSheet, Text, View, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import CallScreen from "./CallScreen";
 import type { Call } from "./useCalls";
 import { Avatar, IconButton } from "../../ui/primitives";
+import { palette, radius, space } from "../../ui/theme";
 import { formatDuration } from "../../domain/model";
+
+const colors = palette(true);
 
 export function CallPill({
   call,
@@ -29,7 +31,7 @@ export function CallPill({
         <Text style={s.pillName}>{call.chat.name}</Text>
         <Text style={s.pillStatus}>
           {call.status === "active"
-            ? `Ongoing call · ${formatDuration(call.seconds)}`
+            ? `Call · ${formatDuration(call.seconds)}`
             : call.status === "incoming"
               ? "Incoming call"
               : "Calling…"}
@@ -38,7 +40,7 @@ export function CallPill({
       {call.status === "incoming" && (
         <IconButton
           name="call"
-          background="#69A584"
+            background={colors.success}
           color="white"
           label="Answer call"
           onPress={onAnswer}
@@ -47,7 +49,7 @@ export function CallPill({
       <IconButton
         name="call"
         hangup
-        background="#E66C66"
+         background={colors.danger}
         color="white"
         label={call.status === "incoming" ? "Decline call" : "End call"}
         onPress={onEnd}
@@ -89,7 +91,7 @@ export default function CallFlow({
       />
     );
   return (
-    <LinearGradient colors={["#303E36", "#18241F"]} style={s.ringing}>
+    <View style={s.ringing}>
       <IconButton
         name="chevron-back"
         color="white"
@@ -104,14 +106,14 @@ export default function CallFlow({
           {call.video ? "video" : "voice"} call
           {call.status === "calling" ? "…" : ""}
         </Text>
-        <Text style={s.demo}>Simulated call</Text>
+        <Text style={s.demo}>Demo call</Text>
       </View>
       <View style={s.actions}>
         <View style={s.action}>
           <IconButton
             name="call"
             hangup
-            background="#F06464"
+            background={colors.danger}
             color="white"
             size={30}
             label={call.status === "incoming" ? "Decline call" : "Cancel call"}
@@ -125,7 +127,7 @@ export default function CallFlow({
           <View style={s.action}>
             <IconButton
               name="call"
-              background="#69A584"
+              background={colors.success}
               color="white"
               size={30}
               label="Answer call"
@@ -135,57 +137,57 @@ export default function CallFlow({
           </View>
         )}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 const s = StyleSheet.create({
   pill: {
-    marginHorizontal: 15,
-    marginTop: 7,
-    marginBottom: 4,
-    backgroundColor: "#34493D",
-    borderRadius: 20,
+    marginHorizontal: space.lg,
+    marginTop: space.sm,
+    marginBottom: space.xs,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 10,
-    paddingLeft: 16,
+    gap: space.sm,
+    padding: space.sm,
+    paddingLeft: space.lg,
   },
-  dot: { width: 7, height: 7, backgroundColor: "#94D6A0", borderRadius: 5 },
-  pillName: { fontFamily: "DMSans_700Bold", color: "#FFF", fontSize: 12 },
+  dot: { width: 8, height: 8, backgroundColor: colors.success, borderRadius: 4 },
+  pillName: { fontFamily: "DMSans_600SemiBold", color: colors.fg, fontSize: 12 },
   pillStatus: {
     fontFamily: "DMSans_400Regular",
-    color: "#D6E2D9",
+    color: colors.muted,
     fontSize: 10,
-    marginTop: 3,
+    marginTop: space.xs,
   },
-  ringing: { flex: 1, paddingTop: 50, paddingHorizontal: 22 },
+  ringing: { flex: 1, paddingTop: 48, paddingHorizontal: space.xl, backgroundColor: colors.media },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingBottom: 45,
+    paddingBottom: 48,
   },
   name: {
     color: "#FFF",
-    fontFamily: "DMSans_700Bold",
-    fontSize: 31,
-    marginTop: 25,
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 30,
+    marginTop: space.xl,
   },
-  status: { color: "#C1D0C4", fontFamily: "DMSans_400Regular", marginTop: 11 },
+  status: { color: colors.muted, fontFamily: "DMSans_400Regular", marginTop: space.sm },
   demo: {
-    color: "#FFFFFF77",
+    color: colors.muted,
     fontFamily: "DMSans_400Regular",
     fontSize: 11,
-    marginTop: 20,
+    marginTop: space.xl,
   },
   actions: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 90,
-    paddingBottom: 65,
+    gap: 88,
+    paddingBottom: 64,
   },
-  action: { alignItems: "center", gap: 12 },
+  action: { alignItems: "center", gap: space.md },
   caption: {
     color: "#FFFFFFC0",
     fontFamily: "DMSans_400Regular",

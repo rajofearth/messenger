@@ -12,7 +12,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat, Message } from "../../domain/data";
 import { Avatar, IconButton } from "../../ui/primitives";
-import { coral, onCoral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 export default function ForwardScreen({
   chats,
   message,
@@ -125,10 +125,10 @@ export default function ForwardScreen({
         accessibilityState={{ disabled: !selected.length }}
         disabled={!selected.length}
         onPress={() => onForward(selected)}
-        style={[s.send, { opacity: selected.length ? 1 : 0.4 }]}
+        style={[s.send, { backgroundColor: colors.switchTrackOn, opacity: selected.length ? 1 : 0.4 }]}
       >
-        <Ionicons name="arrow-redo" size={20} color={onCoral} />
-        <Text style={s.sendText}>
+        <Ionicons name="arrow-redo" size={20} color={colors.onCoral} />
+        <Text style={[s.sendText, { color: colors.onCoral }]}>
           Forward{selected.length ? ` · ${selected.length}` : ""}
         </Text>
       </Pressable>
@@ -137,44 +137,43 @@ export default function ForwardScreen({
 }
 const s = StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", padding: 13, gap: 10 },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 23 },
+  header: { flexDirection: "row", alignItems: "center", padding: space.md, gap: space.sm },
+  title: { fontFamily: "DMSans_500Medium", fontSize: 23 },
   preview: {
-    margin: 20,
-    marginTop: 4,
-    borderRadius: 14,
+    margin: space.xl,
+    marginTop: space.xs,
+    borderRadius: radius.card,
     borderLeftWidth: 3,
-    padding: 15,
-    gap: 6,
+    padding: space.lg,
+    gap: space.xs,
   },
   label: { fontFamily: "DMSans_500Medium", fontSize: 12 },
   text: { fontFamily: "DMSans_400Regular", fontSize: 13, lineHeight: 20 },
   input: {
-    marginHorizontal: 20,
-    padding: 15,
-    borderRadius: 14,
+    marginHorizontal: space.xl,
+    padding: space.lg,
+    borderRadius: radius.card,
     fontFamily: "DMSans_400Regular",
-    marginBottom: 10,
+    marginBottom: space.sm,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    gap: space.md,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
   },
-  body: { flex: 1, gap: 3 },
+  body: { flex: 1, gap: space.xs },
   name: { fontFamily: "DMSans_500Medium", fontSize: 15 },
-  empty: { textAlign: "center", margin: 40 },
+  empty: { textAlign: "center", margin: space.xxxl },
   send: {
-    margin: 20,
-    borderRadius: 20,
-    backgroundColor: coral,
-    padding: 17,
+    margin: space.xl,
+    borderRadius: radius.pill,
+    padding: space.lg,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
+    gap: space.sm,
   },
-  sendText: { color: onCoral, fontFamily: "DMSans_700Bold", fontSize: 15 },
+  sendText: { fontFamily: "DMSans_500Medium", fontSize: 15 },
 });

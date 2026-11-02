@@ -10,7 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { Chat } from "../../domain/data";
 import { Avatar } from "../../ui/primitives";
-import { coral, palette } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 
 export type NewConversationScreenProps = {
   contacts: Chat[];
@@ -86,7 +86,7 @@ export default function NewConversationScreen({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
-          selectionColor={coral}
+          selectionColor={colors.coralInk}
           style={[s.searchInput, { color: colors.text }]}
         />
         {search.length > 0 && (
@@ -196,10 +196,10 @@ const s = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-    gap: 8,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.xl,
+    gap: space.sm,
   },
   iconButton: {
     width: 48,
@@ -207,22 +207,22 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { flex: 1, fontFamily: "DMSans_700Bold", fontSize: 26 },
+  title: { flex: 1, fontFamily: "DMSans_500Medium", fontSize: 24 },
   search: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 24,
-    marginBottom: 16,
-    paddingLeft: 16,
-    paddingRight: 4,
-    borderRadius: 18,
+    marginHorizontal: space.xxl,
+    marginBottom: space.lg,
+    paddingLeft: space.lg,
+    paddingRight: space.xs,
+    borderRadius: radius.control,
     minHeight: 52,
-    gap: 10,
+    gap: space.sm,
   },
   searchInput: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: 14,
+    paddingVertical: space.md,
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
@@ -232,32 +232,32 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { paddingHorizontal: 24, paddingBottom: 24 },
+  list: { paddingHorizontal: space.xxl, paddingBottom: space.xxl },
   row: {
     flexDirection: "row",
     alignItems: "center",
     minHeight: 76,
-    paddingVertical: 10,
-    gap: 16,
+    paddingVertical: space.sm,
+    gap: space.lg,
   },
   actionIcon: {
     width: 52,
     height: 52,
-    borderRadius: 18,
+    borderRadius: radius.control,
     alignItems: "center",
     justifyContent: "center",
   },
   name: { flex: 1, fontFamily: "DMSans_500Medium", fontSize: 17 },
   section: {
     borderTopWidth: 1,
-    marginTop: 16,
-    paddingTop: 24,
-    paddingBottom: 8,
+    marginTop: space.lg,
+    paddingTop: space.xxl,
+    paddingBottom: space.sm,
   },
-  sectionLabel: { fontFamily: "DMSans_700Bold", fontSize: 14 },
+  sectionLabel: { fontFamily: "DMSans_500Medium", fontSize: 14 },
   empty: {
     textAlign: "center",
-    paddingVertical: 40,
+    paddingVertical: space.xxxl + space.sm,
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },

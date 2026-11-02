@@ -6,6 +6,7 @@ import { Asset, MediaType } from "expo-media-library";
 import type { AssetMetadata } from "expo-media-library";
 import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { Colors } from "../../ui/theme";
 import { IconButton } from "../../ui/primitives";
@@ -159,7 +160,7 @@ function PreviewPage({
         onPress={onToggle}
         style={[s.previewSelectBadge, selected && s.previewSelectBadgeSelected]}
       >
-        {selected && <Text style={s.previewSelectBadgeText}>✓</Text>}
+        {selected && <Ionicons name="checkmark" size={20} color={colors.onCoral} />}
       </Pressable>
     </View>
   );

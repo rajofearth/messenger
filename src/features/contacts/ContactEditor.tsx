@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { IconButton } from "../../ui/primitives";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { palette, coral, onCoral } from "../../ui/theme";
+import { palette, radius, space } from "../../ui/theme";
 export default function ContactEditor({
   kind,
   dark,
@@ -38,8 +38,8 @@ export default function ContactEditor({
       Alert.alert(
         "Missing details",
         kind === "group"
-          ? "Enter a group name and at least one member username."
-          : "Enter a name and username.",
+          ? "Enter a group name and at least one member username"
+          : "Enter a name and username",
       );
       return;
     }
@@ -128,9 +128,9 @@ export default function ContactEditor({
           <Pressable
             accessibilityRole="button"
             onPress={save}
-            style={s.primary}
+            style={[s.primary, { backgroundColor: colors.switchTrackOn }]}
           >
-            <Text style={s.primaryText}>
+            <Text style={[s.primaryText, { color: colors.onCoral }]}>
               {kind === "group" ? "Create group" : "Add contact"}
             </Text>
           </Pressable>
@@ -142,33 +142,32 @@ export default function ContactEditor({
 const s = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "#FBFAF7",
+    backgroundColor: "transparent",
   },
   sheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-    gap: 15,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    padding: space.xxl,
+    paddingBottom: space.xxxl,
+    gap: space.lg,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { fontFamily: "DMSans_700Bold", fontSize: 23 },
+  title: { fontFamily: "DMSans_500Medium", fontSize: 22 },
   input: {
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: radius.control,
+    padding: space.lg,
     fontFamily: "DMSans_400Regular",
     fontSize: 15,
   },
   members: { minHeight: 92, textAlignVertical: "top" },
   primary: {
-    backgroundColor: coral,
-    padding: 16,
-    borderRadius: 17,
+    padding: space.lg,
+    borderRadius: radius.control,
     alignItems: "center",
   },
-  primaryText: { fontFamily: "DMSans_700Bold", color: onCoral, fontSize: 14 },
+  primaryText: { fontFamily: "DMSans_500Medium", fontSize: 14 },
 });

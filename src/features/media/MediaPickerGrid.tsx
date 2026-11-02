@@ -52,7 +52,7 @@ export function MediaPickerGrid(props: Props) {
       <View style={s.pickerCenter}>
         <ActivityIndicator size="large" color={coral} />
         <Text style={[s.pickerEmptyText, { color: props.colors.muted }]}>
-          Loading your photos…
+          Loading media…
         </Text>
       </View>
     );

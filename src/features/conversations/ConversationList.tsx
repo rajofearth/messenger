@@ -211,7 +211,7 @@ export default function ConversationList({
       }
       ListEmptyComponent={
         <Text style={[s.emptyThread, { color: muted }]}>
-          No messages yet. Say hello to start the conversation.
+          No messages yet. Say hello.
         </Text>
       }
     />
