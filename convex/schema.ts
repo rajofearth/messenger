@@ -50,6 +50,11 @@ export default defineSchema({
     deviceId: v.string(),
     label: v.string(),
     platform: v.string(),
+    // Kept optional so rows written by the earlier push-registration
+    // architecture remain valid while push delivery is out of scope here.
+    pushPlatform: v.optional(v.string()),
+    pushToken: v.optional(v.string()),
+    pushUpdatedAt: v.optional(v.number()),
     registeredAt: v.number(),
     lastSeenAt: v.number(),
     revokedAt: v.optional(v.number()),
