@@ -20,7 +20,7 @@ import Navigation from "./src/ui/Navigation";
 import type { Tab } from "./src/ui/Navigation";
 import CallFlow, { CallPill } from "./src/features/calls/CallFlow";
 import { useRemoteMessenger } from "./src/state/useRemoteMessenger";
-import { useCalls } from "./src/features/calls/useCalls";
+import { useCallSession } from "./src/features/calls/useCallSession";
 import type { Chat, Message } from "./src/domain/data";
 import ContactDetail from "./src/features/contacts/ContactDetail";
 import ForwardScreen from "./src/features/conversations/ForwardScreen";
@@ -49,10 +49,9 @@ export default function App() {
     </StartupGate>
   );
 }
-
 function MessengerApp() {
   const messenger = useRemoteMessenger();
-  const calls = useCalls(messenger.addCall);
+  const calls = useCallSession(messenger);
   const updates = useAppUpdater();
   const [tab, setTab] = useState<Tab>("chats");
   const [compose, setCompose] = useState<ComposeMode | null>(null);
@@ -284,6 +283,9 @@ function MessengerApp() {
           >
             <CallFlow
               call={calls.call}
+              signals={calls.signals}
+              onSignal={calls.sendSignal}
+              onEngineState={calls.onEngineState}
               onBack={() => calls.setFull(false)}
               onEnd={calls.end}
               onAnswer={calls.answer}

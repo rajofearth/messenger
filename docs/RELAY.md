@@ -21,6 +21,8 @@ In scope and shipped:
 - Text plus attachments up to a **2 MiB** queued-media budget.
 - Reactions, delete-for-everyone, forwarding, clear-chat and delete-for-me
   against the local-history model.
+- Direct-call signaling: Convex stores short-lived SDP/ICE envelopes only;
+  media is peer-to-peer through the Android system WebView.
 
 Out of scope for now:
 
@@ -30,7 +32,9 @@ Out of scope for now:
 - Google Drive backup and restore. Designed in `11-storage-reality.md` §4,
   parked on purpose.
 - Groups beyond creation, multi-device, end-to-end encryption. Later phases.
-- Voice and video calls.
+- Native call lifecycle: audio routing, foreground-service survival, PiP and
+  Telecom integration. The WebView 1:1 engine and signaling seam are shipped;
+  group calls remain disabled.
 
 The trade is stated in the UI: until backup ships, **reinstalling or clearing
 app data loses history**, because the server no longer keeps it. Settings says so
@@ -64,6 +68,7 @@ next to the account section.
 | R2 | Relay queue for text and small media: `relayQueue`, send/react/remove, pull, caps, per-conversation sequence | Shipped `e84f1b5`, dev release `dev-1793251060`, APK 14,074,187 B |
 | R3 | Deletion: ack deletes the row and releases the blob, 30-day purge, reinstall warning | Shipped in R2 |
 | Cleanup | Component, legacy import, migrations, server paging, presence, typing and read receipts removed | Shipped `072c890`, dev release `dev-1793337177`, APK 14,043,551 B |
+| D1 | WebView `RTCPeerConnection` engine and short-lived Convex signaling | Shipped in this phase; native audio route, foreground service and PiP remain D2 |
 | R4 | Groups beyond creation, multi-device, end-to-end encryption | Later |
 | C5 | Encrypted Drive backup | On hold (design ready in research §4) |
 

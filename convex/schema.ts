@@ -66,6 +66,29 @@ export default defineSchema({
     .index("by_user_device", ["userId", "deviceId"])
     .index("by_pushToken", ["pushToken"]),
   /**
+   * Short-lived WebRTC signalling envelopes. Media never passes through this
+   * table: it only carries SDP and ICE candidates for a direct call.
+   */
+  callSignals: defineTable({
+    callId: v.string(),
+    conversationId: v.string(),
+    fromUserId: v.id("users"),
+    toUserId: v.id("users"),
+    kind: v.union(
+      v.literal("invite"),
+      v.literal("offer"),
+      v.literal("answer"),
+      v.literal("ice"),
+      v.literal("end"),
+    ),
+    payload: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_call", ["callId", "createdAt"])
+    .index("by_recipient", ["toUserId", "createdAt"])
+    .index("by_expiry", ["expiresAt"]),
+  /**
    * The routing record for one conversation. Its document id is the id the
    * client passes back, so `relayQueue.conversationId` and the preferences
    * tables stay plain strings.

@@ -35,7 +35,12 @@ type Calls = {
   setFull: (full: boolean) => void;
   setMuted: (value: boolean) => void;
   setSpeaker: (value: boolean) => void;
-  start: (chat: Chat, video: boolean, incoming?: boolean, resume?: { id: string }) => void;
+  start: (
+    chat: Chat,
+    video: boolean,
+    incoming?: boolean,
+    resume?: { id?: string; peerId?: string },
+  ) => void;
 };
 
 export function useNotificationActions({

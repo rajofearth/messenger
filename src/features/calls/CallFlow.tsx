@@ -5,6 +5,7 @@ import CallScreen from "./CallScreen";
 import type { Call } from "./useCalls";
 import { Avatar, IconButton } from "../../ui/primitives";
 import { formatDuration } from "../../domain/model";
+import type { CallSignal, CallSignalKind } from "./CallWebView";
 
 export function CallPill({
   call,
@@ -63,8 +64,14 @@ export default function CallFlow({
   onChat,
   onMuteChange,
   onSpeakerChange,
+  signals,
+  onSignal,
+  onEngineState,
 }: {
   call: Call;
+  signals: CallSignal[];
+  onSignal: (kind: CallSignalKind, payload: string) => void;
+  onEngineState: (state: string) => void;
   onBack: () => void;
   onEnd: () => void;
   onAnswer: () => void;
@@ -72,12 +79,18 @@ export default function CallFlow({
   onMuteChange: (value: boolean) => void;
   onSpeakerChange: (value: boolean) => void;
 }) {
-  if (call.status === "active")
+  if (call.status !== "incoming")
     return (
       <CallScreen
         name={call.chat.name}
         avatar={call.chat.avatar}
         video={call.video}
+        callId={call.id}
+        initiator={call.initiator}
+        connecting={call.status === "calling"}
+        signals={signals}
+        onSignal={onSignal}
+        onEngineState={onEngineState}
         seconds={call.seconds}
         muted={call.muted}
         speaker={call.speaker}
@@ -100,11 +113,9 @@ export default function CallFlow({
         <Avatar uri={call.chat.avatar} name={call.chat.name} size={124} />
         <Text style={s.name}>{call.chat.name}</Text>
         <Text style={s.status}>
-          {call.status === "incoming" ? "Incoming" : "Calling"}{" "}
-          {call.video ? "video" : "voice"} call
-          {call.status === "calling" ? "…" : ""}
+          Incoming {call.video ? "video" : "voice"} call
         </Text>
-        <Text style={s.demo}>Simulated call</Text>
+        <Text style={s.demo}>Waiting for the WebRTC connection</Text>
       </View>
       <View style={s.actions}>
         <View style={s.action}>

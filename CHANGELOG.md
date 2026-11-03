@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Added
 
+- Direct 1:1 calls now use an owned Android WebView `RTCPeerConnection` with
+  `getUserMedia`, local/remote media tracks, mute, camera flip and short-lived
+  Convex SDP/ICE signaling. The call UI remains unchanged at the app boundary;
+  native audio routing, foreground-service survival, PiP and Telecom integration
+  remain the next call phase. Group calls stay disabled.
 - New messages travel through a relay queue instead of the server copy. A send
   writes one envelope per recipient to `relayQueue`, wakes that recipient, and
   the phone commits the envelope to SQLite in one transaction with a

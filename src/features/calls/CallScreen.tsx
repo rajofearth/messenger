@@ -11,20 +11,23 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { CORAL, styles } from "./CallScreen.styles";
 import Control from "./CallControl";
-import CallScreenCamera from "./CallScreenCamera";
+import CallWebView, { type CallSignal, type CallSignalKind } from "./CallWebView";
 import { Avatar } from "../../ui/primitives";
-import { useAvatarUri } from "../../ui/useAvatarUri";
-import { imageCacheKey } from "../../domain/imageVariants";
 
 export type CallScreenProps = {
   name: string;
   avatar: string;
   video: boolean;
+  callId: string;
+  initiator: boolean;
+  connecting: boolean;
+  signals: CallSignal[];
+  onSignal: (kind: CallSignalKind, payload: string) => void;
+  onEngineState: (state: string) => void;
   seconds: number;
   /** Confirmed call state, shared with the system notification. */
   muted: boolean;
@@ -47,6 +50,12 @@ export default function CallScreen({
   name,
   avatar,
   video,
+  callId,
+  initiator,
+  connecting,
+  signals,
+  onSignal,
+  onEngineState,
   seconds,
   muted,
   speaker,
@@ -60,30 +69,15 @@ export default function CallScreen({
   const [frontCamera, setFrontCamera] = useState(true);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [remoteFailed, setRemoteFailed] = useState(false);
-  const avatarUri = useAvatarUri(avatar);
   useEffect(() => {
     setRemoteFailed(false);
   }, [avatar]);
 
   const showingVideo = cameraOn;
   const displayName = name.trim() || "Your contact";
-  const backdropUri = avatarUri?.replace(/w=\d+/, "w=1080");
-  const backdropKey = backdropUri ? imageCacheKey(backdropUri) : undefined;
-
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor="#161B20" />
-      {showingVideo && !remoteFailed && avatarUri && (
-        <Image
-          source={{ uri: backdropUri, cacheKey: backdropKey }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          allowDownscaling
-          recyclingKey={backdropKey ?? backdropUri}
-          accessible={false}
-          onError={() => setRemoteFailed(true)}
-        />
-      )}
       <LinearGradient
         colors={
           showingVideo && !remoteFailed
@@ -119,7 +113,7 @@ export default function CallScreen({
             <View style={styles.connection}>
               <View style={styles.connectionDot} />
               <Text style={styles.connectionText}>
-                Connected · {duration(seconds)}
+               {connecting ? "Connecting…" : `Connected · ${duration(seconds)}`}
               </Text>
             </View>
           </View>
@@ -139,31 +133,27 @@ export default function CallScreen({
               </Text>
             </View>
           )}
-          {showingVideo && (
-            <View style={styles.preview}>
-              <CallScreenCamera front={frontCamera} />
-              <LinearGradient
-                pointerEvents="none"
-                colors={["transparent", "#00000099"]}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={styles.previewLabel}>
-                <Text style={styles.youText}>You</Text>
-                <Ionicons
-                  name={muted ? "mic-off" : "mic"}
-                  size={13}
-                  color="#FFFFFF"
-                />
-              </View>
-            </View>
-          )}
+          <CallWebView
+            key={callId}
+            video={video}
+            initiator={initiator}
+            muted={muted}
+            videoEnabled={cameraOn}
+            frontCamera={frontCamera}
+            signals={signals}
+            onSignal={onSignal}
+            onState={onEngineState}
+            onError={() => setRemoteFailed(true)}
+          />
         </View>
 
         <View style={styles.bottom}>
           <View style={styles.callNote}>
             <View style={styles.smallDot} />
             <Text style={styles.callNoteText}>
-              Demo call · Local preview only · No audio or video sent
+               {connecting
+                 ? "Connecting securely · Audio/video stays peer-to-peer"
+                 : "WebRTC call · No media is stored by Messenger"}
             </Text>
           </View>
           <View style={styles.dock}>
@@ -292,9 +282,8 @@ export default function CallScreen({
                   color={CORAL}
                 />
                 <Text style={styles.simulationText}>
-                  The camera shows a live local preview when enabled. No video
-                  is recorded or sent. Microphone and speaker controls are
-                  simulated; no call audio is captured.
+                  Camera and microphone use the Android WebView permission. The
+                  speaker switch will be wired to the native audio route in D2.
                 </Text>
               </View>
             </ScrollView>

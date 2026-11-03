@@ -14,5 +14,10 @@ crons.daily(
   { hourUTC: 3, minuteUTC: 47 },
   internal.relay.purgeExpired,
 );
+crons.hourly(
+  "purge expired call signals",
+  { minuteUTC: 23 },
+  internal.calls.purgeExpired,
+);
 
 export default crons;
