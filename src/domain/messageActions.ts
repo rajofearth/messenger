@@ -46,7 +46,6 @@ export function refreshChatPreview(chat: Chat, messages: Message[]): Chat {
     ...chat,
     preview: latest ? messagePreview(latest) : "No messages yet",
     time: latest?.time || "",
-    typing: false,
     unread: messages.length ? chat.unread : 0,
   };
 }

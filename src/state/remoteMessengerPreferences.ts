@@ -97,7 +97,7 @@ export function createChatPreferences({
           : item,
       ),
     );
-    void messengerRepository.saveMessages(id, []).catch(() => {});
+    void messengerRepository.clearMessages(id).catch(() => {});
     void clearPreference({
       conversationId: id,
       through: Date.now(),
@@ -107,6 +107,8 @@ export function createChatPreferences({
   function deleteChat(id: string) {
     clearChat(id);
     updateChats((current) => current.filter((item) => item.id !== id));
+    // The row stays as a tombstone (hidden, cleared through the delete), so a
+    // page already in flight cannot recreate the chat and its messages.
     void messengerRepository.removeMessages(id).catch(() => {});
     void hidePreference({
       conversationId: id,

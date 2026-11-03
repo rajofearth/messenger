@@ -1,10 +1,10 @@
 /**
  * Removes the files a signed-out account leaves on the device.
  *
- * Messages live in AsyncStorage and are cleared by the repository. Received and
- * sent media, avatars, picker and recording caches, the image and video
- * libraries' caches, and a downloaded update APK live on the filesystem, so
- * without this the next account would inherit them.
+ * The SQLite rows are cleared by the repository. Received and sent media,
+ * avatars, picker and recording caches, the image and video libraries' caches,
+ * and a downloaded update APK live on the filesystem, so without this the next
+ * account would inherit them.
  */
 
 import { Directory, Paths } from "expo-file-system";

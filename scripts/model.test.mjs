@@ -15,7 +15,6 @@ const fixture = () => [
     preview: "Hello",
     time: "10:00",
     unread: 2,
-    typing: true,
     avatar: "",
     color: "",
   },
@@ -80,7 +79,6 @@ test("a reply after leaving the chat is unread, even if another chat is open", (
     update({ id: "a", openChatId: "b" }),
   );
   assert.equal(result[0].unread, 3);
-  assert.equal(result[0].typing, false);
 });
 test("messages received in the open chat are read", () => {
   assert.equal(
@@ -93,7 +91,6 @@ test("outgoing messages update the preview without adding unread", () => {
   const result = updateChatPreview(fixture(), update({ id: "a", mine: true }));
   assert.equal(result[0].unread, 0);
   assert.equal(result[0].time, "12:00");
-  assert.equal(result[0].typing, false);
 });
 test("opening a conversation clears only its unread count and preserves ordering", () => {
   const result = markChatRead(fixture(), "a");

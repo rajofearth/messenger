@@ -3,7 +3,6 @@ import type { MutableRefObject } from "react";
 import type { Chat, Message } from "../domain/data";
 import { localChatPreview } from "../domain/messageActions";
 import { deleteLocalMessage } from "./remoteMessengerWriters";
-import { remoteUid } from "./remoteMessengerTypes";
 
 type UpdateMessages = (
   next: (current: Record<string, Message[]>) => Record<string, Message[]>,
@@ -14,34 +13,23 @@ type UpdateChats = (
   persist?: boolean,
 ) => void;
 
-type DeleteForMe = (args: {
-  conversationId: string;
-  messageId: string;
-}) => Promise<unknown>;
-
 type DeleteForEveryone = (args: {
   conversationId: string;
   messageId: string;
-  expectedRevision: number;
 }) => Promise<unknown>;
 
-type Forward = (args: {
-  sourceConversationId: string;
-  targetConversationId: string;
-  messageId: string;
-  clientMessageId: string;
-}) => Promise<unknown>;
+type Forward = (message: Message, targetChatId: string) => boolean;
 
 /**
- * Delete and forward keep the same optimistic/device-local behaviour as the
- * rest of the state layer while persisting the server-side copy in parallel.
+ * Delete keeps the same optimistic, device-local behaviour as the rest of the
+ * state layer. Deleting for everyone is a relay op; deleting for me is a local
+ * tombstone the relay never hears about.
  */
 export function createRemoteMessageActions({
   selectedRef,
   messagesRef,
   updateMessages,
   updateChats,
-  deleteForMe,
   deleteForEveryone,
   forward,
 }: {
@@ -49,54 +37,55 @@ export function createRemoteMessageActions({
   messagesRef: MutableRefObject<Record<string, Message[]>>;
   updateMessages: UpdateMessages;
   updateChats: UpdateChats;
-  deleteForMe: DeleteForMe;
   deleteForEveryone: DeleteForEveryone;
   forward: Forward;
 }) {
+  /** Drops the bubble and recomputes the inbox preview from what is left. */
+  function removeLocal(chatId: string, messageId: string) {
+    const remaining = (messagesRef.current[chatId] || []).filter(
+      (item) => item.id !== messageId,
+    );
+    deleteLocalMessage({ chatId, messageId, updateMessages });
+    // The server has no inbox row to refresh, so the preview is recomputed
+    // here instead of waiting for a snapshot that will never arrive.
+    updateChats(
+      (current) =>
+        current.map((item) =>
+          item.id === chatId
+            ? { ...item, ...localChatPreview(remaining) }
+            : item,
+        ),
+      false,
+    );
+  }
+
   function deleteMessage(id: string, everyone: boolean) {
     const chatId = selectedRef.current;
     const message = chatId
       ? (messagesRef.current[chatId] || []).find((item) => item.id === id)
       : undefined;
     if (!chatId || !message) return;
-    if (!everyone) {
-      const remaining = (messagesRef.current[chatId] || []).filter(
-        (item) => item.id !== id,
-      );
-      deleteLocalMessage({ chatId, messageId: id, updateMessages });
-      // The server never saw an unconfirmed bubble, so no inbox refresh will
-      // fix the preview after it is deleted. Recompute it from what is left.
-      updateChats(
-        (current) =>
-          current.map((item) =>
-            item.id === chatId
-              ? { ...item, ...localChatPreview(remaining) }
-              : item,
-          ),
-        false,
-      );
-      void deleteForMe({ conversationId: chatId, messageId: id }).catch(
-        () => {},
-      );
+    if (!everyone || message.status) {
+      removeLocal(chatId, id);
       return;
     }
-    if (!message.mine || !message.revision) {
+    if (!message.mine) {
       Alert.alert(
         "Not deleted",
         "Only the sender can delete this message for everyone.",
       );
       return;
     }
-    void deleteForEveryone({
-      conversationId: chatId,
-      messageId: id,
-      expectedRevision: message.revision,
-    }).catch(() => Alert.alert("Message not deleted", "Please try again."));
+    void deleteForEveryone({ conversationId: chatId, messageId: id })
+      .then(() => {
+        // The relay keeps no copy to echo a delete back, so the sender applies
+        // its own tombstone as soon as the queue accepted the op.
+        removeLocal(chatId, id);
+      })
+      .catch(() => Alert.alert("Message not deleted", "Please try again."));
   }
 
-  async function forwardMessage(message: Message, targetChatId: string) {
-    const sourceConversationId = selectedRef.current;
-    if (!sourceConversationId) return;
+  function forwardMessage(message: Message, targetChatId: string) {
     if (message.status) {
       Alert.alert(
         "Message not ready",
@@ -104,14 +93,9 @@ export function createRemoteMessageActions({
       );
       return;
     }
-    try {
-      await forward({
-        sourceConversationId,
-        targetConversationId: targetChatId,
-        messageId: message.id,
-        clientMessageId: remoteUid(),
-      });
-    } catch {
+    // The send path owns the durable copy, the upload and the retry, so a
+    // forward is just a new outgoing message in the target conversation.
+    if (!forward(message, targetChatId)) {
       Alert.alert("Message not forwarded", "Check your connection and try again.");
     }
   }

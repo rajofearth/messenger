@@ -92,7 +92,14 @@ export function createStore(driver: StorageDriver, namespace: string): Store {
 
     const run = Promise.resolve().then(drain);
     const scheduled = run.finally(() => {
-      if (flushing === scheduled) flushing = null;
+      if (flushing !== scheduled) return;
+      flushing = null;
+      // A save can land after the last drain pass but before this callback
+      // runs. Failed writes stay queued for an explicit flush instead, so only
+      // a fresh, unattempted value starts another pass.
+      if ([...queue.values()].some((write) => !write.failed)) {
+        void schedule().catch(() => undefined);
+      }
     });
     flushing = scheduled;
     return scheduled;

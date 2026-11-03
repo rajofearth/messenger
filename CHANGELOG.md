@@ -10,6 +10,61 @@ and this project adheres to
 
 ### Added
 
+- Background notifications now complete the local delivery path: an opaque FCM
+  wake authenticates with the stored Convex session, drains and commits relay
+  envelopes before acknowledging them, then posts MessagingStyle notifications
+  from SQLite. Call invites wake the same path and rebuild an incoming CallStyle
+  notification from short-lived signaling; no message or call content is placed
+  in FCM. Force-stopped apps still wait for Android to allow delivery.
+- Direct 1:1 calls now use an owned Android WebView `RTCPeerConnection` with
+  `getUserMedia`, local/remote media tracks, mute, camera flip and short-lived
+  Convex SDP/ICE signaling. The call UI remains unchanged at the app boundary;
+  native audio routing, foreground-service survival, PiP and Telecom integration
+  remain the next call phase. Group calls stay disabled.
+- New messages travel through a relay queue instead of the server copy. A send
+  writes one envelope per recipient to `relayQueue`, wakes that recipient, and
+  the phone commits the envelope to SQLite in one transaction with a
+  `pending_ack` row before acknowledging it. The acknowledgement deletes the
+  queue row, and the attachment blob, its file row and its stored widths go when
+  the last recipient acknowledges. Undelivered rows expire after 30 days, and a
+  daily sweep deletes them in resumable batches. Caps are 200 rows and 10 MiB of
+  queued attachments per recipient, 2 MiB per attachment, and 8000 characters
+  per message; a full queue answers with the recipient's last-seen time.
+  Reactions and delete-for-everyone use the same queue. Message order continues
+  from `conversations.nextSequence`. The dev APK grows 26,764 bytes (+0.19%) to
+  14,074,187 bytes (13.42 MiB), 2.58 MiB under the 16 MiB gate; the relay adds no
+  dependency and no native library.
+- Settings now says that chats live on this phone and that uninstalling
+  Messenger or clearing its data deletes them permanently.
+- The server keeps no delivered message. A message that is not acknowledged
+  within 30 days expires with its attachment, and a recorded reply carries only
+  the quoted id because retired envelopes leave no text to quote.
+- The relay is now the only message path. Conversations come from
+  `conversations` and `conversationMembers`, threads are read from SQLite only,
+  and forwarding is a fresh relay send. The 2026-10-30 cleanup dev APK
+  (`dev-1793337177`) is 14,043,551 bytes (13.39 MiB), 30,636 bytes (-0.22%)
+  smaller than the relay build and 2.61 MiB under the 16 MiB gate; the
+  JavaScript bundle fell from 2.40 MiB to 2.37 MiB with no dependency or
+  native-library change.
+- Push wakes arrive through Firebase Cloud Messaging. Each device registers its
+  FCM token against its own `devices` row, and the server sends a data-only
+  message that carries no content, only an opaque queue id. A wake reaches the
+  app in the foreground, in the background, and after the app is swiped away;
+  Android delivers nothing to a force-stopped app until it is reopened. The
+  token is cleared on sign-out and whenever FCM reports it dead, and signing in
+  as a different account detaches it from the previous row. Nothing is rendered
+  from a push: the local notification module owns every notification. The dev
+  APK grows 429,911 bytes (+3.2%) to 14,047,423 bytes (13.40 MiB), 2.60 MiB
+  under the 16 MiB gate. `expo-notifications` and Firebase Messaging are
+  324,891 bytes of that (one new native library, `libdatastore_shared_counter.so`,
+  at 2,630 stored bytes, plus Firebase dex); `googleServicesFile` and the client
+  push code are 105,020, because an app id keeps the Firebase initialisation
+  path that R8 previously removed.
+- Chats keep their full history on the phone in SQLite (`messenger.db`). Scrolling
+  to the top of a thread loads the previous page from the device; there is no
+  server history to ask. A thread shorter than the screen shows a "Load older
+  messages" control. This build does not import the old `messenger/v2` cache:
+  a different local schema resets the database instead of migrating it.
 - Unsent text and attachments now survive a process kill. Every send is
   recorded in a durable outbox first, an attachment is copied into app
   documents before upload, and a finalized upload id is reused on retry so the
@@ -40,8 +95,47 @@ and this project adheres to
   at 2x density, caches one preview file per image and keeps the original URI
   in `uri`/`image`, so a gallery save still exports full resolution.
 
+### Removed
+
+- The `convex-chat` component, `convex/chat.ts`, `convex/convex.config.ts`,
+  `convex/lib/paging.ts`, `convex/lib/retention.ts` and the component
+  dependency. `messageRefs` and `messageDeletes` are gone; conversations are
+  `conversations` plus `conversationMembers`.
+- The one-time AsyncStorage history import (`migrate.ts`), snapshots, the
+  migration tests and the additive `user_version` steps. `messenger.db` has one
+  schema version and drops a database from any other build.
+- Server paging and thread media downloads: `threadPaging.ts`,
+  `loadOlderThread.ts`, `useRemoteThreadMedia.ts` and their tests.
+- The server-era thread helpers with no caller left: `mergeThread`,
+  `mergeChats`, `sameOptimistic`, `newestReadSequence`, `isPendingStatus` and
+  `SERVER_MATCH_WINDOW_MS`. `threadMerge.ts` keeps only `isConfirmed` and
+  `mergeOlderPage`; direct and group chats come from `conversations`.
+- Presence, typing indicators and read receipts, including
+  `useRemotePresence.ts` and their UI. Settings states that they are not part of
+  this build.
+- The local `tools/web-tester` browser client and its `web:*` scripts. It read
+  server-stored messages, which the relay no longer keeps; a second phone is now
+  required for a relay round trip.
+- The development deployment's data: every relay row, conversation, file, story
+  and telemetry event was deleted, including 31 storage blobs. Accounts,
+  profiles, devices and the release history were kept.
+
 ### Changed
 
+- The device cache is now `messenger.db` (expo-sqlite) with WAL, foreign keys
+  and a single schema version; a mismatched `user_version` resets the database
+  instead of migrating it. Media bytes stay in app documents.
+  Opening or refreshing a chat upserts rows instead of re-serialising a whole
+  thread, and a short local page can no longer drop older history the phone
+  already owns. The dev APK grows 678,113 bytes (+5.2%) to
+  13,610,208 bytes: the SQLite library adds 684,983 stored bytes (1,431,992
+  raw, with FTS disabled) and the JavaScript bundle adds 169,140, while the dex
+  is about 18 KB larger. The Ionicons subset in the same build removes 194,959
+  bytes of font (`res/CU.ttf` 210,672 to 15,713 stored), so SQLite's own cost is
+  about +873 KB (+6.7%) and the net growth is +678 KB. `docs/PERFORMANCE.md` has
+  the entry-level measurements. The follow-up durability build is 13,617,512
+  bytes (+7,304, +0.05%): the whole delta is the JavaScript bundle, and the dex,
+  resources and native libraries are unchanged.
 - Settings keeps account controls at the bottom, directly above Information.
   The Android permission, call-notification and message-notification rows are
   gone because they all opened the same system page; only the app's own
@@ -51,6 +145,14 @@ and this project adheres to
   or forces a crop. The upload keeps the picker's real MIME type and filename.
 - A profile update that races profile creation now creates the profile and
   retries once instead of failing the photo save.
+- Message and story photos are re-encoded to WebP on the phone before upload:
+  1600 px at quality 0.80 for a message (the relay cap is checked against the
+  prepared copy, not the picked file) and 1920 px at 0.82 for a story, plus the
+  stored 256/512/1080 px widths. A 5.5 MB, 4096 px camera photo becomes a few
+  hundred kilobytes, so it both fits the 2 MiB relay limit and arrives faster.
+  A failed transform falls back to the original file, GIFs keep their animation,
+  and videos are uploaded as picked because the device has no transcoder. The
+  signed profile photo keeps its own 512 px avatar path.
 - Expo configuration now goes through `app.config.js`, which returns `app.json`
   unchanged unless `APP_VARIANT=dev`. The dev branch only changes the installed
   identity and feed, so production builds keep the same name, package, icons
@@ -74,6 +176,24 @@ and this project adheres to
 
 ### Fixed
 
+- A message that arrived through a relay drain before the inbox query had seen
+  its conversation now reaches the chat list. The drain creates the placeholder
+  conversation row before writing the preview and unread count, the cached inbox
+  includes a nameless row that has a real message time, and it orders by newest
+  message instead of the last inbox snapshot, so a new message moves its chat to
+  the top immediately. The inbox snapshot then fills in the name and avatar
+  without discarding the stored preview.
+- Android notifications now appear for incoming messages. The app asks for
+  `POST_NOTIFICATIONS` once per install after sign-in instead of relying on a
+  permission no one had granted, primes only after the device copy has loaded so
+  a drain that lands at launch is not mistaken for history, announces only a
+  conversation with unread messages, and retries a post that permission refused.
+- The story ring no longer shows a bare "Y": the self avatar keeps the signed-in
+  name for its initials when no picture exists.
+- Saving a profile photo no longer fails when the previous avatar blob is
+  already gone. Cleaning a wiped deployment left a storage id that no longer
+  existed, and deleting it threw; blobs are now deleted only when they still
+  exist, in profiles, stories and the file sweep.
 - The updater now sweeps leftover `.part` fragments, deletes a corrupt cached
   APK before reusing its name, clears the update cache after an install even
   when the app starts offline, closes the socket when a download connection
@@ -86,6 +206,26 @@ and this project adheres to
 - Signing out now deletes `messenger-media`, `message-media`, the avatar cache
   and the cached update APK, so the next account on the same installation
   cannot inherit the previous account's files.
+- Deleting or clearing a chat is now durable. The conversation row stays as a
+  tombstone (`hidden_at`, `cleared_through`), so a late relay receipt can no
+  longer recreate the chat with default columns and put the deleted messages
+  back; only a genuinely newer incoming message reopens it. Delete-for-me writes
+  a per-message tombstone (`hidden_messages`) that the thread reads honour, so
+  the message cannot return after a relaunch or a stale page.
+- A failed cold-start read of the outbox can no longer be persisted as an empty
+  queue. Writes stay closed until a read succeeds, and rows queued in the
+  meantime are persisted by that successful read instead of being wiped.
+- Load-older no longer offers a dead control on a short thread, jumps to the
+  bottom when a page is prepended, drops the rows already on disk when a read
+  fails, or leaks its spinner into the next chat. A failure now shows "Couldn't
+  load older messages. Tap to retry." with a polite accessibility announcement.
+
+The reliability development APK `0.1.1-dev.20261031.193255`
+(`dev-1793455375`) is 14,047,519 bytes (13.40 MiB), 3,968 bytes (+0.03%) above
+the cleanup build and 2.60 MiB under the 16 MiB gate. The delta is JavaScript
+only: no dependency and no native library changed, the dex stays 8.71 MiB, the
+bundle 2.38 MiB, and the APK keeps one ABI and 19 native libraries. The dev gate
+passed all 11 checks. See `docs/PERFORMANCE.md`.
 
 The stacked A2/A3/C3 local gate build is 12,702,235 bytes (12.11 MiB),
 458,828 bytes (-3.5%) below the 13,161,063-byte R8 build and 3.89 MiB below

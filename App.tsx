@@ -20,7 +20,7 @@ import Navigation from "./src/ui/Navigation";
 import type { Tab } from "./src/ui/Navigation";
 import CallFlow, { CallPill } from "./src/features/calls/CallFlow";
 import { useRemoteMessenger } from "./src/state/useRemoteMessenger";
-import { useCalls } from "./src/features/calls/useCalls";
+import { useCallSession } from "./src/features/calls/useCallSession";
 import type { Chat, Message } from "./src/domain/data";
 import ContactDetail from "./src/features/contacts/ContactDetail";
 import ForwardScreen from "./src/features/conversations/ForwardScreen";
@@ -49,10 +49,9 @@ export default function App() {
     </StartupGate>
   );
 }
-
 function MessengerApp() {
   const messenger = useRemoteMessenger();
-  const calls = useCalls(messenger.addCall);
+  const calls = useCallSession(messenger);
   const updates = useAppUpdater();
   const [tab, setTab] = useState<Tab>("chats");
   const [compose, setCompose] = useState<ComposeMode | null>(null);
@@ -138,6 +137,7 @@ function MessengerApp() {
     previews: messenger.profile.previews !== false,
     sound: messenger.profile.sound !== false,
     enabled: notificationsEnabled,
+    ready: messenger.loaded,
   });
   /** Mute is stored in both places: the app preference and native suppression. */
   function muteChat(id: string, muted: boolean) {
@@ -283,6 +283,9 @@ function MessengerApp() {
           >
             <CallFlow
               call={calls.call}
+              signals={calls.signals}
+              onSignal={calls.sendSignal}
+              onEngineState={calls.onEngineState}
               onBack={() => calls.setFull(false)}
               onEnd={calls.end}
               onAnswer={calls.answer}
@@ -369,7 +372,6 @@ function MessengerApp() {
               chat={chat}
               messages={messenger.messages[chat.id] || []}
               dark={messenger.dark}
-              typing={messenger.typingIds.includes(chat.id)}
               onBack={messenger.closeChat}
               onCall={(video) => startCall(chat, video)}
               onSend={messenger.send}
@@ -380,7 +382,10 @@ function MessengerApp() {
               onDelete={messenger.deleteMessage}
               onForward={setForward}
               onSaveMedia={messenger.saveMedia}
-              onTypingChange={messenger.setTyping}
+              hasOlder={messenger.hasOlder}
+              loadingOlder={messenger.loadingOlder}
+              loadOlderFailed={messenger.loadOlderFailed}
+              onLoadOlder={messenger.loadOlder}
             />
           ) : compose ? (
             <NewConversationScreen
@@ -416,8 +421,8 @@ function MessengerApp() {
               chats={messenger.chats}
               stories={messenger.stories}
               avatar={messenger.profile.avatar}
+              selfName={messenger.profile.name}
               dark={messenger.dark}
-              typingId={messenger.typingIds[0] || null}
               onOpenChat={openChat}
               onProfile={(contact) =>
                 setDetail({ id: contact.id, kind: "profile" })

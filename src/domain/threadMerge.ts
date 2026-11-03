@@ -1,121 +1,62 @@
-import type { Chat, Message, MessageStatus } from "./data";
+import type { Message } from "./data";
 
-/** How far after a local send the server copy may appear. */
-export const SERVER_MATCH_WINDOW_MS = 30 * 60 * 1000;
+/**
+ * The two thread helpers the local-history model still needs.
+ *
+ * The relay never serves a thread, so there is no server page to reconcile: an
+ * older page comes from this phone's own database, and a confirmed row is the
+ * one the relay gave a sequence. Everything the old explorer needed — matching
+ * an optimistic bubble to a server copy, keeping an inbox row until a server
+ * snapshot caught up, tracking read sequences — went with the server history.
+ */
 
-/** True once the server has echoed the message with a sequence number. */
-export function isConfirmed(message: Message): boolean {
+/** True once the relay has confirmed the message with a sequence number. */
+export function isConfirmed(
+  message: Message,
+): message is Message & { sequence: number } {
   return message.sequence !== undefined;
 }
 
-export function isPendingStatus(status: MessageStatus | undefined): boolean {
-  return status === "sending" || status === "failed";
-}
-
 /**
- * The newest server sequence in a thread. Local-only sends have no sequence,
- * so looking at the last array element can miss the actual unread rows.
+ * Keeps the media this device already downloaded when a stored row is replaced
+ * by another copy of itself: a `file://` original and a cached preview survive.
  */
-export function newestReadSequence(messages: Message[]): number | undefined {
-  let newest: number | undefined;
-  for (const message of messages) {
-    if (
-      message.sequence !== undefined &&
-      (newest === undefined || message.sequence > newest)
-    ) {
-      newest = message.sequence;
-    }
+function withLocalMedia(remote: Message, cached: Message): Message {
+  let next = remote;
+  const uri = cached.uri?.startsWith("file://") ? cached.uri : remote.uri;
+  if (uri && uri !== remote.uri) next = { ...next, uri };
+  const previewUri = cached.previewUri || remote.previewUri;
+  const previewWidth = cached.previewUri
+    ? (cached.previewWidth ?? remote.previewWidth)
+    : remote.previewWidth;
+  if (
+    previewUri &&
+    (previewUri !== remote.previewUri || previewWidth !== remote.previewWidth)
+  ) {
+    next = { ...next, previewUri, previewWidth };
   }
-  return newest;
+  return next;
 }
 
 /**
- * Server message ids are Convex document ids, not the client id used for the
- * optimistic bubble, so match a sent message by its sender, payload and the
- * time immediately after the local send. The one-to-one `used` set in
- * mergeThread prevents two identical sends from collapsing into one.
+ * Adds a page of older history to the thread without dropping local rows.
+ *
+ * An older page is additive: a row the page does not name is not a deletion.
+ * Both pages came from this device, so the page wins over the row already in
+ * memory, except for media this device has already downloaded. Pending sends
+ * have no sequence and stay at the end.
  */
-export function sameOptimistic(remote: Message, local: Message): boolean {
-  if (remote.mine !== local.mine) return false;
-  if (remote.deleted) return false;
-  if (remote.kind !== local.kind) return false;
-  if ((remote.text || "") !== (local.text || "")) return false;
-  // Image and keyboard picks have no filename until uploadLocalFile derives one
-  // from the temporary file, so only reject when both sides name the file.
-  if (remote.filename && local.filename && remote.filename !== local.filename) {
-    return false;
+export function mergeOlderPage(page: Message[], local: Message[]): Message[] {
+  const byId = new Map<string, Message>();
+  for (const message of local) byId.set(message.id, message);
+  for (const message of page) {
+    const cached = byId.get(message.id);
+    byId.set(message.id, cached ? withLocalMedia(message, cached) : message);
   }
-  const remoteAt = remote.createdAt ? Date.parse(remote.createdAt) : NaN;
-  const localAt = local.createdAt ? Date.parse(local.createdAt) : NaN;
-  if (!Number.isFinite(remoteAt) || !Number.isFinite(localAt)) return false;
-  // Allow a minute of device-clock skew; the server still has to be the later
-  // copy, so an old identical message cannot hide a new optimistic send.
-  return remoteAt >= localAt - 60_000 && remoteAt <= localAt + SERVER_MATCH_WINDOW_MS;
-}
-
-/**
- * Keep local-only bubbles while the server page catches up, and reuse media
- * already downloaded to this device instead of dropping it on every refresh.
- * A cached preview for the chosen width survives too; an empty local preview
- * never replaces the server's copy. Failed bubbles stay because the server
- * page has no copy to replace them.
- */
-export function mergeThread(remote: Message[], local: Message[]): Message[] {
-  const localById = new Map(local.map((message) => [message.id, message]));
-  const merged = remote.map((message) => {
-    const cached = localById.get(message.id);
-    if (!cached) return message;
-    let next = message;
-    const uri = cached.uri?.startsWith("file://") ? cached.uri : message.uri;
-    if (uri && uri !== message.uri) next = { ...next, uri };
-    const previewUri = cached.previewUri || message.previewUri;
-    const previewWidth = cached.previewUri
-      ? (cached.previewWidth ?? message.previewWidth)
-      : message.previewWidth;
-    if (
-      previewUri &&
-      (previewUri !== message.previewUri ||
-        previewWidth !== message.previewWidth)
-    ) {
-      next = { ...next, previewUri, previewWidth };
-    }
-    return next;
-  });
-  const used = new Set<string>();
-  const optimistic = local.filter((message) => {
-    if (isConfirmed(message)) return false;
-    // A failed bubble always stays until the user retries it. Matching it to
-    // an older identical message would make the failure disappear silently.
-    if (message.status === "failed") return true;
-    const match = remote.find(
-      (item) => !used.has(item.id) && sameOptimistic(item, message),
-    );
-    if (match) {
-      used.add(match.id);
-      return false;
-    }
-    return true;
-  });
-  return [...merged, ...optimistic];
-}
-
-/**
- * Keep an unconfirmed inbox row while the server snapshot catches up, but let
- * a newer server message (or a later server timestamp) replace it.
- */
-export function mergeChats(remote: Chat[], local: Chat[]): Chat[] {
-  return remote.map((chat) => {
-    const current = local.find((item) => item.id === chat.id);
-    if (!current || !isPendingStatus(current.lastMessageStatus)) return chat;
-    const serverAt = chat.lastMessageAt ?? 0;
-    const localAt = current.lastMessageAt ?? 0;
-    if (localAt < serverAt) return chat;
-    return {
-      ...chat,
-      preview: current.preview,
-      time: current.time,
-      lastMessageAt: current.lastMessageAt,
-      lastMessageStatus: current.lastMessageStatus,
-    };
-  });
+  const all = [...byId.values()];
+  const confirmed = all
+    .filter(isConfirmed)
+    .sort((a, b) => a.sequence - b.sequence);
+  const pending = all.filter((message) => !isConfirmed(message));
+  return [...confirmed, ...pending];
 }

@@ -1,8 +1,8 @@
 # Convex backend
 
 The app's server lives here: Convex Auth accounts, profiles, devices,
-conversation preferences, message deletes, files, 24-hour stories, the
-`convex-chat` component and the public update feed.
+conversations and their members, conversation preferences, the relay queue,
+files, 24-hour stories and the public update feed.
 
 ## What runs where
 
@@ -12,8 +12,17 @@ conversation preferences, message deletes, files, 24-hour stories, the
 - `profiles.ts` owns the public name, username, bio and uploaded avatar.
   `profiles.ensure` runs once after the first sign-in; `profiles.update` checks
   username uniqueness, renames the auth account and deletes a replaced avatar.
-- `chat.ts` wraps the `convex-chat` component with the app's identity, block
-  rules, message projection, inbox shape, delete-for-me records and forwarding.
+- `conversations.ts` owns conversation creation and the inbox list. A
+  conversation is one `conversations` row (kind, title, direct-chat key and the
+  per-conversation sequence counter) plus one `conversationMembers` row per
+  member; the document id is the conversation id the client passes back.
+  `createDirect` reuses the row with the same `externalKey`, so both sides share
+  one thread, and `createGroup` needs at least one other member.
+- `relay.ts` is the message path: `send`, `react`, `remove`, `pull`, `ack` and
+  the internal `purgeExpired` sweep. Each relayed item is one `relayQueue` row
+  per recipient, holding an envelope and an optional attachment. Membership and
+  block rules live in `lib/relayStore.ts`; a delivered or expired row is deleted
+  and its blob released.
 - `devices.ts` ties an installation's stable SecureStore id to its auth session.
   A device must be registered for 24 hours before it can remove other devices.
 - `preferences.ts` stores mute, block, gallery visibility, cleared history and
@@ -22,9 +31,10 @@ conversation preferences, message deletes, files, 24-hour stories, the
   size must be non-zero and at most 25 MiB, and the declared MIME type must
   match the upload kind. An image upload may also carry up to three rendered
   widths, stored in `mediaVariants` after a per-width size, MIME and dimension
-  check. Message and story media are stored in Convex storage; readers receive
-  signed URLs only through the membership-checked message and story queries,
-  and a variant row keeps the URL resolved when it was written.
+  check. Message media stays in Convex storage only while a relay queue row
+  points at it; readers receive signed URLs through the queue pull and the
+  membership-checked story queries, and a variant row keeps the URL resolved
+  when it was written.
 - `stories.ts` creates, lists, marks and removes stories. The list is capped to
   the newest rows first, and `crons.ts` deletes expired rows hourly, including
   their storage objects, variants and views.
@@ -67,7 +77,8 @@ npx convex dev --once   # deploy and regenerate once, then exit
 ```
 
 Run the app against the same development deployment. Sign up two accounts to
-test contacts, direct chats, groups, presence, blocks and story visibility.
+test contacts, direct chats, groups, blocks, the relay round trip and story
+visibility.
 Media downloads go through Convex storage, so a missing deployment or a
 signed-out session is the first thing to check when the app shows cached data
 but cannot send.

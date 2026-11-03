@@ -50,7 +50,6 @@ export function updateChatPreview(
       ...found,
       preview: update.preview,
       time: update.time,
-      typing: false,
       unread:
         update.mine || update.openChatId === update.id ? 0 : found.unread + 1,
     },

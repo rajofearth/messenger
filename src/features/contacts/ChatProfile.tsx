@@ -165,25 +165,11 @@ export default function ChatProfile({
       </View>
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.hero}>
-          <Avatar
-            uri={chat.avatar}
-            name={chat.name}
-            size={112}
-            online={!chat.group && chat.online}
-          />
+          <Avatar uri={chat.avatar} name={chat.name} size={112} />
           <Text style={[s.name, { color: colors.fg }]}>{chat.name}</Text>
           {!!chat.username && (
             <Text style={[s.label, { color: colors.coralInk }]}>
               @{chat.username.replace(/^@/, "")}
-            </Text>
-          )}
-          {!chat.group && (
-            <Text style={[s.caption, { color: colors.muted }]}>
-              {chat.online
-                ? "Online"
-                : chat.online === false
-                  ? "Offline"
-                  : "Contact"}
             </Text>
           )}
           {!!chat.pinned && (

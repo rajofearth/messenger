@@ -1,90 +1,109 @@
 import {
   useEffect,
-  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
 } from "react";
 import type { Chat, Message, Story } from "../domain/data";
 import { markOwnStories } from "../domain/stories";
-import { mergeChats, mergeThread } from "../domain/threadMerge";
 import { messengerRepository } from "../data/messengerRepository";
 import { prefetchStories } from "../services/mediaCache";
-import { mapChat, mapStory } from "./remoteMessengerTypes";
+import { mapStory } from "./remoteMessengerTypes";
+import {
+  mergeConversations,
+  type RemoteConversation,
+  type RemotePreference,
+} from "./conversationSync";
 
-type RemoteChat = Parameters<typeof mapChat>[0];
 type RemoteStory = Parameters<typeof mapStory>[0];
 
+/**
+ * Re-reads the conversations a relay drain changed. The drain commits to
+ * SQLite itself, so the stored thread is authoritative: it also carries the
+ * outbox rows for sends that have not been confirmed, and a delete has already
+ * removed its row there.
+ */
+export function syncRelayRows(
+  chatIds: string[],
+  setMessages: Dispatch<SetStateAction<Record<string, Message[]>>>,
+  setCachedChats: Dispatch<SetStateAction<Chat[]>>,
+) {
+  for (const chatId of chatIds) {
+    void messengerRepository
+      .loadMessages(chatId)
+      .then((stored) => {
+        setMessages((current) => ({
+          ...current,
+          [chatId]: stored || [],
+        }));
+      })
+      .catch(() => {});
+  }
+  void messengerRepository
+    .loadChats()
+    .then((stored) => {
+      if (!stored) return;
+      // The stored row owns the preview, time and unread count, but a chat the
+      // inbox has not named yet would otherwise lose the name and avatar the
+      // server already told us. Keep that identity until `saveChats` rewrites
+      // the row.
+      setCachedChats((current) => {
+        const known = new Map(current.map((chat) => [chat.id, chat]));
+        return stored.map((chat) => {
+          const previous = known.get(chat.id);
+          if (!previous) return chat;
+          return {
+            ...chat,
+            name: chat.name || previous.name,
+            avatar: chat.avatar || previous.avatar,
+            username: chat.username ?? previous.username,
+            bio: chat.bio ?? previous.bio,
+          };
+        });
+      });
+    })
+    .catch(() => {});
+}
+
 type Args = {
-  remoteChats: RemoteChat[] | undefined;
+  remoteChats: RemoteConversation[] | undefined;
+  remotePreferences: RemotePreference[] | undefined;
   remoteStories: RemoteStory[] | undefined;
-  remoteThread: Message[] | undefined;
-  selected: string | null;
-  conversationVisible: boolean;
   selfId?: string;
   chatsRef: MutableRefObject<Chat[]>;
   storiesRef: MutableRefObject<Story[]>;
   setCachedChats: Dispatch<SetStateAction<Chat[]>>;
   setStories: Dispatch<SetStateAction<Story[]>>;
-  setMessages: Dispatch<SetStateAction<Record<string, Message[]>>>;
-  markReadThrough: (args: {
-    conversationId: string;
-    sequence: number;
-  }) => Promise<unknown>;
 };
 
 /**
  * Copies live Convex data into the device cache and prefetches the first few
- * story images. A thread that has never been opened falls back to its disk
- * copy until the network query answers.
+ * story images. Conversations only contribute identity and membership: the
+ * preview, the unread count and the order stay local, because the phone owns
+ * the history.
  */
 export function useRemoteServerSync({
   remoteChats,
+  remotePreferences,
   remoteStories,
-  remoteThread,
-  selected,
-  conversationVisible,
   selfId,
   chatsRef,
   storiesRef,
   setCachedChats,
   setStories,
-  setMessages,
-  markReadThrough,
 }: Args) {
-  const lastRead = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!selected || !conversationVisible || !remoteThread) return;
-    const sequence = remoteThread[remoteThread.length - 1]?.sequence;
-    if (!sequence) return;
-    const marker = `${selected}:${sequence}`;
-    if (lastRead.current === marker) return;
-    lastRead.current = marker;
-    setCachedChats((current) =>
-      current.map((item) =>
-        item.id === selected ? { ...item, unread: 0 } : item,
-      ),
+    if (!remoteChats || !remotePreferences) return;
+    const next = mergeConversations(
+      remoteChats,
+      remotePreferences,
+      chatsRef.current,
+      selfId,
     );
-    void markReadThrough({ conversationId: selected, sequence }).catch(() => {});
-  }, [
-    conversationVisible,
-    markReadThrough,
-    remoteThread,
-    selected,
-    setCachedChats,
-  ]);
-
-  useEffect(() => {
-    if (!remoteChats) return;
-    // The server snapshot is the only version that may reach disk. The merged
-    // view keeps a pending local row on screen until the inbox catches up.
-    const confirmed = remoteChats.map(mapChat);
-    const next = mergeChats(confirmed, chatsRef.current);
     chatsRef.current = next;
     setCachedChats(next);
-    void messengerRepository.saveChats(confirmed).catch(() => {});
-  }, [chatsRef, remoteChats, setCachedChats]);
+    void messengerRepository.saveChats(next).catch(() => {});
+  }, [chatsRef, remoteChats, remotePreferences, selfId, setCachedChats]);
 
   useEffect(() => {
     if (!remoteStories) return;
@@ -111,24 +130,4 @@ export function useRemoteServerSync({
       active = false;
     };
   }, [remoteStories, selfId, setStories, storiesRef]);
-
-  useEffect(() => {
-    if (!selected) return;
-    let active = true;
-    void messengerRepository
-      .loadMessages(selected)
-      .then((stored) => {
-        if (!active || remoteThread) return;
-        // The disk copy holds confirmed rows only; merge so the outbox bubbles
-        // hydrated at startup stay on screen while the network is away.
-        setMessages((current) => ({
-          ...current,
-          [selected]: mergeThread(stored || [], current[selected] || []),
-        }));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [remoteThread, selected, setMessages]);
 }

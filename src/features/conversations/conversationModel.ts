@@ -55,8 +55,8 @@ export function deleteOptions(
       style: "destructive" as const,
       onPress: () => onDelete(message.id, false),
     },
-    // A local-only bubble has no server revision yet, so "everyone" cannot
-    // work and would only surface an avoidable error.
+    // A local-only bubble has no confirmed server row yet, so "everyone"
+    // cannot work and would only surface an avoidable error.
     ...(message.mine && !message.status
       ? [
           {

@@ -9,6 +9,8 @@ export type Call = {
   /** Session id shared with the system notification, never a contact id. */
   id: string;
   chat: Chat;
+  peerId: string;
+  initiator: boolean;
   video: boolean;
   status: "calling" | "incoming" | "active";
   seconds: number;
@@ -17,17 +19,12 @@ export type Call = {
   muted: boolean;
   speaker: boolean;
 };
-export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
+export function useCalls(
+  onEnded: (record: RemoteCallRecord) => void,
+  selfId?: string,
+) {
   const [call, setCall] = useState<Call | null>(null);
   const [full, setFull] = useState(false);
-  useEffect(() => {
-    if (call?.status !== "calling") return;
-    const timer = setTimeout(
-      () => setCall((current) => connect(current)),
-      2500,
-    );
-    return () => clearTimeout(timer);
-  }, [call?.status]);
   useEffect(() => {
     if (call?.status !== "active") return;
     const timer = setInterval(
@@ -41,6 +38,8 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
     );
     return () => clearInterval(timer);
   }, [call?.status]);
+  // The WebView engine reports the actual connection. The old timer made a
+  // call look connected even when no peer had answered.
   /**
    * `resume` continues a call that a system notification already announced, so
    * the engine and the notification use the same session id after a cold start.
@@ -49,7 +48,7 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
     chat: Chat,
     video: boolean,
     incoming = false,
-    resume?: { id: string },
+    resume?: { id?: string; peerId?: string },
   ) {
     if (call) {
       setFull(true);
@@ -58,6 +57,9 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
     setCall({
       id: resume?.id ?? remoteUid(),
       chat,
+      peerId:
+        resume?.peerId || chat.memberIds?.find((id) => id !== selfId) || "",
+      initiator: !incoming,
       video,
       status: incoming ? "incoming" : "calling",
       seconds: 0,
@@ -67,8 +69,13 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
     setFull(!incoming);
   }
   function answer() {
-    setCall((current) => connect(current));
+    setCall((current) =>
+      current ? { ...current, status: "calling", initiator: false } : current,
+    );
     setFull(true);
+  }
+  function connected() {
+    setCall((current) => connect(current));
   }
   function setMuted(value: boolean) {
     setCall((current) => (current ? { ...current, muted: value } : current));
@@ -79,7 +86,7 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
   function end() {
     if (!call) return;
     onEnded({
-      id: remoteUid(),
+      id: call.id,
       chat: call.chat,
       video: call.video,
       seconds: call.seconds,
@@ -89,7 +96,7 @@ export function useCalls(onEnded: (record: RemoteCallRecord) => void) {
     setCall(null);
     setFull(false);
   }
-  return { call, full, setFull, start, answer, end, setMuted, setSpeaker };
+  return { call, full, setFull, start, answer, connected, end, setMuted, setSpeaker };
 }
 /** Answering and the simulated connect both produce a connected call. */
 function connect(current: Call | null): Call | null {

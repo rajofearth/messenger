@@ -1,19 +1,24 @@
 import { ConvexError, v } from "convex/values";
-import { components } from "./_generated/api";
 import { mutation, query } from "./_generated/server";
+import { isMember } from "./lib/conversations";
 import { requireUser } from "./lib/identity";
 
 async function member(ctx: Parameters<typeof requireUser>[0], conversationId: string) {
   const actor = await requireUser(ctx);
-  const access = await ctx.runQuery(
-    components.chat.conversations.getMemberAccess,
-    {
-      scopeId: actor.scopeId,
-      conversationId,
-      subjectId: actor.subjectId,
-    },
-  );
-  if (access.access === "none") throw new ConvexError("CHAT_NOT_FOUND");
+  const conversationKey = ctx.db.normalizeId("conversations", conversationId);
+  const rows = conversationKey
+    ? await ctx.db
+        .query("conversationMembers")
+        .withIndex("by_conversation", (q) =>
+          q.eq("conversationId", conversationKey),
+        )
+        .collect()
+    : [];
+  // A preference row is only meaningful for a member, and a forged id must get
+  // the same answer as a conversation the caller was never part of.
+  if (!isMember(rows.map((row) => row.subjectId), actor.subjectId)) {
+    throw new ConvexError("CHAT_NOT_FOUND");
+  }
   return actor;
 }
 

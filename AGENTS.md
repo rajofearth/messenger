@@ -6,10 +6,11 @@ changing anything; it is short on purpose.
 ## The project
 
 Messenger is a local-first Android app built with Expo SDK 57 and React Native
-0.86, released as one arm64-v8a APK of about 14.2 MiB. The client is
+0.86, released as one arm64-v8a APK of about 13.7 MiB. The client is
 backend-ready: screens read through one typed repository
-(`src/data/messengerRepository.ts`) and one cache, and `src/domain` is pure.
-Read `docs/ARCHITECTURE.md` and `docs/PERFORMANCE.md` before touching code;
+(`src/data/messengerRepository.ts`) backed by local SQLite, and `src/domain` is
+pure. Read `docs/ARCHITECTURE.md` and `docs/PERFORMANCE.md` before touching code;
+`docs/RELAY.md` holds the live relay scope, phase order and decision log;
 `CONTRIBUTING.md` has setup, code rules and pull-request expectations.
 
 The standing bias is smaller and faster: when two designs are close, pick the

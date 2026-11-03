@@ -170,16 +170,11 @@ export default function NewConversationScreen({
         renderItem={({ item: chat }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${chat.name}${chat.online ? ", online" : ""}`}
+            accessibilityLabel={chat.name}
             onPress={() => onSelect(chat)}
             style={({ pressed }) => [s.row, pressed && s.pressed]}
           >
-            <View style={s.avatarWrap}>
-              <Avatar uri={chat.avatar} name={chat.name} size={52} />
-              {chat.online && (
-                <View style={[s.online, { borderColor: colors.bg }]} />
-              )}
-            </View>
+            <Avatar uri={chat.avatar} name={chat.name} size={52} />
             <Text style={[s.name, { color: colors.text }]}>{chat.name}</Text>
           </Pressable>
         )}
@@ -260,17 +255,6 @@ const s = StyleSheet.create({
     paddingBottom: 8,
   },
   sectionLabel: { fontFamily: "DMSans_700Bold", fontSize: 14 },
-  avatarWrap: { width: 52, height: 52 },
-  online: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 3,
-    backgroundColor: "#84A98C",
-  },
   empty: {
     textAlign: "center",
     paddingVertical: 40,

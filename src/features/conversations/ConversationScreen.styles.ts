@@ -23,14 +23,6 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  typing: {
-    borderRadius: 19,
-    borderBottomLeftRadius: 5,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    alignSelf: "flex-start",
-    marginTop: 12,
-  },
   composer: {
     flexDirection: "row",
     alignItems: "center",

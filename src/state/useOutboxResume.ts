@@ -13,7 +13,7 @@ const RETRY_LIMIT = 3;
 const RETRY_INTERVAL_MS = 30_000;
 
 /**
- * Resumes unsent outbox rows once the local cache is ready: immediately, when
+ * Resumes unsent outbox rows once the local database is ready: immediately, when
  * the app returns to the foreground, when the Convex socket reconnects, and
  * every 30 seconds while it stays active. Automatic attempts are capped per
  * message so a permanent failure (file too large, source gone) does not retry

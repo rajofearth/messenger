@@ -4,6 +4,7 @@ import React from 'react';
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
 
 import App from './App';
+import { registerBackgroundWake } from './src/services/backgroundWake';
 import { convexClient, secureTokenStorage } from './src/services/convexClient';
 
 function Root() {
@@ -16,6 +17,11 @@ function Root() {
     },
   );
 }
+
+// Registering the wake task happens at module scope, fire-and-forget: the OS
+// loads this bundle with no views mounted, and a failure only means no
+// background wakes.
+void registerBackgroundWake().catch(() => {});
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,
