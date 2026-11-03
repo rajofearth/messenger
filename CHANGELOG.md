@@ -10,6 +10,12 @@ and this project adheres to
 
 ### Added
 
+- Background notifications now complete the local delivery path: an opaque FCM
+  wake authenticates with the stored Convex session, drains and commits relay
+  envelopes before acknowledging them, then posts MessagingStyle notifications
+  from SQLite. Call invites wake the same path and rebuild an incoming CallStyle
+  notification from short-lived signaling; no message or call content is placed
+  in FCM. Force-stopped apps still wait for Android to allow delivery.
 - Direct 1:1 calls now use an owned Android WebView `RTCPeerConnection` with
   `getUserMedia`, local/remote media tracks, mute, camera flip and short-lived
   Convex SDP/ICE signaling. The call UI remains unchanged at the app boundary;

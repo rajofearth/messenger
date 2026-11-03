@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { requireUser } from "./lib/identity";
@@ -57,6 +58,14 @@ export const sendSignal = mutation({
       createdAt: now,
       expiresAt: now + SIGNAL_TTL_MS,
     });
+    if (args.kind === "invite") {
+      // The payload remains opaque. The recipient fetches the signal and builds
+      // the native incoming-call notification locally.
+      await ctx.scheduler.runAfter(0, internal.push.wakeUser, {
+        userId: args.toUserId,
+        queueId: `call:${args.callId}`,
+      });
+    }
   },
 });
 

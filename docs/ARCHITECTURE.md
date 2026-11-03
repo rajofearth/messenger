@@ -302,7 +302,7 @@ Notification replies use `notice-<actionId>` as the client message id. `relay.se
 
 ## Deliberate non-goals and known limitations
 
-- **Push wakes are not a delivery path.** FCM carries an opaque wake, and the running app answers it by draining the relay. A killed app records the wake but cannot drain, because the headless task has no Convex auth session; delivery waits for the app to open. Android force-stop suppresses even the wake. Setup and the wire contract are in `docs/PUSH.md`.
+- **Push wakes carry no content.** FCM carries an opaque wake. The headless task reads the deployment-scoped auth JWT, drains the relay after the SQLite commit, and builds message notifications from local rows; if auth has expired, foreground refresh retries it. Call invites use the same wake and rebuild an incoming CallStyle notification from short-lived `callSignals`. Android force-stop still suppresses the wake. Setup and the wire contract are in `docs/PUSH.md`.
 - **No presence, typing or read receipts.** Online status, typing indicators and read receipts are not part of this build; Settings says so. Unread counts are local.
 - **History lives on one phone.** A delivered message is deleted from the server, so a second device starts empty and a reinstall or Clear data loses history until the parked Drive backup ships. Settings warns about this.
 - **Calls use a WebView engine.** `CallWebView` owns `getUserMedia` and `RTCPeerConnection`; `convex/calls.ts` stores only short-lived SDP/ICE signaling envelopes, never media. The existing call UI remains the owner of controls and history. Native audio routing, foreground-service survival, PiP and Telecom integration are still deferred; group calls remain disabled.

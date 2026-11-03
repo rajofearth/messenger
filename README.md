@@ -201,7 +201,7 @@ The two feeds are separate. Production's `releases` rows live on the production 
 
 ## Known limitations
 
-- Push wakes arrive through FCM, but they do not deliver messages. A killed app records the wake and drains when it next opens, because the headless task has no Convex auth session; Android force-stop suppresses the wake entirely.
+- Push wakes arrive through FCM without message content. A killed/background app uses its stored deployment-scoped auth session to drain the relay and build a local notification; call invites rebuild an incoming call notification from short-lived signaling. Expired sessions wait for foreground refresh, and Android force-stop suppresses the wake entirely.
 - Calls use a WebView WebRTC engine and short-lived Convex signaling, but there is not yet a native audio route, foreground service, PiP or Telecom integration. Group calls are intentionally unavailable.
 - History lives on one phone. A delivered message is deleted from the server, so a second device starts empty, and reinstalling or clearing app data loses history. Presence, typing indicators and read receipts are not implemented.
 - The app stores its local history unencrypted. There is no end-to-end encryption, and signing out deletes this device's local copy so the next account cannot read it.

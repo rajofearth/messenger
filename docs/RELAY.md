@@ -51,6 +51,8 @@ next to the account section.
 4. A queue row is an envelope, not a payload. Convex caps a document at 1 MiB, so
    envelopes stay under 64 KiB and bytes live in `_storage`.
 5. A push payload carries an opaque wake only: no sender, no preview, no text.
+   The authenticated headless task uses that wake to pull, commit and notify;
+   the payload itself never becomes a notification.
 6. Large files do not create a queue entry they cannot satisfy.
 7. Delete-for-me and clear-chat are durable local tombstones; a stale relay row
    can never revive a row the user removed.
@@ -119,12 +121,12 @@ on first launch because `PRAGMA user_version` no longer matches.
 
 ## 6. Known gaps
 
-1. A killed app cannot drain or notify. The headless task has no Convex auth
-   session, so a wake records itself and delivery waits for the app to open; the
-   notification is posted by the running app in the same pass, which means a
-   swiped-away Messenger shows nothing until it is opened again. Wakes cut
-   latency only while the app is alive. The fix needs a headless drain that can
-   refresh the Convex session without a UI, which is a separate design pass.
+1. A force-stopped app cannot drain or notify because Android suppresses its
+   FCM delivery. In the ordinary killed/background case the headless task now
+   reads the deployment-scoped auth JWT, drains after the SQLite commit, and
+   builds the local message notification. Expired auth waits for the next
+   foreground refresh. Call invites use the same opaque wake and rebuild their
+   incoming CallStyle notification from the short-lived signal table.
 2. One history device per account. A second device starts empty.
 3. An op that arrives before its target message is applied once and not retried.
 4. Groups are create-only: no add, remove, leave or rename.
