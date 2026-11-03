@@ -209,6 +209,13 @@ and this project adheres to
   fails, or leaks its spinner into the next chat. A failure now shows "Couldn't
   load older messages. Tap to retry." with a polite accessibility announcement.
 
+The reliability development APK `0.1.1-dev.20261031.193255`
+(`dev-1793455375`) is 14,047,519 bytes (13.40 MiB), 3,968 bytes (+0.03%) above
+the cleanup build and 2.60 MiB under the 16 MiB gate. The delta is JavaScript
+only: no dependency and no native library changed, the dex stays 8.71 MiB, the
+bundle 2.38 MiB, and the APK keeps one ABI and 19 native libraries. The dev gate
+passed all 11 checks. See `docs/PERFORMANCE.md`.
+
 The stacked A2/A3/C3 local gate build is 12,702,235 bytes (12.11 MiB),
 458,828 bytes (-3.5%) below the 13,161,063-byte R8 build and 3.89 MiB below
 the 16 MiB gate. The Ionicons subset accounts for 194,822 stored bytes; the

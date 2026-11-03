@@ -4,11 +4,15 @@ This file records what was changed for size and runtime, why, and how to re-meas
 
 ## APK size
 
-The current development build (relay queue with the pre-decision architecture
-removed) is **14,043,551 bytes (13.39 MiB)**, 2.61 MiB below the 16 MiB gate and
-1.61 MiB below the 15 MiB shipping line. It is a development APK, so the gate
-runs with `--variant dev`, which expects the dev package and version; all 11
-checks pass.
+The current development build (relay reliability, notification permission and
+upload compression) is **14,047,519 bytes (13.40 MiB)**, 2.60 MiB below the
+16 MiB gate and 1.60 MiB below the 15 MiB shipping line. It is up **3,968 bytes
+(+0.03%)** from the 2026-10-30 cleanup build, which is JavaScript only: the
+notification-permission request, the inbox placeholder row, the prepared WebP
+upload path and the guarded blob delete add no dependency and no native library.
+The dex (8.71 MiB), the 19 native libraries and the stored 2.38 MiB bundle are
+unchanged in shape. It is a development APK, so the gate runs with `--variant
+dev`, which expects the dev package and version; all 11 checks pass.
 The per-change numbers are under "Measured APK size"; the historical narrative
 follows.
 
@@ -249,6 +253,7 @@ Each figure is the same working tree, the same Expo config and the same
 | Push wake build (FCM sends, device token registry, data-only wake; dev variant) | 14,047,423 bytes (13.40 MiB) | **+429,911 bytes, +3.2%** against the C4b build, -67.7% overall |
 | Relay build (queue, acknowledgements, 30-day purge, Settings warning; dev variant) | 14,074,187 bytes (13.42 MiB) | **+26,764 bytes, +0.19%** against the push build, -67.7% overall |
 | Cleanup build (component, migrations, presence, typing, read receipts, server paging, dead thread helpers and the web tester removed; dev variant) | 14,043,551 bytes (13.39 MiB) | **-30,636 bytes, -0.22%** against the relay build, -67.7% overall |
+| Reliability build (inbox placeholder for drained messages, notification permission request, WebP upload compression, guarded blob delete; dev variant) | 14,047,519 bytes (13.40 MiB) | **+3,968 bytes, +0.03%** against the cleanup build, -67.7% overall |
 
 The v0.0.1 APK published on the GitHub release is 35,632,330 bytes; the four
 byte difference from the local build of the same commit is build-to-build
