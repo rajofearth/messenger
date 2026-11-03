@@ -78,6 +78,92 @@ function deleteQuietly(file: File) {
   }
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isMessageKind(value: unknown): value is NonNullable<Message["kind"]> {
+  return value === "image" || value === "video" || value === "audio" || value === "file";
+}
+
+function isMessage(value: unknown): value is Message {
+  if (!isObject(value)) return false;
+  const message = value as Partial<Message>;
+  if (
+    typeof message.id !== "string" ||
+    message.id.length === 0 ||
+    message.mine !== true ||
+    typeof message.time !== "string"
+  ) {
+    return false;
+  }
+  if (message.text !== undefined && typeof message.text !== "string") return false;
+  if (message.kind !== undefined && !isMessageKind(message.kind)) return false;
+  if (message.forwarded !== undefined && typeof message.forwarded !== "boolean") return false;
+  if (message.deleted !== undefined && typeof message.deleted !== "boolean") return false;
+  if (message.createdAt !== undefined && typeof message.createdAt !== "string") return false;
+  if (message.albumId !== undefined && typeof message.albumId !== "string") return false;
+  if (message.mimeType !== undefined && typeof message.mimeType !== "string") return false;
+  if (message.uri !== undefined && typeof message.uri !== "string") return false;
+  if (message.previewUri !== undefined && typeof message.previewUri !== "string") return false;
+  if (message.filename !== undefined && typeof message.filename !== "string") return false;
+  if (message.storageId !== undefined && typeof message.storageId !== "string") return false;
+  if (message.width !== undefined && !isFiniteNumber(message.width)) return false;
+  if (message.height !== undefined && !isFiniteNumber(message.height)) return false;
+  if (message.duration !== undefined && !isFiniteNumber(message.duration)) return false;
+  if (message.sequence !== undefined && !isFiniteNumber(message.sequence)) return false;
+  if (message.revision !== undefined && !isFiniteNumber(message.revision)) return false;
+  if (message.previewWidth !== undefined && !isFiniteNumber(message.previewWidth)) return false;
+  if (
+    message.uploadProgress !== undefined &&
+    (!isFiniteNumber(message.uploadProgress) ||
+      message.uploadProgress < 0 ||
+      message.uploadProgress > 1)
+  ) {
+    return false;
+  }
+  if (
+    message.status !== undefined &&
+    !["sending", "sent", "failed"].includes(message.status)
+  ) {
+    return false;
+  }
+  if (message.reaction !== undefined && typeof message.reaction !== "string") return false;
+  if (message.replyTo !== undefined) {
+    const reply = message.replyTo;
+    if (
+      !isObject(reply) ||
+      typeof reply.id !== "string" ||
+      typeof reply.text !== "string" ||
+      typeof reply.mine !== "boolean" ||
+      (reply.kind !== undefined && !isMessageKind(reply.kind))
+    ) {
+      return false;
+    }
+  }
+  if (message.variants !== undefined) {
+    if (
+      !Array.isArray(message.variants) ||
+      !message.variants.every(
+        (variant) =>
+          isObject(variant) &&
+          typeof variant.name === "string" &&
+          isFiniteNumber(variant.width) &&
+          isFiniteNumber(variant.height) &&
+          typeof variant.uri === "string" &&
+          (variant.mimeType === undefined || typeof variant.mimeType === "string"),
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Copies a picked file into app documents before it is uploaded and points the
  * bubble at that copy. Bytes are kept unchanged: no transcode, no re-encode.
@@ -106,6 +192,10 @@ export async function keepOutgoingCopy(
     if (uri.startsWith(Paths.document.uri)) return message;
     try {
       await source.copy(destination);
+      if (!destination.exists || destination.size <= 0) {
+        deleteQuietly(destination);
+        return null;
+      }
     } catch {
       deleteQuietly(destination);
       return null;
@@ -140,15 +230,32 @@ function put(chatId: string, message: Message) {
   return queueWrite();
 }
 
-/** Shape guard for a persisted row: a chat id and a message id are required. */
+/** Shape guard for a persisted row: only complete outgoing messages are used. */
 function isOutboxRecord(value: unknown): value is OutboxRecord {
-  if (!value || typeof value !== "object") return false;
+  if (!isObject(value)) return false;
   const record = value as Partial<OutboxRecord>;
   return (
     typeof record.chatId === "string" &&
-    !!record.message &&
-    typeof record.message.id === "string"
+    record.chatId.length > 0 &&
+    isMessage(record.message)
   );
+}
+
+function mergeOutbox(
+  stored: readonly unknown[],
+  queued: readonly OutboxRecord[],
+): OutboxRecord[] {
+  const merged = new Map<string, OutboxRecord>();
+  for (const value of stored) {
+    if (!isOutboxRecord(value)) continue;
+    if (!merged.has(value.message.id)) merged.set(value.message.id, value);
+  }
+  // A row queued in this process is newer than any persisted copy.
+  for (const record of queued) {
+    merged.delete(record.message.id);
+    merged.set(record.message.id, record);
+  }
+  return [...merged.values()];
 }
 
 /**
@@ -158,19 +265,16 @@ function isOutboxRecord(value: unknown): value is OutboxRecord {
  * cannot inherit the previous one's pending sends.
  */
 export async function loadOutbox(): Promise<OutboxRecord[]> {
+  const startedIn = generation;
   try {
     const stored = await messengerRepository.loadOutbox();
-    // A row queued during the read is newer than the stored copy.
-    const queued = records ?? [];
-    const queuedIds = new Set(queued.map((record) => record.message.id));
-    const valid = Array.isArray(stored)
-      ? stored.filter(isOutboxRecord)
-      : [];
-    records = [
-      ...valid.filter((record) => !queuedIds.has(record.message.id)),
-      ...queued,
-    ];
+    // Sign-out invalidates a read that started under the previous account.
+    if (startedIn !== generation) return records ?? [];
+    records = mergeOutbox(Array.isArray(stored) ? stored : [], records ?? []);
     loaded = true;
+    // Persist the complete merge so rows not in an in-flight write survive a
+    // relaunch.
+    await queueWrite();
   } catch {
     // A failed read must not drop sends already queued in this session.
     records ??= [];
@@ -194,9 +298,11 @@ export function outboxLoaded(): boolean {
  */
 export async function clearOutbox(): Promise<void> {
   generation += 1;
-  records = null;
+  records = [];
   loaded = false;
-  await writes.catch(() => undefined);
+  // Wait for prior snapshots, then persist the invalidated empty queue before
+  // unregister/signOut can let another account use this installation.
+  await queueWrite();
 }
 
 /**
@@ -214,7 +320,7 @@ export function outboxGeneration(): number {
  * must not inherit the previous one's pending sends.
  */
 export function initializeOutbox(stored: readonly OutboxRecord[]) {
-  records = [...stored];
+  records = mergeOutbox(stored, []);
 }
 
 export function outboxSnapshot(): OutboxRecord[] {

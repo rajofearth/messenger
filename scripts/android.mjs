@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { devMappingPath } from "./dev-artifact.mjs";
 import { pruneExtraDensities } from "./prune-densities.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -316,7 +317,9 @@ if (action === "install") {
           "a minified dev APK cannot be published without its mapping",
       );
     }
-    const mapping = path.join(root, "artifacts", "messenger-dev-mapping.txt");
+    // Keep the mapping as an immutable sidecar keyed to the exact APK bytes.
+    // A later build with the same version code cannot overwrite this file.
+    const mapping = devMappingPath(root, versionCode, apkSha256);
     copyFileSync(gradleMapping, mapping);
     const mappingBytes = statSync(mapping).size;
     const mappingSha256 = createHash("sha256").update(readFileSync(mapping)).digest("hex");
@@ -332,6 +335,8 @@ if (action === "install") {
       mapping,
       mappingBytes,
       mappingSha256,
+      mappingApkSha256: apkSha256,
+      mappingVersionCode: versionCode,
       builtAt: new Date().toISOString(),
     };
     writeFileSync(

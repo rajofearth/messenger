@@ -64,8 +64,18 @@ function saveConfirmedThread(chatId: string, confirmed: Message[]) {
     .then(async () => {
       const stored = (await messengerRepository.loadMessages(chatId)) ?? [];
       const merged = new Map(stored.map((item) => [item.id, item]));
-      // The in-memory copy is newer, so it wins on a duplicate id.
-      for (const item of confirmed) merged.set(item.id, item);
+      // The current confirmation wins at the same sequence, but a stale
+      // in-memory row must not replace a newer cached version of that id.
+      for (const item of confirmed) {
+        const cached = merged.get(item.id);
+        if (
+          cached?.sequence !== undefined &&
+          cached.sequence > (item.sequence ?? Number.NEGATIVE_INFINITY)
+        ) {
+          continue;
+        }
+        merged.set(item.id, item);
+      }
       const rows = [...merged.values()]
         .filter((item) => isConfirmed(item))
         .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));

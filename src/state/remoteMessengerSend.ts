@@ -101,7 +101,9 @@ export function createRemoteSend({
 
   async function deliverText(chatId: string, message: Message) {
     try {
-      await rememberOutgoing(chatId, message);
+      const startedIn = outboxGeneration();
+      await rememberOutgoing(chatId, message, startedIn);
+      if (startedIn !== outboxGeneration()) return;
       const view = await sendText({
         conversationId: chatId,
         clientMessageId: message.id,

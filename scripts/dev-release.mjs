@@ -14,6 +14,7 @@ import { copyFileSync, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { releaseProblem } from "../convex/lib/manifest.ts";
+import { validateDevMappingBinding } from "./dev-artifact.mjs";
 import { buildManifest, normalizeReleaseNotes } from "./update-manifest.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -106,6 +107,8 @@ for (const field of [
   "mapping",
   "mappingBytes",
   "mappingSha256",
+  "mappingApkSha256",
+  "mappingVersionCode",
 ]) {
   if (metadata[field] === undefined || metadata[field] === null || metadata[field] === "") {
     throw new Error(`artifacts/messenger-dev.json has no ${field}`);
@@ -123,6 +126,7 @@ const apkSha256 = createHash("sha256").update(readFileSync(apkPath)).digest("hex
 if (apkBytes !== metadata.apkBytes || apkSha256 !== metadata.apkSha256) {
   throw new Error("the dev APK changed after it was built; rebuild before publishing");
 }
+validateDevMappingBinding(root, metadata);
 const mappingPath = path.resolve(metadata.mapping);
 if (!existsSync(mappingPath)) {
   throw new Error(

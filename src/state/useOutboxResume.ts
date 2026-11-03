@@ -33,7 +33,7 @@ export function useOutboxResume(
   // in-flight set would miss the committed callback's retries.
   useEffect(() => {
     retry.current = retryMessage;
-  });
+  }, [retryMessage]);
 
   useEffect(() => {
     if (!localReady) return;
